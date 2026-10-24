@@ -1,7 +1,7 @@
 import { animateShot, flyBall, getShotStyle, landPlayers } from "./replay-shots.js";
 
 const SLOT_ORDER = ["PG", "SG", "SF", "PF", "C"];
-const FORMATION = [[63, 25], [72, 8], [74, 42], [80, 17], [82, 32]];
+const FALLBACK_SPACING = [[62, 25], [70, 10], [73, 40], [79, 17], [83, 31]];
 
 export function clockSeconds(clock) {
 	const match = clock.match(/^PT(?:(\d+)M)?([\d.]+)S$/);
@@ -91,9 +91,14 @@ function planMatchups(scenes, index, offense, state, data) {
 	const defense = state.lineups[otherTeam(data, offense)];
 	const assignments = {};
 	const assigned = new Set();
+	const contacts = [];
+	let rebounderId = null;
 	for (let i = index; i < scenes.length; i++) {
 		const scene = scenes[i];
 		const action = scene.action;
+		if (scene.kind === "rebound" && action.teamId !== offense) {
+			rebounderId = defense.includes(action.personId) ? action.personId : null;
+		}
 		if (
 			(scene.kind === "rebound" && action.teamId !== offense) ||
 			(scene.kind === "period" && action.subType === "end") ||
@@ -118,10 +123,35 @@ function planMatchups(scenes, index, offense, state, data) {
 		) {
 			assignments[defender] = attacker;
 			assigned.add(attacker);
+			contacts.push({ defender, attacker, actionNumber: action.actionNumber });
 		}
 		if (scene.kind === "turnover" || (["2pt", "3pt"].includes(scene.kind) && action.shotResult === "Made")) {
 			break;
 		}
+	}
+	let reboundMatchup = null;
+	if (rebounderId) {
+		const constrained = assignments[rebounderId] !== undefined;
+		if (!constrained) {
+			const available = attack.filter((id) => !assigned.has(id));
+			const direction = attackDirection(data, offense, scenes[index].action.period);
+			const points = attack.map((id, slot) =>
+				state.formation?.offense === offense && state.formation.period === scenes[index].action.period
+					? state.formation.slots[slot]
+					: [direction === 1 ? state.positions[id].x : 94 - state.positions[id].x, state.positions[id].y]
+			);
+			const nearest = available.reduce((best, id) => {
+				const point = points[attack.indexOf(id)];
+				const other = points[attack.indexOf(best)];
+				return Math.hypot(point[0] - 88.75, point[1] - 25) <
+						Math.hypot(other[0] - 88.75, other[1] - 25)
+					? id
+					: best;
+			});
+			assignments[rebounderId] = nearest;
+			assigned.add(nearest);
+		}
+		reboundMatchup = { defender: rebounderId, attacker: assignments[rebounderId], constrained };
 	}
 	defense.forEach((id, slot) => {
 		if (!assignments[id]) {
@@ -130,12 +160,144 @@ function planMatchups(scenes, index, offense, state, data) {
 			assigned.add(attacker);
 		}
 	});
-	return assignments;
+	return { assignments, contacts, reboundMatchup };
 }
 
-function placeFormation(state, offense, direction, matchups, data) {
+function planFormation(replay, index, offense, direction, lineup, state) {
+	let evidence = null;
+	let evidenceIndex = -1;
+	for (let i = index; i < replay.scenes.length; i++) {
+		const candidate = replay.scenes[i];
+		if (
+			candidate.action.period !== replay.scenes[index].action.period ||
+			(candidate.kind === "rebound" && candidate.action.teamId !== offense) ||
+			(["2pt", "3pt", "turnover", "freethrow"].includes(candidate.kind) && candidate.action.teamId !== offense)
+		) {
+			break;
+		}
+		if (["2pt", "3pt"].includes(candidate.kind)) {
+			evidence = candidate.action;
+			evidenceIndex = i;
+			break;
+		}
+		if (candidate.kind === "turnover") {
+			break;
+		}
+	}
+	const carried = lineup.map((id) => {
+		const position = state.positions[id];
+		return [direction === 1 ? position.x : 94 - position.x, position.y];
+	});
+	const center = carried.reduce((sum, [x]) => sum + x, 0) / carried.length;
+	const advance = Math.max(0, 71 - center);
+	const slots = state.formation
+		? carried.map(([x, y]) => [Math.max(55, Math.min(89, x + advance)), Math.max(4, Math.min(46, y))])
+		: FALLBACK_SPACING.map((point) => point.slice());
+	const origins = slots.map((point) => point.slice());
+	const shooterSlot = evidence ? lineup.indexOf(evidence.personId) : -1;
+	const assistSlot = evidence ? lineup.indexOf(evidence.assistPersonId) : -1;
+	const style = evidence && getShotStyle(evidence);
+	const shot = evidence
+		? { x: direction === 1 ? evidence.x * 0.94 : 94 - evidence.x * 0.94, y: evidence.y * 0.5 }
+		: null;
+	let interiorSlot = -1;
+	// Plan only the space needed by the recorded finish; no template implies a real set play.
+	if (shot) {
+		const side = Math.sign(shot.y - 25) || 1;
+		if (shooterSlot >= 0) {
+			const approach = style.running
+				? 12
+				: style.driving || style.cutting || style.pullup || style.alleyOop
+				? 7
+				: style.family === "layup" || style.family === "dunk"
+				? 4
+				: 0;
+			slots[shooterSlot] = [Math.max(54, Math.min(89, shot.x - approach)), Math.max(4, Math.min(46, shot.y))];
+		}
+		if (assistSlot >= 0 && assistSlot !== shooterSlot) {
+			const [x, y] = origins[assistSlot];
+			const dx = x - shot.x;
+			const dy = y - shot.y;
+			const distance = Math.hypot(dx, dy);
+			const length = Math.max(11, Math.min(19, distance));
+			slots[assistSlot] = [
+				Math.max(56, Math.min(84, shot.x + (distance > 0.1 ? dx / distance : -1) * length)),
+				Math.max(5, Math.min(45, shot.y + (distance > 0.1 ? dy / distance : -side * 0.5) * length)),
+			];
+		}
+		const rebound = replay.scenes[evidenceIndex + 1];
+		const rebounderSlot = rebound?.kind === "rebound" && rebound.action.teamId === offense
+			? lineup.indexOf(rebound.action.personId)
+			: -1;
+		const available = lineup.map((_, slot) => slot).filter((slot) => slot !== shooterSlot && slot !== assistSlot);
+		interiorSlot = available.includes(rebounderSlot)
+			? rebounderSlot
+			: available.reduce((best, slot) =>
+				Math.hypot(slots[slot][0] - 88.75, slots[slot][1] - 25) <
+						Math.hypot(slots[best][0] - 88.75, slots[best][1] - 25)
+					? slot
+					: best
+			);
+		if (Math.hypot(slots[interiorSlot][0] - 88.75, slots[interiorSlot][1] - 25) > 12) {
+			slots[interiorSlot] = [81 + (slots[interiorSlot][0] - 81) * 0.2, 25 - side * 7];
+		}
+		if (style.driving || style.cutting || style.running || style.family === "layup" || style.alleyOop) {
+			const entry = shooterSlot >= 0 ? slots[shooterSlot] : [shot.x - 7, shot.y];
+			const dx = shot.x - entry[0];
+			const dy = shot.y - entry[1];
+			const length = Math.hypot(dx, dy) || 1;
+			for (const slot of available) {
+				const [x, y] = slots[slot];
+				const fraction = Math.max(0, Math.min(1, ((x - entry[0]) * dx + (y - entry[1]) * dy) / length ** 2));
+				const nearest = [entry[0] + dx * fraction, entry[1] + dy * fraction];
+				if (Math.hypot(x - nearest[0], y - nearest[1]) < 5) {
+					slots[slot] = [x, Math.max(4, Math.min(46, nearest[1] + (y < nearest[1] ? -6 : 6)))];
+				}
+			}
+		}
+	}
+	if (shooterSlot !== 0 && assistSlot !== 0 && interiorSlot !== 0) {
+		slots[0] = [Math.min(67, slots[0][0]), Math.max(13, Math.min(37, slots[0][1]))];
+	}
+	const priority = [...new Set([shooterSlot, assistSlot, interiorSlot, 0, 1, 2, 3, 4].filter((slot) => slot >= 0))];
+	// Resolve local overlaps, giving the shooter and passer priority.
+	for (let pass = 0; pass < 3; pass++) {
+		for (let i = 1; i < priority.length; i++) {
+			const slot = priority[i];
+			for (let j = 0; j < i; j++) {
+				const other = slots[priority[j]];
+				const dx = slots[slot][0] - other[0];
+				const dy = slots[slot][1] - other[1];
+				const distance = Math.hypot(dx, dy);
+				if (distance < 6) {
+					const angle = distance > 0.1 ? Math.atan2(dy, dx) : slot % 2 ? Math.PI / 2 : -Math.PI / 2;
+					slots[slot] = [
+						Math.max(54, Math.min(89, other[0] + Math.cos(angle) * 6)),
+						Math.max(4, Math.min(46, other[1] + Math.sin(angle) * 6)),
+					];
+				}
+			}
+		}
+	}
+	const formation = {
+		id: replay.formations.length,
+		offense,
+		period: replay.scenes[index].action.period,
+		kind: evidence ? "event-spacing" : state.formation ? "continuity" : "fallback",
+		evidenceActionNumber: evidence?.actionNumber ?? null,
+		shooterId: evidence?.personId ?? null,
+		assistId: evidence?.assistPersonId ?? null,
+		interiorId: interiorSlot >= 0 ? lineup[interiorSlot] : null,
+		origins,
+		slots,
+	};
+	replay.formations.push(formation);
+	return formation;
+}
+
+function placeFormation(state, offense, direction, matchups, data, destinations) {
 	state.lineups[offense].forEach((id, slot) => {
-		const [x, y] = FORMATION[slot];
+		const [x, y] = destinations[slot];
 		Object.assign(state.positions[id], { x: direction === 1 ? x : 94 - x, y });
 	});
 	state.lineups[otherTeam(data, offense)].forEach((id) => {
@@ -190,7 +352,7 @@ function releaseBall(state) {
 	}
 }
 
-function prepareAttack(state, scene, offense, direction, matchups, record, data) {
+function prepareAttack(state, scene, offense, direction, matchups, record, data, replay, index) {
 	const lineup = state.lineups[offense];
 	const pg = lineup[0];
 	const changed = state.possession !== offense;
@@ -202,12 +364,32 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data)
 	const carrier = state.ball.owner;
 	const origin = carrier ? { ...state.positions[carrier] } : { ...state.ball };
 	scene.attackTeam = offense;
+	const newAttack = !state.formation || state.formation.offense !== offense ||
+		state.formation.period !== scene.action.period || state.needsAdvance || restart === "baseline";
+	if (newAttack) {
+		state.formation = planFormation(replay, index, offense, direction, lineup, state);
+		const plan = planMatchups(replay.scenes, index, offense, state, data);
+		state.matchups = { ...plan.assignments };
+		state.formation.initialMatchups = plan.assignments;
+		state.formation.contactMatchups = plan.contacts;
+		state.formation.reboundMatchup = plan.reboundMatchup;
+	}
+	Object.assign(matchups, state.matchups);
+	scene.matchups = { ...matchups };
+	scene.matchupPlanId = state.formation.id;
+	scene.formation = state.formation;
 	if (!restart && !changed && !state.needsAdvance && carrier) {
 		return;
 	}
+	const destinations = newAttack ? state.formation.slots : lineup.map((id) => {
+		const position = state.positions[id];
+		return [direction === 1 ? position.x : 94 - position.x, position.y];
+	});
+	scene.spacingDestinations = destinations;
+	scene.spacingSource = newAttack ? "planned" : "current";
 	state.possession = offense;
 	state.ball.dribble = true;
-	placeFormation(state, offense, direction, matchups, data);
+	placeFormation(state, offense, direction, matchups, data, destinations);
 	const destination = { ...state.positions[pg] };
 	if (restart || changed || !state.ball.owner) {
 		const inbounder = lineup[4];
@@ -224,7 +406,7 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data)
 			record(0.85);
 			state.ball.owner = pg;
 			record(0.45);
-			const [x, y] = FORMATION[4];
+			const [x, y] = destinations[4];
 			Object.assign(state.positions[inbounder], { x: direction === 1 ? x : 94 - x, y });
 			Object.assign(state.positions[pg], { x: 47, y: 28 });
 			record(0.6);
@@ -247,14 +429,14 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data)
 			Object.assign(state.positions[pg], { x: 47, y: 25 });
 			record(0.7);
 		}
-		placeFormation(state, offense, direction, matchups, data);
+		placeFormation(state, offense, direction, matchups, data, destinations);
 		record(0.7);
 	}
 	state.restart = null;
 	state.needsAdvance = false;
 }
 
-function prepareReboundFormation(state, scene, rebounderId, hoop, matchups, contacts, record, data) {
+function prepareReboundFormation(state, scene, rebounderId, hoop, record, data) {
 	if (
 		[scene.action.personId, scene.action.assistPersonId, scene.action.blockPersonId, state.ball.owner].includes(
 			rebounderId,
@@ -263,6 +445,9 @@ function prepareReboundFormation(state, scene, rebounderId, hoop, matchups, cont
 		return;
 	}
 	const team = data.teams.find((item) => state.lineups[item.id].includes(rebounderId));
+	if (team.id !== scene.attackTeam) {
+		return;
+	}
 	const candidates = state.lineups[team.id].filter((id) =>
 		![scene.action.personId, scene.action.assistPersonId, scene.action.blockPersonId, state.ball.owner].includes(id)
 	);
@@ -270,17 +455,15 @@ function prepareReboundFormation(state, scene, rebounderId, hoop, matchups, cont
 		Math.hypot(state.positions[a].x - hoop.x, state.positions[a].y - hoop.y) -
 		Math.hypot(state.positions[b].x - hoop.x, state.positions[b].y - hoop.y)
 	)[0];
-	if (closest === rebounderId) {
+	if (
+		closest === rebounderId ||
+		Math.hypot(state.positions[closest].x - hoop.x, state.positions[closest].y - hoop.y) >=
+			Math.hypot(state.positions[rebounderId].x - hoop.x, state.positions[rebounderId].y - hoop.y) - 0.01
+	) {
 		return;
 	}
 	const from = { ...state.positions[rebounderId] };
 	const inside = { ...state.positions[closest] };
-	const defenders = matchups[rebounderId] !== undefined;
-	if (defenders) {
-		[matchups[rebounderId], matchups[closest]] = [matchups[closest], matchups[rebounderId]];
-		contacts.add(rebounderId);
-		contacts.add(closest);
-	}
 	const start = scene.frames.at(-1).time;
 	// Rotate two off-ball roles during the buildup, without revealing the later catch point.
 	for (const fraction of [0.5, 1]) {
@@ -293,10 +476,6 @@ function prepareReboundFormation(state, scene, rebounderId, hoop, matchups, cont
 			y: inside.y + (from.y - inside.y) * fraction,
 		});
 		record(0.5);
-	}
-	if (defenders) {
-		contacts.delete(rebounderId);
-		contacts.delete(closest);
 	}
 	scene.reboundRotation = { rebounderId, partnerId: closest, start, end: scene.frames.at(-1).time };
 }
@@ -338,7 +517,7 @@ function compileScene(replay, scene, index, state, data) {
 	const offense = eventOffense(scene, state.possession, data);
 	const direction = attackDirection(data, offense, action.period);
 	const hoop = { x: direction === 1 ? 88.75 : 5.25, y: 25 };
-	const matchups = planMatchups(replay.scenes, index, offense, state, data);
+	const matchups = {};
 	const nextScene = replay.scenes[index + 1];
 	const namedRebound = nextScene?.kind === "rebound" && nextScene.action.personId;
 	if (scene.kind === "rebound") {
@@ -376,6 +555,7 @@ function compileScene(replay, scene, index, state, data) {
 		scene.hoop = hoop;
 		scene.shotPoint = shot;
 		if (scene.kind === "heave") {
+			Object.assign(matchups, planMatchups(replay.scenes, index, offense, state, data).assignments);
 			// A last-second heave starts in the backcourt, without a complete half-court setup.
 			state.possession = offense;
 			if (state.restart) {
@@ -387,10 +567,10 @@ function compileScene(replay, scene, index, state, data) {
 			state.restart = null;
 			state.needsAdvance = false;
 		} else {
-			prepareAttack(state, scene, offense, direction, matchups, record, data);
+			prepareAttack(state, scene, offense, direction, matchups, record, data, replay, index);
 		}
 		if (namedRebound && scene.kind !== "heave") {
-			prepareReboundFormation(state, scene, namedRebound, hoop, matchups, contacts, record, data);
+			prepareReboundFormation(state, scene, namedRebound, hoop, record, data);
 		}
 		animateShot(state, scene, shot, hoop, direction, record, contacts, matchups);
 		if (action.blockPersonId) {
@@ -520,7 +700,7 @@ function compileScene(replay, scene, index, state, data) {
 			["shooting", "take", "transition take"].includes(action.descriptor);
 		if (onBall) {
 			followAttackers = true;
-			prepareAttack(state, scene, offense, direction, matchups, record, data);
+			prepareAttack(state, scene, offense, direction, matchups, record, data, replay, index);
 			state.ball.owner = (scene.kind === "foul" && !offensive ? action.foulDrawnPersonId : action.personId) ||
 				state.ball.owner || state.lineups[offense][0];
 			record(0.4);
@@ -647,6 +827,17 @@ function compileScene(replay, scene, index, state, data) {
 				Object.assign(state.positions[incoming.personId], { x: 43 + i * 3, y: 55, opacity: 0 });
 				scene.swaps.push({ out: out.personId, in: incoming.personId, slot, teamId: team.id, previous });
 				lineup[slot] = incoming.personId;
+				if (state.matchups) {
+					if (state.matchups[out.personId] !== undefined) {
+						state.matchups[incoming.personId] = state.matchups[out.personId];
+						delete state.matchups[out.personId];
+					}
+					for (const defender of Object.keys(state.matchups)) {
+						if (state.matchups[defender] === out.personId) {
+							state.matchups[defender] = incoming.personId;
+						}
+					}
+				}
 				if (state.ball.owner === out.personId) {
 					state.ball = { x: previous.x + 1, y: previous.y + 0.8, z: 0.5, owner: null, dribble: false };
 					state.restart = "sideline";
@@ -748,6 +939,8 @@ export function compileReplay(data) {
 		possession: data.teams.find((team) => team.home).id,
 		restart: null,
 		needsAdvance: false,
+		formation: null,
+		matchups: null,
 	};
 	for (const team of data.teams) {
 		lineups[team.id].forEach((id, slot) => {
@@ -768,7 +961,15 @@ export function compileReplay(data) {
 			state.positions[id].y = 37;
 		}
 	}
-	const replay = { scenes: buildScenes(data.actions), markers: [], attacks: [0], quarters: [], players, duration: 0 };
+	const replay = {
+		scenes: buildScenes(data.actions),
+		formations: [],
+		markers: [],
+		attacks: [0],
+		quarters: [],
+		players,
+		duration: 0,
+	};
 	replay.scenes.forEach((scene, index) => {
 		const previous = replay.scenes[index - 1];
 		scene.start = replay.duration;

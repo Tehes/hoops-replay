@@ -11,6 +11,74 @@ export function checkReplay(data) {
 		}
 	};
 	const replay = compileReplay(data);
+	const formationCounts = {};
+	for (const formation of replay.formations) {
+		formationCounts[formation.kind] = (formationCounts[formation.kind] || 0) + 1;
+		check(
+			formation.slots.length === 5 && new Set(formation.slots.map((slot) => slot.join(","))).size === 5 &&
+				formation.slots.every(([x, y]) =>
+					Number.isFinite(x) && Number.isFinite(y) && x > 47 && x < 94 && y > 0 && y < 50
+				),
+			`${id} distinct half-court formation slots ${formation.id}`,
+		);
+		const evidence = data.actions.find((action) => action.actionNumber === formation.evidenceActionNumber);
+		check(
+			formation.evidenceActionNumber === null ||
+				(evidence && evidence.teamId === formation.offense && evidence.period === formation.period &&
+					["2pt", "3pt"].includes(evidence.actionType)),
+			`${id} formation evidence ${formation.id}`,
+		);
+		for (let slot = 0; slot < formation.slots.length; slot++) {
+			for (let other = slot + 1; other < formation.slots.length; other++) {
+				check(
+					Math.hypot(
+						formation.slots[slot][0] - formation.slots[other][0],
+						formation.slots[slot][1] - formation.slots[other][1],
+					) >= 4,
+					`${id} readable player spacing ${formation.id}`,
+				);
+			}
+		}
+		const setup = replay.scenes.find((scene) => scene.formation?.id === formation.id);
+		const attackers = setup.lineups[formation.offense];
+		const defenders = setup.lineups[data.teams.find((team) => team.id !== formation.offense).id];
+		check(
+			Object.keys(formation.initialMatchups).length === 5 &&
+				new Set(Object.values(formation.initialMatchups)).size === 5 &&
+				defenders.every((defender) => attackers.includes(formation.initialMatchups[defender])),
+			`${id} initial man-to-man assignments ${formation.id}`,
+		);
+		for (const contact of formation.contactMatchups) {
+			check(
+				formation.initialMatchups[contact.defender] === contact.attacker,
+				`${id} contact priority over rebound placement ${contact.actionNumber}`,
+			);
+		}
+		const preference = formation.reboundMatchup;
+		if (preference && !preference.constrained) {
+			const reserved = new Set(formation.contactMatchups.map((contact) => contact.attacker));
+			const point = formation.slots[attackers.indexOf(preference.attacker)];
+			check(
+				!reserved.has(preference.attacker) && attackers.filter((attacker) => !reserved.has(attacker))
+					.every((attacker) => {
+						const other = formation.slots[attackers.indexOf(attacker)];
+						return Math.hypot(point[0] - 88.75, point[1] - 25) <=
+							Math.hypot(other[0] - 88.75, other[1] - 25) + 0.00001;
+					}),
+				`${id} rebounder assigned near rim in buildup ${formation.id}`,
+			);
+		}
+		if (evidence) {
+			check(
+				formation.shooterId === evidence.personId && formation.assistId === (evidence.assistPersonId ?? null),
+				`${id} recorded finish participants ${formation.id}`,
+			);
+		}
+	}
+	check(
+		JSON.stringify(replay.formations) === JSON.stringify(compileReplay(data).formations),
+		`${id} deterministic formation planning`,
+	);
 	const teamFor = new Map(replay.players.map((p) => [p.id, p.teamId]));
 	const represented = new Set();
 	let shots = 0;
@@ -98,9 +166,76 @@ export function checkReplay(data) {
 	}
 	check(represented.size === data.actions.length, `${id} all actions represented`);
 	check(JSON.stringify(replay.finalScore) === JSON.stringify(data.teams.map((t) => t.score)), `${id} final score`);
+	let matchupPlanId = null;
+	let expectedMatchups = null;
 	for (const [index, scene] of replay.scenes.entries()) {
+		if (expectedMatchups && scene.kind === "substitution") {
+			for (const swap of scene.swaps) {
+				if (expectedMatchups[swap.out] !== undefined) {
+					expectedMatchups[swap.in] = expectedMatchups[swap.out];
+					delete expectedMatchups[swap.out];
+				}
+				for (const defender of Object.keys(expectedMatchups)) {
+					if (expectedMatchups[defender] === swap.out) {
+						expectedMatchups[defender] = swap.in;
+					}
+				}
+			}
+		}
+		if (scene.matchups) {
+			const defenders = scene.lineups[data.teams.find((team) => team.id !== scene.attackTeam).id];
+			check(
+				Object.keys(scene.matchups).length === 5 && new Set(Object.values(scene.matchups)).size === 5 &&
+					defenders.every((defender) => scene.lineups[scene.attackTeam].includes(scene.matchups[defender])),
+				`${id} active matchups ${scene.action.actionNumber}`,
+			);
+			if (scene.matchupPlanId === matchupPlanId) {
+				check(
+					Object.keys(expectedMatchups).every((defender) =>
+						scene.matchups[defender] === expectedMatchups[defender]
+					),
+					`${id} stable matchups within possession ${scene.action.actionNumber}`,
+				);
+			}
+			matchupPlanId = scene.matchupPlanId;
+			expectedMatchups = { ...scene.matchups };
+		}
+
+		if (scene.spacingSource === "current") {
+			const home = data.teams.find((team) => team.home);
+			const direction = (scene.attackTeam === home.id) === (scene.action.period <= 2) ? 1 : -1;
+			for (const [slot, playerId] of scene.lineups[scene.attackTeam].entries()) {
+				const previous = scene.frames[0].players.find((player) => player.id === playerId);
+				const [x, y] = scene.spacingDestinations[slot];
+				check(
+					Math.hypot(previous.x - (direction === 1 ? x : 94 - x), previous.y - y) < 0.00001,
+					`${id} retain current position on restart ${scene.action.actionNumber}:${playerId}`,
+				);
+			}
+		}
+		if (scene.formation) {
+			check(scene.formation.offense === scene.attackTeam, `${id} formation offense ${scene.action.actionNumber}`);
+		}
+		if (scene.kind === "rebound" && scene.action.subType === "offensive") {
+			const previous = replay.scenes.slice(0, index).findLast((item) => item.formation);
+			const next = replay.scenes[index + 1];
+			if (
+				previous?.formation.offense === scene.action.teamId && next?.formation &&
+				next.action.period === scene.action.period
+			) {
+				check(
+					next.formation.id === previous.formation.id,
+					`${id} formation retained after offensive rebound ${scene.action.actionNumber}`,
+				);
+			}
+		}
 		if (scene.reboundRotation) {
 			const rotation = scene.reboundRotation;
+			check(
+				teamFor.get(rotation.rebounderId) === scene.attackTeam &&
+					teamFor.get(rotation.partnerId) === scene.attackTeam,
+				`${id} no defensive rebound swap ${scene.action.actionNumber}`,
+			);
 			const from = scene.frames.find((frame) => frame.time === rotation.start);
 			const to = scene.frames.find((frame) => frame.time === rotation.end);
 			const before = from.players.find((player) => player.id === rotation.rebounderId);
@@ -165,6 +300,7 @@ export function checkReplay(data) {
 		score: replay.finalScore,
 		frames,
 		profiles: [...profiles.keys()],
+		formations: formationCounts,
 		errors,
 	};
 }

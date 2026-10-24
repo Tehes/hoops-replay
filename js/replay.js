@@ -169,15 +169,15 @@ function drawCourt() {
 	}
 	for (
 		const label of [
-			{ x: -6.1, angle: -Math.PI / 2, text: TEAM_NAMES[home?.code || "OKC"] },
-			{ x: 100.1, angle: Math.PI / 2, text: game?.arena || "Paycom Center" },
+			{ x: -1.25, y: 40, angle: -Math.PI / 2, text: TEAM_NAMES[home?.code || "OKC"] },
+			{ x: 95.25, y: 10, angle: Math.PI / 2, text: game?.arena || "Paycom Center" },
 		]
 	) {
 		c.save();
 		c.fillStyle = "#f5f6f7";
 		c.font = "700 1.4px system-ui";
 		c.textAlign = "center";
-		c.translate(label.x, 25);
+		c.translate(label.x, label.y);
 		c.rotate(label.angle);
 		c.fillText(label.text.toUpperCase(), 0, 0);
 		c.restore();

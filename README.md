@@ -38,7 +38,12 @@ Each data file includes source URLs. Both snapshots contain the play-by-play, pl
 and boxscore information needed by the replay. All required logos and the favicon are local.
 
 Shot coordinates come from the recorded events. Formations, defensive matchups, passes, rebounds,
-and running paths are schematic reconstructions, not tracking data. The choreography is computed
+and running paths are schematic reconstructions, not tracking data.
+Starting positions are planned backward from the recorded finish and assist, with off-ball players
+retaining their previous schematic positions where possible. The first setup uses fallback spacing;
+subsequent possessions use local adjustments instead of fixed formation templates. Same-possession
+restarts preserve current positions. Pick-and-roll/pop or screens require explicit source evidence.
+The choreography is computed
 before playback. Different shot types use different approaches, player poses, and ball flights.
 
 The browser loads local JSON only. The command-line importer downloads the NBA feeds from the

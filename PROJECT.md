@@ -39,7 +39,8 @@ festgelegt. Der Nutzer findet den Prototyp interessant, möchte aber weiter erku
   hochkant gedreht, aber niemals gespiegelt. Unter dem Court steht kein zusätzlicher Arenaname;
   der untere Canvas-Rand ist zugunsten einer näheren Wiedergabesteuerung verkürzt.
   Beide Körbe besitzen eine schematische gepolsterte Stütze hinter der Grundlinie und einen
-  Träger zum Brett. Die seitlichen Beschriftungen stehen außerhalb der Stützen; Ring- und
+  Träger zum Brett. Die seitlichen Beschriftungen stehen nahe an den Grundlinien: Teamname unten links,
+  Arenaname oben rechts, jeweils außerhalb des mittigen Stützenbereichs. Ring- und
   Brettpositionen im Spielfeld bleiben maßstäblich unverändert.
 - Spieler als Trikots mit Rückennummern: Heimteam in Weiß mit teamfarbenen Rändern und Nummern,
   Auswärtsteam in seiner bisherigen Teamfarbe, ohne Ausnahmen für Gelb oder Silber.
@@ -60,6 +61,9 @@ festgelegt. Der Nutzer findet den Prototyp interessant, möchte aber weiter erku
 - Die vollständigen Daten eines abgeschlossenen Spiels dürfen vorab analysiert werden.
   Ein späteres Foul, ein Steal oder ein Block darf bereits frühere schematische Matchups beeinflussen.
   Das ist bewusst erlaubt; es handelt sich nicht um eine kausale Live-Simulation.
+- Formationen und verbindende Bewegungen dürfen schematisch ergänzt werden. Konkrete Spielzüge
+  wie Pick & Roll, Pick & Pop oder Blockaktionen dürfen nur animiert werden, wenn eine Datenquelle
+  sie ausdrücklich belegt. Assist und Wurfkoordinaten allein belegen keinen solchen Spielzug.
 - Vanilla HTML/CSS/JavaScript, ohne Framework, zusätzliche Dependencies oder Build-Schritt.
 - Ziel für die weitere Entwicklung: `?game=<GameID>` soll ein abgeschlossenes Spiel vom bestehenden
   Deno-Server laden und simulieren können. Alle NBA-Teams benötigen lokale Assets und Farben.
@@ -120,9 +124,9 @@ geprüften NBA-Datenstand. Beide gehören laut Snapshot zur Saison 2026–27.
 
 | ID | Spiel | Datum im Snapshot (UTC) | Endstand | Aktionen | Szenen | Replay-Dauer |
 | --- | --- | --- | --- | --- | --- | --- |
-| 0022600007 | DEN bei OKC | 2026-10-23 01:30 | 84:96 | 613 | 462 | 1420,923 s |
-| 0022600008 | NYK bei BOS | 2026-10-23 23:00 | 103:107 | 563 | 434 | 1385,018 s |
-| 0022600094 | ATL bei CHA | 2026-10-23 23:00 | 128:81 | 600 | 460 | 1471,665 s |
+| 0022600007 | DEN bei OKC | 2026-10-23 01:30 | 84:96 | 613 | 462 | 1413,923 s |
+| 0022600008 | NYK bei BOS | 2026-10-23 23:00 | 103:107 | 563 | 434 | 1382,018 s |
+| 0022600094 | ATL bei CHA | 2026-10-23 23:00 | 128:81 | 600 | 460 | 1468,665 s |
 
 Ohne Parameter startet DEN–OKC. `?game=0022600008` startet NYK–BOS mit Boston-Homecourt.
 Jede zehnstellige GameID lädt jetzt die entsprechende lokale Datei. Eine nicht vorhandene Datei
@@ -274,7 +278,8 @@ Timeline-Schritt 0.001 beibehalten oder bei einer Änderung bewusst gleichwertig
   Team, passende PG–C-Starterpositionen, bekannte Personen und zusammenpassende Substitutionen voraus.
   Andere Spiele, fehlende Koordinaten, Korrekturen und seltene Events können diese Annahmen verletzen.
 - Rebounds und weitere kontaktlose Ereignisse haben nur plausible abgeleitete Positionen.
-  Die Grundformation ist statisch; reale Sets, Zonenverteidigung und exakte Off-ball-Wege fehlen.
+  Die schematische Aufstellung wird aus Abschluss und bisherigen Positionen abgeleitet; echte Sets,
+  Zonenverteidigung und exakte Off-ball-Wege sind dadurch weiterhin nicht rekonstruiert.
 - Die Wurfklassifikation nutzt derzeit strukturierte Subtypes und Descriptor-Text. Unbekannte
   Schreibweisen oder neue Kombinationen können bei der allgemeinen Animation landen.
 - Keine öffentliche Bereitstellung, kein Custom-Domain-Setup und kein Live-Datenanschluss im Rahmen
@@ -369,3 +374,51 @@ Fangpunkt sprinten. Audit-Prüfungen stellen sicher, dass die Rotation näher zu
 Wurfabgabe stattfindet und den Ballbesitz nicht verändert. Die drei Referenzspiele enthalten jetzt
 18.544 Keyframes; die aktuellen Animationsdauern stehen in der Tabelle oben. Ältere Prüfzahlen in
 dieser Übergabe beschreiben den jeweils damaligen Stand.
+
+
+## Aktueller Ansatz: Vom Abschluss rückwärts planen
+
+Die festen Five-out-/Four-out-/Horns-/Asymmetrie-Vorlagen wurden nach visueller Bewertung wieder
+entfernt. Selbst bei anderer Verteilung wirkten die Angriffe zu ähnlich und schematisch. Der aktuelle
+Ansatz setzt die belegte Aktion an erste Stelle und übernimmt für die übrigen Spieler möglichst die
+Positionen aus dem bisherigen Ablauf. Eine Grundaufstellung ist nur noch Hilfe beim ersten Aufbau.
+
+`planFormation()` sucht weiterhin den ersten belegten Feldwurf im bevorstehenden Angriff. Sie
+setzt weder das Label eines echten Spielzugs noch nimmt sie unbelegte Screens an. Im internen
+Plan werden nun `event-spacing`, `continuity` oder `fallback` statt taktischer Vorlagennamen gespeichert.
+`replay.formations` und `scene.formation` bleiben als technische Bezeichner erhalten.
+
+- Ausgangspunkte sind die letzten schematischen Spielerpositionen. Beim Wechsel in die andere
+  Spielhälfte wird die Gruppe in Angriffsrichtung vorgerückt, ihre räumliche Anordnung bleibt
+  soweit möglich erhalten. Das ist keine Behauptung gemessener Positionen.
+- Der Schütze erhält einen Anlauf-/Ausgangspunkt aus belegter Wurfposition und Aktionsmerkmalen.
+  Die eigentliche Wurfkoordinate bleibt unverändert. Der Assistgeber erhält einen plausiblen
+  Passabstand, ausgehend von seiner bisherigen Seite zum Schützen.
+- Ein bekannter offensiver Rebounder oder ein bereits korbnaher ballferner Mitspieler erhält
+  Raum für eine Innenposition. Das ist nicht der spätere genaue Abprallort. Die bestehende späte
+  Reaktion und animierte Fangphase bleiben erhalten.
+- Spieler im vorgesehenen Anlaufkorridor weichen seitlich aus. Zu enge Abstände werden lokal
+  aufgelöst, mit Vorrang für Schütze und Passgeber. Es gibt keine zufälligen Musterwechsel und
+  kein künstliches Dauerlaufen unbeteiligter Spieler.
+- Ohne Abschlussbeleg wird mit der bisherigen räumlichen Anordnung weitergearbeitet. Nur wenn
+  noch keine solche Aufstellung existiert, hilft `FALLBACK_SPACING` beim Einstieg.
+- Im gleichen Angriff bleibt der Plan erhalten. Bei einem seitlichen Wiedereinwurf werden die
+  aktuellen Positionen als Ziele verwendet; niemand wird auf alte Startplätze zurückgesetzt.
+  Eingewechselte Spieler übernehmen weiter den Platz ihres Vorgängers.
+
+Die Pläne enthalten `evidenceActionNumber`, `shooterId`, `assistId`, `interiorId`, `origins` und
+`slots`. Alles außer der Belegaktion und beteiligten Personen bleibt schematisch. `spacingSource`
+und `spacingDestinations` an einer Szene machen nachvollziehbar, ob ein neuer Angriff aufgebaut
+oder mit den aktuellen Positionen weitergespielt wurde.
+
+Pick & Roll, Pick & Pop und andere konkrete Block-/Spielzugabläufe werden nur bei ausdrücklichem
+Datenbeleg ergänzt. Assist, Wurfort oder ein gut passender Laufweg reichen dafür nicht aus.
+
+Der Audit prüft weiterhin deterministische Planung, den Bezug zu echten Abschlussbeteiligten,
+lesbare Abstände, Positionskontinuität bei Wiedereinwürfen und den Erhalt des Angriffsplans nach
+Offensiv-Rebounds. Alle Wurf-, Rebound-, Lineup-, Score- und Seeking-Prüfungen bleiben aktiv.
+Die drei Referenzspiele bestehen 18.518 Keyframes in 1.356 Szenen. Die Animationsdauern oben sind
+aktualisiert; ältere Audit-Zahlen in vorherigen Abschnitten beschreiben den damaligen Stand.
+
+Die lokale Vorschau und Browserprüfung verwenden Port 5502. Port 5500 wird parallel für ein
+anderes Projekt genutzt und darf für diese Arbeit nicht verändert oder übernommen werden.
