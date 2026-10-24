@@ -5,6 +5,7 @@ import { getJerseyColors, TEAM_COLORS, TEAM_NAMES } from "./replay-teams.js";
 
 const WORLD = { width: 110, height: 65, left: 8, top: 9 };
 const ACTION_DURATION = 5;
+const NEUTRAL_COURT = { shirt: "#34434f", trim: "#9aabb8" };
 let actionEvents = [];
 let displayedAction = undefined;
 let replay = null;
@@ -57,7 +58,7 @@ function roundedRect(context, x, y, width, height, radius) {
 
 function drawCourt() {
 	const home = game?.teams.find((team) => team.home);
-	const colors = TEAM_COLORS[home?.code || "OKC"];
+	const colors = home ? TEAM_COLORS[home.code] : NEUTRAL_COURT;
 	courtBackground = document.createElement("canvas");
 	courtBackground.width = canvas.width;
 	courtBackground.height = canvas.height;
@@ -164,8 +165,8 @@ function drawCourt() {
 	}
 	for (
 		const label of [
-			{ x: -1.25, y: 40, angle: -Math.PI / 2, text: TEAM_NAMES[home?.code || "OKC"] },
-			{ x: 95.25, y: 10, angle: Math.PI / 2, text: game?.arena || "Paycom Center" },
+			{ x: -1.25, y: 40, angle: -Math.PI / 2, text: home ? TEAM_NAMES[home.code] : "" },
+			{ x: 95.25, y: 10, angle: Math.PI / 2, text: game?.arena || "" },
 		]
 	) {
 		c.save();
@@ -568,13 +569,15 @@ async function init() {
 		if (requestedGame !== null && !/^\d{10}$/.test(requestedGame)) {
 			throw new Error("Game ID must contain ten digits.");
 		}
-		game = await loadReplayData(requestedGame);
-		replay = compileReplay(game);
-		const report = checkReplay(game, replay);
+		const loadedGame = await loadReplayData(requestedGame);
+		const compiledReplay = compileReplay(loadedGame);
+		const report = checkReplay(loadedGame, compiledReplay);
 		if (report.errors.length) {
 			console.error("Replay validation failed:", report.errors);
 			throw new Error(`Replay data is inconsistent (${report.errors.length} validation errors).`);
 		}
+		game = loadedGame;
+		replay = compiledReplay;
 		actionEvents = replay.scenes.filter((scene) => scene.action.description).map((scene) => ({
 			time: scene.start + scene.eventAt,
 			label: scene.banner || "",
@@ -587,8 +590,9 @@ async function init() {
 			element.querySelector("span").textContent = team.code;
 			element.querySelector("img").src = `./img/NBA/${team.code}.svg`;
 			element.querySelector("img").alt = team.name;
+			element.querySelector("img").hidden = false;
 		}
-		document.title = `Court Replay · ${game.teams[0].code} @ ${game.teams[1].code}`;
+		document.title = `Hoops Replay · ${game.teams[0].code} @ ${game.teams[1].code}`;
 		actionPhoto.addEventListener("error", () => {
 			if (actionPhoto.getAttribute("src")?.startsWith("https://cdn.nba.com/headshots/")) {
 				console.warn(`Player photo unavailable: ${actionPhoto.getAttribute("src")}`);
@@ -650,6 +654,7 @@ async function init() {
 			lastTimestamp = 0;
 		});
 		loadState.hidden = true;
+		drawCourt();
 		render();
 	} catch (error) {
 		replay = null;
