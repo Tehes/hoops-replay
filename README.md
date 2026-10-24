@@ -1,3 +1,5 @@
+[![Hoops Replay – Court-Replay-Demo](img/demo.png)](img/demo.png)
+
 # Hoops Replay
 
 Schematic NBA game replays on a full basketball court, powered by play-by-play and boxscore data.
