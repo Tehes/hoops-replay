@@ -1,0 +1,87 @@
+PROJECT LICENSE KIT
+
+Use this kit when the starter template becomes a real published project
+(game, PWA, tool, website, or app).
+
+==================================================
+1. README BLOCK TO INSERT
+==================================================
+
+## License and usage
+
+This project is source-available, not open source.
+
+You may view and modify the code for personal, educational, and non-commercial purposes.
+
+If you publicly redistribute this project or a modified version of it, you must:
+
+- link to the original project repository
+- include a visible attribution to the original project and author, where technically and contextually appropriate
+- clearly mark your version as modified and unofficial
+
+Commercial use, paid hosting, resale, and misleading rebranding are not allowed without prior written permission.
+
+==================================================
+2. LICENSE TEXT TO REPLACE LICENSE.txt
+==================================================
+
+Project Source-Available License v1.0
+
+Copyright (c) Tino Sabetta
+
+This software and all associated files in this repository are provided as
+source-available software. You may view, download, and modify the source code
+for personal, educational, and non-commercial purposes, subject to the
+conditions below.
+
+1. Attribution
+Any public redistribution of this software, whether modified or unmodified,
+must include a prominent attribution to the original project and a link to the
+original repository.
+
+2. Visible attribution is required
+Any public redistribution of this software, whether modified or unmodified,
+must include a visible attribution to the original project and its original
+author, together with a link to the original repository, where technically and
+contextually appropriate. This must not imply that the redistributed version is
+the original project.
+
+3. Modified versions must be identified
+If you publish or redistribute a modified version, you must clearly state that
+your version is modified and unofficial. You must not present it as the
+original project.
+
+4. No misleading rebranding
+You may not use the project name, identity, or presentation in a way that
+suggests your version is the original project or officially endorsed by the
+original author.
+
+5. Non-commercial use only
+You may not sell this software, offer it as a paid service, use it in a
+commercial product or service, or otherwise commercially exploit it without
+prior written permission from the copyright holder.
+
+6. No sublicense of broader rights
+You may not grant downstream recipients rights broader than those granted under
+this license.
+
+7. Termination
+Any breach of these terms automatically terminates your rights under this
+license.
+
+8. Warranty disclaimer
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+==================================================
+3. HOW TO USE
+==================================================
+
+- Keep the starter template itself permissive.
+- When the template becomes a real published project, insert the README block.
+- Replace LICENSE.txt with the project license text.
+- Optionally adapt the wording to the specific project name or UI.
