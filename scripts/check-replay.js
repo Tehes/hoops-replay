@@ -12,7 +12,11 @@ export function checkReplay(data) {
 	};
 	const replay = compileReplay(data);
 	const formationCounts = {};
+	let formationWidth = 0;
+	let crowdedPairs = 0;
 	for (const formation of replay.formations) {
+		formationWidth += Math.max(...formation.slots.map((point) => point[1])) -
+			Math.min(...formation.slots.map((point) => point[1]));
 		formationCounts[formation.kind] = (formationCounts[formation.kind] || 0) + 1;
 		check(
 			formation.slots.length === 5 && new Set(formation.slots.map((slot) => slot.join(","))).size === 5 &&
@@ -21,6 +25,10 @@ export function checkReplay(data) {
 				),
 			`${id} distinct half-court formation slots ${formation.id}`,
 		);
+		if (formation.interiorSlot >= 0) {
+			const [x, y] = formation.slots[formation.interiorSlot];
+			check(Math.hypot(x - 88.75, y - 25) <= 12, `${id} retained inside option ${formation.id}`);
+		}
 		const evidence = data.actions.find((action) => action.actionNumber === formation.evidenceActionNumber);
 		check(
 			formation.evidenceActionNumber === null ||
@@ -30,6 +38,14 @@ export function checkReplay(data) {
 		);
 		for (let slot = 0; slot < formation.slots.length; slot++) {
 			for (let other = slot + 1; other < formation.slots.length; other++) {
+				if (
+					Math.hypot(
+						formation.slots[slot][0] - formation.slots[other][0],
+						formation.slots[slot][1] - formation.slots[other][1],
+					) < 9
+				) {
+					crowdedPairs++;
+				}
 				check(
 					Math.hypot(
 						formation.slots[slot][0] - formation.slots[other][0],
@@ -79,6 +95,8 @@ export function checkReplay(data) {
 		JSON.stringify(replay.formations) === JSON.stringify(compileReplay(data).formations),
 		`${id} deterministic formation planning`,
 	);
+	check(formationWidth / replay.formations.length >= 25, `${id} uses court width across attacks`);
+	check(crowdedPairs / replay.formations.length < 0.5, `${id} avoids recurring offensive clusters`);
 	const teamFor = new Map(replay.players.map((p) => [p.id, p.teamId]));
 	const represented = new Set();
 	let shots = 0;
@@ -97,6 +115,25 @@ export function checkReplay(data) {
 				!frame.ball.owner || frame.players.some((p) => p.id === frame.ball.owner && p.opacity > 0),
 				`${tag} hidden owner`,
 			);
+		}
+		for (const move of scene.spacingMoves || []) {
+			check(
+				![scene.action.personId, scene.action.assistPersonId].includes(move.id) &&
+					!scene.shotStyle.tip && !scene.shotStyle.putback && scene.kind !== "heave",
+				`${tag} spacing preserves recorded participants and direct finishes`,
+			);
+			const approach = scene.frames.filter((frame) =>
+				frame.time >= scene.approachAt && frame.time <= scene.releaseAt
+			);
+			let distance = 0;
+			for (let i = 1; i < approach.length; i++) {
+				const previous = approach[i - 1].players.find((player) => player.id === move.id);
+				const current = approach[i].players.find((player) => player.id === move.id);
+				const step = Math.hypot(current.x - previous.x, current.y - previous.y);
+				distance += step;
+				check(step <= (approach[i].time - approach[i - 1].time) * 5 + 0.001, `${tag} bounded off-ball speed`);
+			}
+			check(distance <= 6.001, `${tag} small off-ball adjustment`);
 		}
 		const end = scene.frames.at(-1);
 		for (const team of data.teams) {

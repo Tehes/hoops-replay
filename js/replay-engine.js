@@ -163,6 +163,40 @@ function planMatchups(scenes, index, offense, state, data) {
 	return { assignments, contacts, reboundMatchup };
 }
 
+// Search open court space while retaining the previous side and a short route there.
+function findOpenSpace(origin, occupied, lane = null, interior = false, guard = false) {
+	const score = ([x, y]) => {
+		let cost = Math.hypot(x - origin[0], y - origin[1]) ** 2 * 0.045;
+		for (const [otherX, otherY] of occupied) {
+			cost += Math.max(0, 13 - Math.hypot(x - otherX, y - otherY)) ** 2 * 4;
+		}
+		if (lane) {
+			const [[fromX, fromY], [toX, toY]] = lane;
+			const dx = toX - fromX;
+			const dy = toY - fromY;
+			const fraction = Math.max(0, Math.min(1, ((x - fromX) * dx + (y - fromY) * dy) / (dx * dx + dy * dy || 1)));
+			cost += Math.max(0, 7 - Math.hypot(x - fromX - dx * fraction, y - fromY - dy * fraction)) ** 2 * 3;
+		}
+		return cost;
+	};
+	let best = origin.slice();
+	let bestScore = interior && Math.hypot(best[0] - 88.75, best[1] - 25) > 12 ? Infinity : score(best);
+	for (let x = 58; x <= 88; x += 5) {
+		for (let y = 5; y <= 45; y += 5) {
+			if ((interior && Math.hypot(x - 88.75, y - 25) > 12) || (guard && x > 68)) {
+				continue;
+			}
+			const candidate = [x, y];
+			const cost = score(candidate);
+			if (cost < bestScore) {
+				best = candidate;
+				bestScore = cost;
+			}
+		}
+	}
+	return best;
+}
+
 function planFormation(replay, index, offense, direction, lineup, state) {
 	let evidence = null;
 	let evidenceIndex = -1;
@@ -279,6 +313,23 @@ function planFormation(replay, index, offense, direction, lineup, state) {
 			}
 		}
 	}
+	const lane = shot ? [assistSlot >= 0 ? slots[assistSlot] : slots[shooterSlot], [shot.x, shot.y]] : null;
+	// Reserve actual participants first, then use the width and depth for the other three players.
+	for (let pass = 0; pass < 2; pass++) {
+		for (const slot of priority) {
+			if (slot === shooterSlot || slot === assistSlot) {
+				continue;
+			}
+			const occupied = slots.filter((_, other) => other !== slot);
+			slots[slot] = findOpenSpace(
+				slots[slot],
+				occupied,
+				lane,
+				slot === interiorSlot,
+				slot === 0 && slot !== interiorSlot,
+			);
+		}
+	}
 	const formation = {
 		id: replay.formations.length,
 		offense,
@@ -288,6 +339,7 @@ function planFormation(replay, index, offense, direction, lineup, state) {
 		shooterId: evidence?.personId ?? null,
 		assistId: evidence?.assistPersonId ?? null,
 		interiorId: interiorSlot >= 0 ? lineup[interiorSlot] : null,
+		interiorSlot,
 		origins,
 		slots,
 	};
@@ -525,8 +577,18 @@ function compileScene(replay, scene, index, state, data) {
 	}
 	let time = 0;
 	let followAttackers = false;
+	const spacingMoves = [];
 	const contacts = new Set();
 	const record = (delay) => {
+		if (scene.releaseAt === undefined) {
+			for (const move of spacingMoves) {
+				const position = state.positions[move.id];
+				const distance = Math.hypot(move.x - position.x, move.y - position.y);
+				const fraction = distance > 0 ? Math.min(1, delay * 5 / distance) : 0;
+				position.x += (move.x - position.x) * fraction;
+				position.y += (move.y - position.y) * fraction;
+			}
+		}
 		if (followAttackers) {
 			for (const [defender, attacker] of Object.entries(matchups)) {
 				if (!contacts.has(Number(defender))) {
@@ -572,6 +634,37 @@ function compileScene(replay, scene, index, state, data) {
 		if (namedRebound && scene.kind !== "heave") {
 			prepareReboundFormation(state, scene, namedRebound, hoop, record, data);
 		}
+		if (scene.kind !== "heave" && !scene.shotStyle.tip && !scene.shotStyle.putback) {
+			const lineup = state.lineups[offense];
+			const points = lineup.map((id) => {
+				const position = state.positions[id];
+				return [direction === 1 ? position.x : 94 - position.x, position.y];
+			});
+			const finish = [direction === 1 ? shot.x : 94 - shot.x, shot.y];
+			const passerSlot = lineup.indexOf(action.assistPersonId);
+			const lane = [passerSlot >= 0 ? points[passerSlot] : points[lineup.indexOf(action.personId)], finish];
+			lineup.forEach((id, slot) => {
+				if (
+					id === action.personId || id === action.assistPersonId || id === state.ball.owner ||
+					slot === scene.formation.interiorSlot
+				) {
+					return;
+				}
+				const occupied = points.filter((_, other) => other !== slot).concat([finish]);
+				const target = findOpenSpace(points[slot], occupied, lane, false, slot === 0);
+				const distance = Math.hypot(target[0] - points[slot][0], target[1] - points[slot][1]);
+				if (distance < 2) {
+					return;
+				}
+				// A small pre-release adjustment, never a new route during the shot or rebound.
+				const fraction = Math.min(1, 6 / distance);
+				const x = points[slot][0] + (target[0] - points[slot][0]) * fraction;
+				const y = points[slot][1] + (target[1] - points[slot][1]) * fraction;
+				spacingMoves.push({ id, x: direction === 1 ? x : 94 - x, y });
+				points[slot] = [x, y];
+			});
+		}
+		scene.spacingMoves = spacingMoves;
 		animateShot(state, scene, shot, hoop, direction, record, contacts, matchups);
 		if (action.blockPersonId) {
 			addMarker(replay, scene, time, "block", state.positions[action.blockPersonId]);

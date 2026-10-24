@@ -124,9 +124,9 @@ geprüften NBA-Datenstand. Beide gehören laut Snapshot zur Saison 2026–27.
 
 | ID | Spiel | Datum im Snapshot (UTC) | Endstand | Aktionen | Szenen | Replay-Dauer |
 | --- | --- | --- | --- | --- | --- | --- |
-| 0022600007 | DEN bei OKC | 2026-10-23 01:30 | 84:96 | 613 | 462 | 1413,923 s |
-| 0022600008 | NYK bei BOS | 2026-10-23 23:00 | 103:107 | 563 | 434 | 1382,018 s |
-| 0022600094 | ATL bei CHA | 2026-10-23 23:00 | 128:81 | 600 | 460 | 1468,665 s |
+| 0022600007 | DEN bei OKC | 2026-10-23 01:30 | 84:96 | 613 | 462 | 1361,923 s |
+| 0022600008 | NYK bei BOS | 2026-10-23 23:00 | 103:107 | 563 | 434 | 1336,018 s |
+| 0022600094 | ATL bei CHA | 2026-10-23 23:00 | 128:81 | 600 | 460 | 1420,665 s |
 
 Ohne Parameter startet DEN–OKC. `?game=0022600008` startet NYK–BOS mit Boston-Homecourt.
 Jede zehnstellige GameID lädt jetzt die entsprechende lokale Datei. Eine nicht vorhandene Datei
@@ -358,23 +358,13 @@ Die Replay-Dauern in der Tabelle oben sind aktualisiert; die ursprünglich dokum
 beschreiben den damaligen Prüfstand.
 
 
-## Ergänzung: Unauffällige Positionierung vor dem Rebound
+## Positionierung vor dem Rebound
 
-Vor einem persönlichen Rebound kann `prepareReboundFormation()` während des Angriffs zwei ballferne
-Formationsplätze rotieren lassen: Der bekannte spätere Rebounder übernimmt den korbnäheren freien
-Platz, ein Mitspieler seinen bisherigen. Bei Verteidigern werden die Mann-gegen-Mann-Zuordnungen
-mitgetauscht. Das sind Bewegungen innerhalb der Formation, noch kein Lauf zum späteren Abprallort.
-Schütze, Assistgeber, Blocker und aktueller Ballbesitzer werden aus dieser Rotation ausgenommen;
-steht der Rebounder bereits am korbnächsten verfügbaren Platz, entfällt die Rotation. Sie gilt nicht
-für Heaves. Ein Schütze direkt am Ring kann weiterhin näher stehen als der spätere Rebounder.
-
-Der gezielte Lauf zum Abprallort beginnt weiterhin erst im letzten Viertel der Wurfflugphase, beim
-eigenen Fehlwurf erst nach dem Abschluss. Niemand soll direkt bei Wurfabgabe zum vorherbestimmten
-Fangpunkt sprinten. Audit-Prüfungen stellen sicher, dass die Rotation näher zur Zone führt, vor der
-Wurfabgabe stattfindet und den Ballbesitz nicht verändert. Die drei Referenzspiele enthalten jetzt
-18.544 Keyframes; die aktuellen Animationsdauern stehen in der Tabelle oben. Ältere Prüfzahlen in
-dieser Übergabe beschreiben den jeweils damaligen Stand.
-
+Offensive ballferne Spieler können während des Aufbaus korbnähere Plätze übernehmen. Die bisherige
+sichtbare Rotation zweier Verteidiger zur Vorbereitung eines Defensiv-Rebounds ist entfernt.
+Die defensive Zuordnung entsteht stattdessen bereits im Aufbau und bleibt für diesen Angriff stabil.
+Der gezielte Lauf zum Abprallort beginnt weiterhin erst im letzten Viertel der Wurfflugphase,
+beim eigenen Fehlwurf nach dem Abschluss. Die animierte Fangphase bleibt erhalten.
 
 ## Aktueller Ansatz: Vom Abschluss rückwärts planen
 
@@ -417,8 +407,57 @@ Datenbeleg ergänzt. Assist, Wurfort oder ein gut passender Laufweg reichen daf�
 Der Audit prüft weiterhin deterministische Planung, den Bezug zu echten Abschlussbeteiligten,
 lesbare Abstände, Positionskontinuität bei Wiedereinwürfen und den Erhalt des Angriffsplans nach
 Offensiv-Rebounds. Alle Wurf-, Rebound-, Lineup-, Score- und Seeking-Prüfungen bleiben aktiv.
-Die drei Referenzspiele bestehen 18.518 Keyframes in 1.356 Szenen. Die Animationsdauern oben sind
+Die drei Referenzspiele bestehen nach der Spacing-Anpassung 18.226 Keyframes in 1.356 Szenen. Die Animationsdauern oben sind
 aktualisiert; ältere Audit-Zahlen in vorherigen Abschnitten beschreiben den damaligen Stand.
 
 Die lokale Vorschau und Browserprüfung verwenden Port 5502. Port 5500 wird parallel für ein
 anderes Projekt genutzt und darf für diese Arbeit nicht verändert oder übernommen werden.
+
+
+## Stabile Matchups bereits im Aufbau
+
+`prepareAttack()` berechnet mit dem Aufstellungsplan einmalig auch `planMatchups()`. Bekannte
+Foul-/Block-/Steal-Kontakte werden zuerst zugeordnet. Bei mehreren widersprüchlichen Paarungen hat
+die erste mit den bereits zugeordneten Spielern vereinbare Paarung Vorrang; die spätere konkrete
+Ereignisanimation stellt ihren belegten Kontakt trotzdem dar, ohne daraus einen dauerhaften
+Gegenspielertausch zu erfinden.
+
+Ist ein späterer persönlicher Defensiv-Rebound bekannt und dessen Spieler noch frei, übernimmt er
+den korbnächsten noch freien Angreifer der geplanten Aufstellung. Eine belegte Kontaktzuordnung wird
+dafür nicht verdrängt. Der exakte spätere Abprallort bestimmt weder das Matchup noch die frühe
+Bewegung. Das tatsächliche Lösen zum Rebound bleibt Teil der späten Reaktion auf den Ballflug.
+
+`state.matchups` hält die aktive Zuordnung. Szenen speichern Snapshots in `scene.matchups` und
+`matchupPlanId`; der Aufstellungsplan enthält `initialMatchups`, `contactMatchups` und
+`reboundMatchup` einschließlich Kennzeichnung einer durch Kontakte gebundenen Zuordnung.
+Bei Auswechslungen werden Schlüssel oder Zielspieler auf den eingewechselten Spieler übertragen;
+die anderen Paare bleiben erhalten. Ein neuer Angriff darf neue Zuordnungen erhalten. Heaves
+behalten ihre separate schematische Behandlung.
+
+`prepareReboundFormation()` darf nur noch offensive Mitspieler rotieren lassen, keine Verteidiger.
+Die Tests prüfen vollständige eindeutige Mann-gegen-Mann-Paare, bekannte Kontaktprioritäten,
+korbnahe Zuordnung freier Rebounder, unveränderte Paare innerhalb des Angriffs und die regelgerechte
+Übernahme bei Auswechslungen. Ein eigener Test verhindert defensive Rebound-Platztausch-Szenen.
+Alle drei Referenzspiele bestehen die erweiterten Prüfungen, einschließlich Endständen und Fangphase.
+
+
+## Ballfernes Spacing
+
+Die Startplanung sucht für unbeteiligte Angreifer freie Räume in Breite und Tiefe der
+Angriffshälfte. Schütze und Assistgeber haben Vorrang; ein weiterer Spieler bleibt innerhalb
+von zwölf Fuß zum Korb. Ballferne Spieler halten nach Möglichkeit etwa dreizehn Fuß Abstand
+und meiden den schematischen Pass-/Anlaufkorridor. Vorherige Position und Weglänge beeinflussen
+die Auswahl. Die freien Punkte sind Suchräume, keine behaupteten Spielzüge oder festen Sets.
+
+Während der Wurfvorbereitung können unbeteiligte Spieler einmalig ein nahes freies Ziel anlaufen:
+höchstens sechs Fuß, maximal fünf Fuß pro Replay-Sekunde, nur bis zum Release. Ballbesitzer,
+Schütze, Assistgeber und die Innenposition werden dafür nicht verschoben. Tip-ins, Putbacks und
+Heaves erhalten diese Korrektur nicht. Zugeordnete Verteidiger folgen weiterhin ihrem Angreifer;
+Matchups werden nicht neu vergeben. Wurf- und Rebound-Flugphasen behalten ihre eigene Choreografie.
+`scene.spacingMoves` hält die vorab berechneten Ziele für die technische Prüfung fest.
+
+Die drei vollständigen Referenzspiele bestehen den Audit mit 18.226 Keyframes und 39 Wurfprofilen.
+Zusätzlich geprüft werden eine erhaltene Innenposition, ausreichende durchschnittliche Court-Breite,
+seltene enge Angreiferpaare sowie Weglänge und Geschwindigkeit der kleinen Korrekturen.
+Chrome MCP wurde lokal auf Port 5502 für Stichproben der Court-Darstellung und des Scrubbings genutzt.
+Die Bewegung bleibt eine schematische Ergänzung; reale Verteidiger dürfen ihrem Gegenspieler nahe sein.
