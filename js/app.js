@@ -1,7 +1,15 @@
+/* --------------------------------------------------------------------------------------------------
+Imports
+---------------------------------------------------------------------------------------------------*/
+
 import { loadReplayData } from "./replay-data.js";
 import { checkReplay } from "./replay-validation.js";
 import { compileReplay, getReplayFrame } from "./replay-engine.js";
 import { getJerseyColors, TEAM_COLORS, TEAM_NAMES } from "./replay-teams.js";
+
+/* --------------------------------------------------------------------------------------------------
+Constants and state
+---------------------------------------------------------------------------------------------------*/
 
 const WORLD = { width: 110, height: 65, left: 8, top: 9 };
 const ACTION_DURATION = 5;
@@ -21,6 +29,10 @@ let courtBackground = null;
 let playerById = new Map();
 let teamById = new Map();
 const homeLogo = new Image();
+
+/* --------------------------------------------------------------------------------------------------
+DOM references
+---------------------------------------------------------------------------------------------------*/
 
 const canvas = document.querySelector("#court");
 const ctx = canvas.getContext("2d");
@@ -44,6 +56,10 @@ const actionDisplay = document.querySelector(".action-display");
 const actionPhoto = document.querySelector("#action-photo");
 const actionPlayer = document.querySelector("#action-player");
 const actionDescription = document.querySelector("#action-description");
+
+/* --------------------------------------------------------------------------------------------------
+Court and player drawing
+---------------------------------------------------------------------------------------------------*/
 
 function roundedRect(context, x, y, width, height, radius) {
 	const r = Math.min(radius, width / 2, height / 2);
@@ -157,9 +173,12 @@ function drawCourt() {
 		c.lineTo(4, 28);
 		c.stroke();
 		c.strokeStyle = "#18212b";
-		c.lineWidth = 0.22;
+		c.lineWidth = 0.42;
 		c.beginPath();
 		c.arc(5.25, 25, 0.75, 0, Math.PI * 2);
+		c.stroke();
+		c.strokeStyle = "#ff982e";
+		c.lineWidth = 0.22;
 		c.stroke();
 		c.restore();
 	}
@@ -409,6 +428,10 @@ function drawBall(frame) {
 	ctx.stroke();
 }
 
+/* --------------------------------------------------------------------------------------------------
+Scoreboard and frame rendering
+---------------------------------------------------------------------------------------------------*/
+
 function formatTime(seconds) {
 	const rounded = Math.max(0, Math.ceil(seconds));
 	return `${Math.floor(rounded / 60)}:${String(rounded % 60).padStart(2, "0")}`;
@@ -495,6 +518,10 @@ function render() {
 	nextButton.disabled = currentTime >= replay.attacks.at(-1);
 }
 
+/* --------------------------------------------------------------------------------------------------
+Playback controls
+---------------------------------------------------------------------------------------------------*/
+
 function tick(timestamp) {
 	if (!playing) {
 		return;
@@ -542,6 +569,10 @@ function stepAttack(direction) {
 	seek(target ?? (direction === 1 ? replay.duration : 0));
 }
 
+/* --------------------------------------------------------------------------------------------------
+Player selection
+---------------------------------------------------------------------------------------------------*/
+
 function selectPlayer(event) {
 	if (!currentFrame) {
 		return;
@@ -560,6 +591,10 @@ function selectPlayer(event) {
 
 	render();
 }
+
+/* --------------------------------------------------------------------------------------------------
+Initialization
+---------------------------------------------------------------------------------------------------*/
 
 async function init() {
 	resizeCourt();
@@ -662,5 +697,9 @@ async function init() {
 		loadState.textContent = `Replay could not be loaded. ${error.message}`;
 	}
 }
+
+/* --------------------------------------------------------------------------------------------------
+Start
+---------------------------------------------------------------------------------------------------*/
 
 init();

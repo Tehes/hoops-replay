@@ -63,7 +63,8 @@ festgelegt. Der Nutzer findet den Prototyp interessant, möchte aber weiter erku
   Beide Körbe besitzen eine schematische gepolsterte Stütze hinter der Grundlinie und einen
   Träger zum Brett. Die seitlichen Beschriftungen stehen nahe an den Grundlinien: Teamname unten links,
   Arenaname oben rechts, jeweils außerhalb des mittigen Stützenbereichs. Ring- und
-  Brettpositionen im Spielfeld bleiben maßstäblich unverändert.
+  Brettpositionen im Spielfeld bleiben maßstäblich unverändert. Die Ringe sind orange mit dunkler
+  Kontur, damit sie sowohl auf dunklen als auch auf hellen Teamfarben sichtbar bleiben.
 - Spieler als Trikots mit Rückennummern: Heimteam in Weiß mit teamfarbenen Rändern und Nummern,
   Auswärtsteam in seiner bisherigen Teamfarbe, ohne Ausnahmen für Gelb oder Silber.
   Das ist eine bewusste Replay-Konvention, keine Behauptung der echten Uniformwahl des jeweiligen
@@ -138,10 +139,20 @@ Im alten Spielplan wurden die übertragenen Prototyp-Dateien und ihre README-Erg
 sein Arbeitsverzeichnis war danach sauber. Die gemeinsam genutzten Teamlogos bleiben dort erhalten.
 Der alte Pfad replay.html wird nicht mehr bereitgestellt. Der neue Einstieg ist index.html.
 
-Ungenutzte Starter-Dateien für Beispiel-API, PWA, Service Worker und Beispiel-App wurden im neuen
-Repo entfernt. Die vorhandenen AGENTS-Regeln, LICENSE.txt, PROJECT-LICENSE-KIT.txt und .nojekyll
-wurden erhalten. Die Lizenz nicht beiläufig ändern; das Lizenz-Kit ist kein bereits ausgeführter
-Lizenzwechsel. Es gibt im Replay aktuell weder Service Worker noch Analytics.
+Beim Umzug wurden die Starter-Dateien zunächst zu weitgehend entfernt. Die Website-Basis wurde
+am 25.10.2026 wieder mit dem Replay zusammengeführt: `css/style.css` enthält die Template-Basis
+und anschließend die Replay-Stile; `js/app.js` enthält die Replay-Anwendung und startet sie mit `init()`.
+Der HTML-Head erhält Author, Canonical, Open-Graph-URL/-Bild, Icon-Verweise und das ursprüngliche
+Umami-Script mit Website-ID `2392a451-203c-4d8a-a4f5-bd7d06f832af` und
+`data-domains="tehes.github.io"`. Das erfasst Seitenaufrufe auf GitHub Pages, nicht auf localhost;
+es wurden keine eigenen Tracking-Events ergänzt. Die vorhandene Demo dient als Social-Vorschaubild.
+Die absichtlich leeren SVG-/Touch-Icon-Platzhalter des Templates werden nicht wieder eingesetzt;
+PNG-Favicon und Apple-Touch-Verweis nutzen das vorhandene Projekt-Icon.
+Die optionalen Beispiel-API-, PWA- und Service-Worker-Dateien bleiben entsprechend der
+Website-Variante der Template-README ungenutzt. Die Replay-Darstellung bleibt dunkel, die
+Template-Regeln für Reset, Basis, reduzierte Bewegung und Standalone-Abstand bleiben erhalten.
+AGENTS-Regeln, LICENSE.txt, PROJECT-LICENSE-KIT.txt und .nojekyll wurden erhalten.
+Die Lizenz nicht beiläufig ändern; das Lizenz-Kit ist kein bereits ausgeführter Lizenzwechsel.
 
 ### Enthaltene Referenzspiele
 
@@ -208,9 +219,9 @@ auf null gesetzten Koordinatenfeld einen verlässlichen Ort ableiten.
 ### Architektur und wichtige Einstiegspunkte
 
 - `index.html`: ausschließlich Court/Scoreboard/Controls; Timeline mit `step="0.001"`.
-- `css/replay.css`: Layout und Darstellung.
-- `js/replay.js`: Daten laden, Teamfarben und 30 lokale Logos, Canvas zeichnen, Wiedergabe,
-  Keyboard, Namen und Resize. `init()`, `render()`, `seek()`, `tick()` sind zentrale Einstiegspunkte.
+- `css/style.css`: Template-Basis und anschließend Replay-Layout und Darstellung.
+- `js/app.js`: expliziter App-Einstieg, Daten laden, Teamfarben und 30 lokale Logos, Canvas zeichnen,
+  Wiedergabe, Keyboard, Namen und Resize. `init()`, `render()`, `seek()`, `tick()` sind zentrale Einstiegspunkte.
 - `js/replay-engine.js`: `compileReplay(data)` berechnet Szenen, Keyframes, Lineups, Besitz,
   Matchups, Marker, Angriffs- und Viertelgrenzen. `getReplayFrame(replay, time)` interpoliert daraus
   den Zustand zu einem beliebigen Zeitpunkt. Kein Netzwerk-/DOM-Code in der Engine.
@@ -316,7 +327,7 @@ Timeline-Schritt 0.001 beibehalten oder bei einer Änderung bewusst gleichwertig
   Zonenverteidigung und exakte Off-ball-Wege sind dadurch weiterhin nicht rekonstruiert.
 - Die Wurfklassifikation nutzt derzeit strukturierte Subtypes und Descriptor-Text. Unbekannte
   Schreibweisen oder neue Kombinationen können bei der allgemeinen Animation landen.
-- Keine öffentliche Bereitstellung oder Custom-Domain eingerichtet. Der Browser lädt nun Daten
+- Öffentlich unter https://tehes.github.io/hoops-replay/, keine Custom-Domain eingerichtet. Der Browser lädt Daten
   abgeschlossener Spiele vom vorhandenen Backend; keine Live-Spiel-Simulation. Externe Änderungen nach diesem Datum bei Bedarf frisch prüfen.
 - TEAM_COLORS liegt jetzt in replay-teams.js; die frühere REFERENCE_GAMES-Allowlist ist entfernt.
   Weitere Sonderfälle und echte OT-Spiele bleiben anhand ihrer Daten zu prüfen.
