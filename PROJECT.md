@@ -220,7 +220,11 @@ Der Court misst im Engine-Koordinatensystem 94 × 50. Reguläre Feed-Wurfkoordin
 x × 0,94 und y × 0,5 umgerechnet. Körbe liegen bei x 5,25 / 88,75 und y 25.
 Die Canvas-Welt umfasst 110 × 65 einschließlich Rand und wird um (8,9) versetzt.
 Eigene Änderungen nicht mit halbfeldbezogenen Legacy-Koordinaten verwechseln.
-Die Korbrichtung wechselt zur Halbzeit anhand Heimteam und Periode; dies ist eine Schema-Annahme.
+Die erste Feldwurfaktion mit gültigem `side: "left"` / `"right"` belegt die Korbrichtung.
+Daraus werden die entgegengesetzte Richtung des anderen Teams und der Seitenwechsel zur Halbzeit
+abgeleitet; Verlängerungen behalten die Richtung der zweiten Halbzeit. Ohne solchen Beleg bleibt
+die bisherige Schema-Annahme (Heimteam vor der Halbzeit nach rechts) als Fallback bestehen.
+Die aufgezeichneten x/y-Wurfkoordinaten werden dabei nicht gespiegelt oder geändert.
 
 Szenen verbinden unter anderem zugehörige Blocks mit Würfen, Steals mit Turnovern sowie
 Offensivfouls mit Turnovern, damit dieselbe Aktion nicht doppelt abgespielt wird.
@@ -545,3 +549,18 @@ Ein Regressionstest mit Rückwechsel und gleichzeitigem Wechsel des Gegners repr
 zusätzlichen sichtbaren Spieler und prüft danach zehn aktive Spieler sowie den vollständigen Audit.
 CHI–MIL wird über den Backend-Abruf in Chrome MCP auf Port 5500 geprüft; die drei lokalen
 Referenzspiele und alle sieben Tests bestehen weiter. Keine weiteren Feed-Fälle wurden mitgeändert.
+
+## Korbrichtung aus dem Feed (24.10.2026)
+
+TOR–WAS 0022600097 belegt die umgekehrte Startausrichtung: Washington wirft in Q1/Q2 auf den
+linken, in Q3/Q4 auf den rechten Korb. Die bisherige feste Heimteam-Annahme führte zu Ballflügen
+zum falschen Korb. `attackDirection()` verwendet jetzt den oben beschriebenen Seitenbeleg für
+Aufbau, Matchups, Würfe, Freiwürfe und Wiedereinwürfe. Der Audit prüft jeden Abschluss mit
+vorhandener Feed-Seite unabhängig gegen seinen Zielkorb und lehnt widersprüchliche Seiten ab.
+
+Ein vollständig seitenverkehrter Referenzdatensatz reproduziert den Fehler vor der Korrektur.
+Der Regressionstest prüft Zielkörbe, unveränderte Wurfkoordinaten, Freiwurfseiten und Seeking.
+Alle acht Tests und die drei lokalen Referenzspiele bestehen. Der frisch abgerufene TOR–WAS-Feed
+besteht mit 513 Szenen, 6.595 Keyframes und FINAL 112:102 den vollständigen Audit.
+Chrome MCP auf Port 5500: Feed-Laden, Korbzuordnung in allen vier Vierteln und Seeking zum
+Alley-oop von Davis in Q3 geprüft. Kein neuer lokaler Spiel-Snapshot wurde angelegt.

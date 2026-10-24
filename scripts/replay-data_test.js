@@ -233,3 +233,33 @@ Deno.test("same-clock substitution chains display only the final lineup while pr
 	);
 	assert(checkReplay(data, replay).errors.length === 0, "substitution chain failed replay validation");
 });
+
+Deno.test("recorded shot sides determine baskets for both teams before and after halftime", async () => {
+	const data = await readData("replay-0022600007.json");
+	for (const action of data.actions) {
+		if (action.isFieldGoal) {
+			action.x = 100 - action.x;
+			action.side = action.side === "right" ? "left" : "right";
+		}
+	}
+	const replay = compileReplay(data);
+	for (const scene of replay.scenes.filter((scene) => scene.action.isFieldGoal)) {
+		const expectedHoop = scene.action.side === "left" ? 5.25 : 88.75;
+		assert(scene.hoop.x === expectedHoop, `shot ${scene.action.actionNumber} targets the wrong basket`);
+		assert(
+			Math.abs(scene.shotPoint.x - scene.action.x * 0.94) < 0.00001 &&
+				Math.abs(scene.shotPoint.y - scene.action.y * 0.5) < 0.00001,
+			"recorded shot coordinates were changed",
+		);
+		const frame = getReplayFrame(replay, scene.start + scene.releaseAt);
+		assert(frame.scene === scene, "seeking lost the shot scene");
+	}
+	for (const scene of replay.scenes.filter((scene) => scene.kind === "freethrow")) {
+		const home = data.teams.find((team) => team.home);
+		const shootsLeft = (scene.action.teamId === home.id) === (scene.action.period <= 2);
+		const release = scene.frames.find((frame) => Math.abs(frame.time - scene.releaseAt) < 0.00001);
+		const shooter = release.players.find((player) => player.id === scene.action.personId);
+		assert(shooter.x === (shootsLeft ? 19 : 75), "free throw uses the wrong side");
+	}
+	assert(checkReplay(data, replay).errors.length === 0, "reversed basket replay failed validation");
+});

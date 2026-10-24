@@ -12,9 +12,15 @@ function otherTeam(data, teamId) {
 	return data.teams.find((team) => team.id !== teamId).id;
 }
 
-function attackDirection(data, teamId, period) {
+export function attackDirection(data, teamId, period) {
 	const homeId = data.teams.find((team) => team.home).id;
-	return (teamId === homeId) === (period <= 2) ? 1 : -1;
+	const evidence = data.actions.find((action) => action.isFieldGoal && ["left", "right"].includes(action.side));
+	// The feed's basket side is independent of home/away; both teams switch at halftime.
+	const homeFirstHalfDirection = evidence
+		? (evidence.side === "right" ? 1 : -1) * (evidence.teamId === homeId ? 1 : -1) *
+			(evidence.period <= 2 ? 1 : -1)
+		: 1;
+	return homeFirstHalfDirection * ((teamId === homeId) === (period <= 2) ? 1 : -1);
 }
 
 function eventOffense(scene, fallback, data) {

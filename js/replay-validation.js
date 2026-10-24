@@ -1,4 +1,4 @@
-import { compileReplay, getReplayFrame } from "./replay-engine.js";
+import { attackDirection, compileReplay, getReplayFrame } from "./replay-engine.js";
 
 export function checkReplay(data, replay = compileReplay(data)) {
 	const id = data.gameId;
@@ -148,6 +148,12 @@ export function checkReplay(data, replay = compileReplay(data)) {
 		);
 		const style = scene.shotStyle;
 		if (!style) continue;
+		if (["left", "right"].includes(scene.action.side)) {
+			check(
+				scene.hoop.x === (scene.action.side === "left" ? 5.25 : 88.75),
+				`${tag} recorded basket side`,
+			);
+		}
 		shots++;
 		const profile = style.family + ":" + Object.keys(style).filter((key) => style[key] === true).join(",");
 		profiles.set(profile, (profiles.get(profile) || 0) + 1);
@@ -241,8 +247,7 @@ export function checkReplay(data, replay = compileReplay(data)) {
 		}
 
 		if (scene.spacingSource === "current") {
-			const home = data.teams.find((team) => team.home);
-			const direction = (scene.attackTeam === home.id) === (scene.action.period <= 2) ? 1 : -1;
+			const direction = attackDirection(data, scene.attackTeam, scene.action.period);
 			for (const [slot, playerId] of scene.lineups[scene.attackTeam].entries()) {
 				const previous = scene.frames[0].players.find((player) => player.id === playerId);
 				const [x, y] = scene.spacingDestinations[slot];
