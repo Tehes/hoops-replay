@@ -53,7 +53,7 @@ input:focus-visible {
 
 #replay {
 	width: min(100%, 1320px);
-	max-width: min(1320px, calc((100dvh - 210px) * 110 / 68));
+	max-width: min(1320px, calc((100dvh - 210px) * 110 / 65));
 }
 
 .scoreboard {
@@ -107,7 +107,7 @@ input:focus-visible {
 #court {
 	display: block;
 	width: 100%;
-	aspect-ratio: 110 / 68;
+	aspect-ratio: 110 / 65;
 	touch-action: manipulation;
 }
 #load-state {
@@ -257,7 +257,7 @@ input:focus-visible {
 		padding: 8px 16px;
 	}
 	#replay {
-		max-width: calc((100dvh - 120px) * 110 / 68);
+		max-width: calc((100dvh - 120px) * 110 / 65);
 	}
 	.scoreboard {
 		gap: 20px;

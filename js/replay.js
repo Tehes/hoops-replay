@@ -1,7 +1,7 @@
 import { compileReplay, getReplayFrame } from "./replay-engine.js";
-import { TEAM_COLORS } from "./replay-teams.js";
+import { getJerseyColors, TEAM_COLORS, TEAM_NAMES } from "./replay-teams.js";
 
-const WORLD = { width: 110, height: 68, left: 8, top: 9 };
+const WORLD = { width: 110, height: 65, left: 8, top: 9 };
 const DEFAULT_GAME = "0022600007";
 const ICON_TITLES = {
 	foul: "Foul",
@@ -70,7 +70,7 @@ function drawCourt() {
 	c.scale(scale, scale);
 	c.translate(WORLD.left, WORLD.top);
 	c.fillStyle = "#0c131b";
-	roundedRect(c, -3.4, -3.4, 100.8, 56.8, 0.6);
+	roundedRect(c, -6.8, -3.4, 107.6, 56.8, 0.6);
 	c.fill();
 	c.fillStyle = "#dcb784";
 	c.fillRect(0, 0, 94, 50);
@@ -134,6 +134,26 @@ function drawCourt() {
 		c.arc(5.25, 25, 23.75, -angle, angle);
 		c.lineTo(0, 47);
 		c.stroke();
+		c.strokeStyle = "#80909d";
+		c.lineWidth = 0.35;
+		c.beginPath();
+		c.moveTo(-2.4, 25);
+		c.lineTo(4, 23.7);
+		c.moveTo(-2.4, 25);
+		c.lineTo(4, 26.3);
+		c.stroke();
+		c.strokeStyle = "#b8c4ce";
+		c.lineWidth = 0.65;
+		c.beginPath();
+		c.moveTo(-2.4, 25);
+		c.lineTo(4, 25);
+		c.stroke();
+		c.fillStyle = colors.shirt;
+		roundedRect(c, -4.6, 22.9, 2.2, 4.2, 0.35);
+		c.fill();
+		c.strokeStyle = "#9aabb8";
+		c.lineWidth = 0.16;
+		c.stroke();
 		c.lineWidth = 0.3;
 		c.strokeStyle = "#f6f7f8";
 		c.beginPath();
@@ -145,18 +165,24 @@ function drawCourt() {
 		c.beginPath();
 		c.arc(5.25, 25, 0.75, 0, Math.PI * 2);
 		c.stroke();
+		c.restore();
+	}
+	for (
+		const label of [
+			{ x: -6.1, angle: -Math.PI / 2, text: TEAM_NAMES[home?.code || "OKC"] },
+			{ x: 100.1, angle: Math.PI / 2, text: game?.arena || "Paycom Center" },
+		]
+	) {
+		c.save();
 		c.fillStyle = "#f5f6f7";
 		c.font = "700 1.4px system-ui";
 		c.textAlign = "center";
-		c.translate(-1.25, 25);
-		c.rotate(-Math.PI / 2);
-		c.fillText(home?.code === "BOS" ? "BOSTON CELTICS" : "OKLAHOMA CITY", 0, 0);
+		c.translate(label.x, 25);
+		c.rotate(label.angle);
+		c.fillText(label.text.toUpperCase(), 0, 0);
 		c.restore();
 	}
 	c.textAlign = "center";
-	c.fillStyle = "#9aabb8";
-	c.font = "600 1px system-ui";
-	c.fillText((game?.arena || "Paycom Center").toUpperCase(), 47, 54.8);
 	c.fillStyle = "#536572";
 	c.font = "600 0.9px system-ui";
 	const date = game
@@ -180,9 +206,9 @@ function resizeCourt() {
 	render();
 }
 
-function drawPlayer(position, frame) {
+function drawPlayer(position) {
 	const player = playerById.get(position.id);
-	const colors = TEAM_COLORS[teamById.get(player.teamId).code];
+	const colors = getJerseyColors(teamById.get(player.teamId));
 	const size = Math.max(1, 7 / (scale / (globalThis.devicePixelRatio || 1) * 1.6));
 	ctx.save();
 	ctx.globalAlpha = position.opacity;
@@ -192,13 +218,6 @@ function drawPlayer(position, frame) {
 	ctx.beginPath();
 	ctx.ellipse(0.2, 1.9, 2 / (1 + position.jump * 0.08), 0.7, 0, 0, Math.PI * 2);
 	ctx.fill();
-	if (position.id === frame.ball.owner || position.id === selectedPlayer) {
-		ctx.strokeStyle = position.id === selectedPlayer ? "#ffffff" : "#f6bc55";
-		ctx.lineWidth = 0.2;
-		ctx.beginPath();
-		ctx.ellipse(0, 0, 2.5, 2.8, 0, 0, Math.PI * 2);
-		ctx.stroke();
-	}
 	ctx.translate(0, -position.jump * 0.65);
 	ctx.rotate(position.angle);
 	ctx.beginPath();
@@ -386,6 +405,37 @@ function drawEventIcon(kind, x, y, size) {
 	ctx.restore();
 }
 
+function drawShotMarkers(frame) {
+	const pixelScale = scale / (globalThis.devicePixelRatio || 1);
+	const markerSize = Math.max(1, 5 / pixelScale);
+	for (const marker of frame.markers) {
+		if (marker.kind !== "made" && marker.kind !== "miss") {
+			continue;
+		}
+		const age = frame.time - marker.time;
+		const remaining = marker.end - frame.time;
+		const y = marker.y + 1.7;
+		ctx.save();
+		ctx.globalAlpha = Math.min(1, remaining, age / 0.12 + 0.2);
+		ctx.beginPath();
+		if (marker.kind === "made") {
+			ctx.fillStyle = "#228b50";
+			ctx.arc(marker.x, y, 1.6 * markerSize, 0, Math.PI * 2);
+			ctx.fill();
+		} else {
+			ctx.strokeStyle = "#d03b45";
+			ctx.lineWidth = 0.45 * markerSize;
+			ctx.lineCap = "round";
+			ctx.moveTo(marker.x - 1.1 * markerSize, y - 1.1 * markerSize);
+			ctx.lineTo(marker.x + 1.1 * markerSize, y + 1.1 * markerSize);
+			ctx.moveTo(marker.x + 1.1 * markerSize, y - 1.1 * markerSize);
+			ctx.lineTo(marker.x - 1.1 * markerSize, y + 1.1 * markerSize);
+			ctx.stroke();
+		}
+		ctx.restore();
+	}
+}
+
 function drawMarkers(frame) {
 	const pixelScale = scale / (globalThis.devicePixelRatio || 1);
 	const markerSize = Math.max(1, 5 / pixelScale);
@@ -393,20 +443,12 @@ function drawMarkers(frame) {
 		const age = frame.time - marker.time;
 		const remaining = marker.end - frame.time;
 		ctx.save();
-		ctx.globalAlpha = Math.min(1, remaining / 0.65, age / 0.08 + 0.2);
+		ctx.globalAlpha = Math.min(
+			1,
+			remaining / (marker.kind === "made" || marker.kind === "miss" ? 1 : 0.65),
+			age / 0.08 + 0.2,
+		);
 		if (marker.kind === "made" || marker.kind === "miss") {
-			ctx.strokeStyle = marker.kind === "made" ? "#13694e" : "#af2940";
-			ctx.lineWidth = 0.35 * markerSize;
-			ctx.beginPath();
-			if (marker.kind === "made") {
-				ctx.arc(marker.x, marker.y, 2.5 * markerSize, 0, Math.PI * 2);
-			} else {
-				ctx.moveTo(marker.x - 1.5 * markerSize, marker.y - 1.5 * markerSize);
-				ctx.lineTo(marker.x + 1.5 * markerSize, marker.y + 1.5 * markerSize);
-				ctx.moveTo(marker.x + 1.5 * markerSize, marker.y - 1.5 * markerSize);
-				ctx.lineTo(marker.x - 1.5 * markerSize, marker.y + 1.5 * markerSize);
-			}
-			ctx.stroke();
 			if (marker.value) {
 				ctx.font = `850 ${2.4 * markerSize}px system-ui`;
 				ctx.textAlign = "center";
@@ -529,9 +571,10 @@ function render() {
 	ctx.save();
 	ctx.scale(scale, scale);
 	ctx.translate(WORLD.left, WORLD.top);
+	drawShotMarkers(frame);
 	drawShotEffects(frame);
 	for (const position of frame.players.filter((player) => player.opacity > 0.01).sort((a, b) => a.y - b.y)) {
-		drawPlayer(position, frame);
+		drawPlayer(position);
 	}
 	drawMarkers(frame);
 	drawBall(frame);

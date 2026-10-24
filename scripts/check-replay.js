@@ -99,6 +99,56 @@ export function checkReplay(data) {
 	check(represented.size === data.actions.length, `${id} all actions represented`);
 	check(JSON.stringify(replay.finalScore) === JSON.stringify(data.teams.map((t) => t.score)), `${id} final score`);
 	for (const [index, scene] of replay.scenes.entries()) {
+		if (scene.reboundRotation) {
+			const rotation = scene.reboundRotation;
+			const from = scene.frames.find((frame) => frame.time === rotation.start);
+			const to = scene.frames.find((frame) => frame.time === rotation.end);
+			const before = from.players.find((player) => player.id === rotation.rebounderId);
+			const after = to.players.find((player) => player.id === rotation.rebounderId);
+			check(
+				Math.hypot(after.x - scene.hoop.x, after.y - scene.hoop.y) <
+					Math.hypot(before.x - scene.hoop.x, before.y - scene.hoop.y),
+				`${id} rebounder rotates toward paint ${scene.action.actionNumber}`,
+			);
+			check(
+				rotation.end <= scene.releaseAt && from.ball.owner === to.ball.owner,
+				`${id} off-ball rotation before shot ${scene.action.actionNumber}`,
+			);
+		}
+		if (scene.reboundApproach) {
+			const approach = scene.reboundApproach;
+			const previous = replay.scenes[approach.sceneIndex];
+			const arrived = previous.frames.at(-1).players.find((player) => player.id === approach.playerId);
+			const first = scene.frames[0].players.find((player) => player.id === approach.playerId);
+			check(
+				Math.hypot(arrived.x - approach.target.x, arrived.y - approach.target.y) < 0.00001 &&
+					Math.hypot(first.x - arrived.x, first.y - arrived.y) < 0.00001,
+				`${id} rebound arrival ${scene.action.actionNumber}`,
+			);
+			const catchFrame = scene.frames.find((frame) => Math.abs(frame.time - scene.catchAt) < 0.00001);
+			check(
+				catchFrame && catchFrame.ball.owner === approach.playerId &&
+					catchFrame.players.find((player) => player.id === approach.playerId).jump > 0,
+				`${id} airborne rebound catch ${scene.action.actionNumber}`,
+			);
+			check(
+				scene.frames.filter((frame) => frame.time < scene.catchAt).every((frame) => !frame.ball.owner) &&
+					scene.frames.some((frame) => frame.ball.flight && !frame.ball.owner),
+				`${id} free ball before rebound catch ${scene.action.actionNumber}`,
+			);
+			const origin = previous.frames.findLast((frame) => frame.time <= approach.start)
+				.players.find((player) => player.id === approach.playerId);
+			if (Math.hypot(origin.x - arrived.x, origin.y - arrived.y) > 0.1) {
+				check(
+					previous.frames.some((frame) => {
+						const player = frame.players.find((item) => item.id === approach.playerId);
+						return frame.time > approach.start && frame.time < approach.end &&
+							Math.hypot(player.x - origin.x, player.y - origin.y) > 0.01;
+					}),
+					`${id} early rebound movement ${scene.action.actionNumber}`,
+				);
+			}
+		}
 		if (scene.technical) {
 			check(
 				scene.frames.at(-1).possession === replay.scenes[index - 1].frames.at(-1).possession,

@@ -35,10 +35,24 @@ festgelegt. Der Nutzer findet den Prototyp interessant, möchte aber weiter erku
 - Eigenständige HTML-Seite, ausschließlich Replay und dazugehörige Steuerung. Derzeit keine Menüs,
   keine zusätzlichen Inhaltsbereiche und kein Tickertext als tragende Erklärung des Spielverlaufs.
 - Ganzes Spielfeld, waagerecht. Logo und Farben in den Zonen machen den Homecourt erkennbar.
-- Spieler als Trikots in Teamfarben mit Rückennummern. Namen als kleine Badges oder Overlays;
+  Außen links steht der vollständige Name des Heimteams aus TEAM_NAMES (Stadt und Team), rechts der Arenaname. Beide Beschriftungen werden
+  hochkant gedreht, aber niemals gespiegelt. Unter dem Court steht kein zusätzlicher Arenaname;
+  der untere Canvas-Rand ist zugunsten einer näheren Wiedergabesteuerung verkürzt.
+  Beide Körbe besitzen eine schematische gepolsterte Stütze hinter der Grundlinie und einen
+  Träger zum Brett. Die seitlichen Beschriftungen stehen außerhalb der Stützen; Ring- und
+  Brettpositionen im Spielfeld bleiben maßstäblich unverändert.
+- Spieler als Trikots mit Rückennummern: Heimteam in Weiß mit teamfarbenen Rändern und Nummern,
+  Auswärtsteam in seiner bisherigen Teamfarbe, ohne Ausnahmen für Gelb oder Silber.
+  Das ist eine bewusste Replay-Konvention, keine Behauptung der echten Uniformwahl des jeweiligen
+  Spiels. Logo und Paint behalten ihre Heimteamfarben.
+  Namen als kleine Badges oder Overlays;
   die aktuelle Umsetzung zeigt sie unter anderem beim Antippen eines Trikots.
-- Treffer werden durch Kreise und direkte Werte wie +1, +2 oder +3 am Wurfort erkennbar.
-  Fehlwürfe bekommen Kreuze. Fouls und andere Ereignisse erhalten passende Symbole auf dem Feld.
+  Keine zusätzlichen Kreise um Ballbesitzer oder ausgewählte Spieler; der Namensbadge genügt.
+- Treffer erhalten kleine ausgefüllte grüne Punkte, Fehlwürfe kleine rote Kreuze auf dem Court.
+  Diese Wurfmarker werden unterhalb der Trikots gezeichnet, als stünden die Spieler darauf.
+  Sie bleiben 4,2 Sekunden Replay-Zeit sichtbar, mit Ausblenden über die letzte Sekunde.
+  Direkte Werte wie +1, +2 oder +3 bleiben am Wurfort erkennbar. Fouls und andere Ereignisse
+  erhalten passende Symbole auf dem Feld.
 - Markierungen verschwinden nach kurzer Replay-Zeit, damit der Court übersichtlich bleibt.
   Pause und Seeking müssen ihre Sichtbarkeit konsistent erhalten.
 - Dunk, Layup und weitere Wurfarten sollen sichtbar unterschiedliche Animationen erhalten.
@@ -106,9 +120,9 @@ geprüften NBA-Datenstand. Beide gehören laut Snapshot zur Saison 2026–27.
 
 | ID | Spiel | Datum im Snapshot (UTC) | Endstand | Aktionen | Szenen | Replay-Dauer |
 | --- | --- | --- | --- | --- | --- | --- |
-| 0022600007 | DEN bei OKC | 2026-10-23 01:30 | 84:96 | 613 | 462 | 1392,113 s |
-| 0022600008 | NYK bei BOS | 2026-10-23 23:00 | 103:107 | 563 | 434 | 1363,758 s |
-| 0022600094 | ATL bei CHA | 2026-10-23 23:00 | 128:81 | 600 | 460 | 1448,255 s |
+| 0022600007 | DEN bei OKC | 2026-10-23 01:30 | 84:96 | 613 | 462 | 1420,923 s |
+| 0022600008 | NYK bei BOS | 2026-10-23 23:00 | 103:107 | 563 | 434 | 1385,018 s |
+| 0022600094 | ATL bei CHA | 2026-10-23 23:00 | 128:81 | 600 | 460 | 1471,665 s |
 
 Ohne Parameter startet DEN–OKC. `?game=0022600008` startet NYK–BOS mit Boston-Homecourt.
 Jede zehnstellige GameID lädt jetzt die entsprechende lokale Datei. Eine nicht vorhandene Datei
@@ -178,7 +192,7 @@ auf null gesetzten Koordinatenfeld einen verlässlichen Ort ableiten.
 
 Der Court misst im Engine-Koordinatensystem 94 × 50. Reguläre Feed-Wurfkoordinaten werden mit
 x × 0,94 und y × 0,5 umgerechnet. Körbe liegen bei x 5,25 / 88,75 und y 25.
-Die Canvas-Welt umfasst 110 × 68 einschließlich Rand und wird um (8,9) versetzt.
+Die Canvas-Welt umfasst 110 × 65 einschließlich Rand und wird um (8,9) versetzt.
 Eigene Änderungen nicht mit halbfeldbezogenen Legacy-Koordinaten verwechseln.
 Die Korbrichtung wechselt zur Halbzeit anhand Heimteam und Periode; dies ist eine Schema-Annahme.
 
@@ -207,6 +221,12 @@ Viertel- und Spielende, Auszeiten und weitere Regelverstöße. Beispiele für So
   Positionen werden danach wiederhergestellt.
 - Letzter regulärer Fehlfreiwurf lässt einen anschließenden Rebound zu; Zwischenfreiwürfe bleiben
   beim Schützen. And-one-/Besitzkontext darf keinen unberechtigten Gegenangriff erzeugen.
+- Bei einem direkt folgenden persönlichen Rebound plant die Engine den bekannten Rebounder schon
+  in den Keyframes des vorherigen Fehlwurfs ein. Er reagiert erst im letzten Viertel des Ballflugs und bewegt sich dann zum schematischen
+  Abprallort; beim eigenen Fehlwurf beginnt der Weg nach dem Abschluss. Der Ball prallt sichtbar
+  ab und wird in der Rebound-Szene im Sprung gefangen. Das gilt auch nach einem letzten verfehlten
+  regulären Freiwurf. Team-Rebounds bleiben ohne erfundenen individuellen Fänger. Bei dazwischen
+  liegenden anderen Szenen greift weiterhin der einfache Rebound-Weg statt dieser Vorabplanung.
 - Alley-oop mit freiem Lob und Abschluss am Korb; Tip/Putback mit direktem Folgeabschluss ohne
   zwischengeschalteten normalen Aufbau oder Assistpass.
 - Bankshots über das Brett; Step-back/Fadeaway/Turnaround mit eigener Bewegung oder Pose.
@@ -317,3 +337,35 @@ Nicht durch Sortieren nach actionNumber oder Abschalten von Prüfungen „repari
 Korrektur anhand der archivierten Daten klären, welche Feed-Angabe tatsächlich falsch ist.
 Ein weiterer Abruf 0022600010 erhielt HTTP 403; das belegt keine allgemeine Nichterreichbarkeit
 des Backends oder aller NBA-Daten. Den vorhandenen Spielplan zur Auswahl abgeschlossener IDs nutzen.
+
+
+## Ergänzung: Rebound-Choreografie
+
+`prepareRebound()` passt beim Kompilieren eines persönlichen Rebounds die Bewegungs-Keyframes
+seines unmittelbar vorausgehenden Fehlwurfs an. Die Endposition wird vor dem ersten Rebound-Frame
+auch in den Compilerzustand übernommen, damit Seeking und Szenenübergänge konsistent bleiben.
+Das ist eine bewusste Nutzung des bekannten Spielverlaufs, keine Rekonstruktion gemessener Laufwege.
+Die Fangphase behält einen freien Ball bis zum Kontakt und markiert den Besitzwechsel mit catchAt.
+Der Audit prüft Ankunft vor der Fangphase, Bewegung während der vorausgehenden Szene, Sprung und
+freien Ball bis zum Fang. Putback-/Tip-Folgen, technische Freiwürfe und Endstände werden weiter geprüft.
+Die drei Referenzspiele umfassen nach dieser Änderung 18.200 Keyframes, weiterhin 1.356 Szenen.
+Die Replay-Dauern in der Tabelle oben sind aktualisiert; die ursprünglich dokumentierten Audit-Zahlen
+beschreiben den damaligen Prüfstand.
+
+
+## Ergänzung: Unauffällige Positionierung vor dem Rebound
+
+Vor einem persönlichen Rebound kann `prepareReboundFormation()` während des Angriffs zwei ballferne
+Formationsplätze rotieren lassen: Der bekannte spätere Rebounder übernimmt den korbnäheren freien
+Platz, ein Mitspieler seinen bisherigen. Bei Verteidigern werden die Mann-gegen-Mann-Zuordnungen
+mitgetauscht. Das sind Bewegungen innerhalb der Formation, noch kein Lauf zum späteren Abprallort.
+Schütze, Assistgeber, Blocker und aktueller Ballbesitzer werden aus dieser Rotation ausgenommen;
+steht der Rebounder bereits am korbnächsten verfügbaren Platz, entfällt die Rotation. Sie gilt nicht
+für Heaves. Ein Schütze direkt am Ring kann weiterhin näher stehen als der spätere Rebounder.
+
+Der gezielte Lauf zum Abprallort beginnt weiterhin erst im letzten Viertel der Wurfflugphase, beim
+eigenen Fehlwurf erst nach dem Abschluss. Niemand soll direkt bei Wurfabgabe zum vorherbestimmten
+Fangpunkt sprinten. Audit-Prüfungen stellen sicher, dass die Rotation näher zur Zone führt, vor der
+Wurfabgabe stattfindet und den Ballbesitz nicht verändert. Die drei Referenzspiele enthalten jetzt
+18.544 Keyframes; die aktuellen Animationsdauern stehen in der Tabelle oben. Ältere Prüfzahlen in
+dieser Übergabe beschreiben den jeweils damaligen Stand.

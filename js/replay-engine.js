@@ -168,7 +168,7 @@ function snapshot(state, time) {
 function addMarker(replay, scene, time, kind, position, value = "", duration = null) {
 	replay.markers.push({
 		time: scene.start + time,
-		end: scene.start + time + (duration ?? (kind === "made" || kind === "miss" ? 2.1 : 1.7)),
+		end: scene.start + time + (duration ?? (kind === "made" || kind === "miss" ? 4.2 : 1.7)),
 		kind,
 		x: position.x,
 		y: position.y,
@@ -254,12 +254,96 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data)
 	state.needsAdvance = false;
 }
 
+function prepareReboundFormation(state, scene, rebounderId, hoop, matchups, contacts, record, data) {
+	if (
+		[scene.action.personId, scene.action.assistPersonId, scene.action.blockPersonId, state.ball.owner].includes(
+			rebounderId,
+		)
+	) {
+		return;
+	}
+	const team = data.teams.find((item) => state.lineups[item.id].includes(rebounderId));
+	const candidates = state.lineups[team.id].filter((id) =>
+		![scene.action.personId, scene.action.assistPersonId, scene.action.blockPersonId, state.ball.owner].includes(id)
+	);
+	const closest = candidates.sort((a, b) =>
+		Math.hypot(state.positions[a].x - hoop.x, state.positions[a].y - hoop.y) -
+		Math.hypot(state.positions[b].x - hoop.x, state.positions[b].y - hoop.y)
+	)[0];
+	if (closest === rebounderId) {
+		return;
+	}
+	const from = { ...state.positions[rebounderId] };
+	const inside = { ...state.positions[closest] };
+	const defenders = matchups[rebounderId] !== undefined;
+	if (defenders) {
+		[matchups[rebounderId], matchups[closest]] = [matchups[closest], matchups[rebounderId]];
+		contacts.add(rebounderId);
+		contacts.add(closest);
+	}
+	const start = scene.frames.at(-1).time;
+	// Rotate two off-ball roles during the buildup, without revealing the later catch point.
+	for (const fraction of [0.5, 1]) {
+		Object.assign(state.positions[rebounderId], {
+			x: from.x + (inside.x - from.x) * fraction,
+			y: from.y + (inside.y - from.y) * fraction,
+		});
+		Object.assign(state.positions[closest], {
+			x: inside.x + (from.x - inside.x) * fraction,
+			y: inside.y + (from.y - inside.y) * fraction,
+		});
+		record(0.5);
+	}
+	if (defenders) {
+		contacts.delete(rebounderId);
+		contacts.delete(closest);
+	}
+	scene.reboundRotation = { rebounderId, partnerId: closest, start, end: scene.frames.at(-1).time };
+}
+
+function prepareRebound(replay, scene, index, state) {
+	const previous = replay.scenes[index - 1];
+	const id = scene.action.personId;
+	if (
+		!id || !previous || !["2pt", "3pt", "heave", "freethrow"].includes(previous.kind) ||
+		previous.action.shotResult === "Made" || previous.technical
+	) {
+		return;
+	}
+	const reactionAt = previous.action.personId === id
+		? previous.eventAt
+		: previous.releaseAt + (previous.eventAt - previous.releaseAt) * 0.75;
+	const startFrame = previous.frames.find((frame) => frame.time >= reactionAt);
+	const start = startFrame.time;
+	const end = previous.frames.at(-1).time;
+	const origin = startFrame.players.find((player) => player.id === id);
+	const target = { x: state.ball.x, y: state.ball.y };
+	// React late in the shot flight instead of anticipating the result at release.
+	for (const frame of previous.frames) {
+		if (frame.time <= start) {
+			continue;
+		}
+		const fraction = Math.min(1, (frame.time - start) / (end - start));
+		const smooth = fraction * fraction * (3 - 2 * fraction);
+		const player = frame.players.find((player) => player.id === id);
+		player.x = origin.x + (target.x - origin.x) * smooth;
+		player.y = origin.y + (target.y - origin.y) * smooth;
+	}
+	Object.assign(state.positions[id], target);
+	scene.reboundApproach = { sceneIndex: index - 1, start, end, playerId: id, target };
+}
+
 function compileScene(replay, scene, index, state, data) {
 	const action = scene.action;
 	const offense = eventOffense(scene, state.possession, data);
 	const direction = attackDirection(data, offense, action.period);
 	const hoop = { x: direction === 1 ? 88.75 : 5.25, y: 25 };
 	const matchups = planMatchups(replay.scenes, index, offense, state, data);
+	const nextScene = replay.scenes[index + 1];
+	const namedRebound = nextScene?.kind === "rebound" && nextScene.action.personId;
+	if (scene.kind === "rebound") {
+		prepareRebound(replay, scene, index, state);
+	}
 	let time = 0;
 	let followAttackers = false;
 	const contacts = new Set();
@@ -305,6 +389,9 @@ function compileScene(replay, scene, index, state, data) {
 		} else {
 			prepareAttack(state, scene, offense, direction, matchups, record, data);
 		}
+		if (namedRebound && scene.kind !== "heave") {
+			prepareReboundFormation(state, scene, namedRebound, hoop, matchups, contacts, record, data);
+		}
 		animateShot(state, scene, shot, hoop, direction, record, contacts, matchups);
 		if (action.blockPersonId) {
 			addMarker(replay, scene, time, "block", state.positions[action.blockPersonId]);
@@ -317,7 +404,7 @@ function compileScene(replay, scene, index, state, data) {
 			state.restart = "baseline";
 			state.ball = { ...hoop, z: 0, owner: null };
 		} else {
-			state.ball = {
+			const reboundPoint = {
 				x: action.blockPersonId
 					? Math.max(1, Math.min(93, shot.x + direction * 3))
 					: hoop.x - direction * (2 + action.actionNumber % 4),
@@ -325,20 +412,31 @@ function compileScene(replay, scene, index, state, data) {
 				z: 0,
 				owner: null,
 			};
+			if (namedRebound) {
+				flyBall(state, record, { ...reboundPoint, z: 3.1 }, 1.8, 0.5);
+			} else {
+				state.ball = reboundPoint;
+			}
 		}
 		record(0.01);
 		landPlayers(state);
 		record(0.22);
-		record(0.65);
+		record(!made && namedRebound ? 0.08 : 0.65);
 	} else if (scene.kind === "rebound") {
 		const defensive = action.subType === "defensive";
 		if (action.personId) {
-			Object.assign(state.positions[action.personId], { x: state.ball.x, y: state.ball.y });
-			record(0.55);
-			state.positions[action.personId].jump = 0.8;
+			const rebounder = state.positions[action.personId];
+			if (!scene.reboundApproach) {
+				Object.assign(rebounder, { x: state.ball.x, y: state.ball.y });
+				record(0.55);
+			}
+			rebounder.jump = 1;
+			record(0.22);
+			flyBall(state, record, { x: rebounder.x + 1, y: rebounder.y + 0.8, z: 1.9 }, 0.15, 0.18);
 			state.ball.owner = action.personId;
 			state.ball.dribble = false;
-			record(0.18);
+			record(0.01);
+			scene.catchAt = time;
 			addMarker(replay, scene, time, "rebound", state.positions[action.personId]);
 		} else {
 			// Team rebounds identify possession, not an individual ball winner.
@@ -387,6 +485,7 @@ function compileScene(replay, scene, index, state, data) {
 		if (technical) {
 			addMarker(replay, scene, time, "technical", shooter, "", 0.65);
 		}
+		scene.releaseAt = time;
 		flyBall(state, record, { ...hoop, z: 1 }, 6, 0.8);
 		scene.eventAt = time;
 		const made = action.shotResult === "Made";
@@ -402,8 +501,13 @@ function compileScene(replay, scene, index, state, data) {
 		} else if (!final) {
 			state.ball.owner = action.personId;
 		} else if (!made) {
-			state.ball.x -= direction * 3;
-			state.ball.y = 28;
+			const reboundPoint = { x: state.ball.x - direction * 3, y: 28, z: 3.1 };
+			if (namedRebound) {
+				flyBall(state, record, reboundPoint, 1.8, 0.5);
+			} else {
+				state.ball.x = reboundPoint.x;
+				state.ball.y = reboundPoint.y;
+			}
 		}
 		record(0.01);
 		if (technical) {
