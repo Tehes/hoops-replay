@@ -12,8 +12,5 @@
                 "recommended"
             ]
         }
-    },
-    "tasks": {
-        "start": "deno run -A xxx.js"
     }
 }
