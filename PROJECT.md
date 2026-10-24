@@ -32,8 +32,10 @@ festgelegt. Der Nutzer findet den Prototyp interessant, möchte aber weiter erku
 
 ## Beschlossene Produktentscheidungen
 
-- Eigenständige HTML-Seite, ausschließlich Replay und dazugehörige Steuerung. Keine Menüs oder
-  zusätzlichen Inhaltsbereiche. Eine flache Jumbotron-Anzeige ersetzt das bisherige Scoreboard:
+- Eigenständige HTML-Seite mit Replay, zugehöriger Steuerung und einem dezenten englischen
+  Fußtext unter der Steuerung. Dieser erklärt echte PbP-Ereignisse und verfügbare Wurfkoordinaten
+  als Grundlage sowie schematisch ergänzte Positionen, Formationen, Matchups und Laufwege;
+  keine Rekonstruktion aus Tracking-Daten. Keine Menüs oder weiteren Inhaltsbereiche. Eine flache Jumbotron-Anzeige ersetzt das bisherige Scoreboard:
   Score, Viertel und Uhr bleiben dauerhaft sichtbar. Darunter erscheinen ab dem Ereigniszeitpunkt
   Spielerfoto, Name und der originale englische PbP-Text der Szene, bis zum nächsten Ereignis oder
   maximal fünf Replay-Sekunden. Pause und Seeking bestimmen die Anzeige ohne eigene Timer.

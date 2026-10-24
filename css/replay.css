@@ -264,6 +264,16 @@ input:focus-visible {
 	font-size: 12px;
 }
 
+.replay-note {
+	max-width: 760px;
+	margin: 20px auto 0;
+	padding: 0 12px;
+	color: var(--muted-color);
+	font-size: 11px;
+	line-height: 1.5;
+	text-align: center;
+}
+
 @media (max-width: 600px) {
 	.action-display {
 		gap: 8px;
