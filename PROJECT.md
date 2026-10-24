@@ -148,9 +148,10 @@ geprüften NBA-Datenstand. Beide gehören laut Snapshot zur Saison 2026–27.
 | 0022600094 | ATL bei CHA | 2026-10-23 23:00 | 128:81 | 600 | 460 | 1420,665 s |
 
 Ohne Parameter startet DEN–OKC. `?game=0022600008` startet NYK–BOS mit Boston-Homecourt.
-Jede zehnstellige GameID lädt jetzt die entsprechende lokale Datei. Eine nicht vorhandene Datei
-oder ungültige ID führt zur Ladefehlermeldung; kein stiller Fallback auf ein anderes Spiel. Ohne
-Parameter bleibt DEN–OKC der Standard. Der direkte Browser-Abruf vom Deno-Server ist noch offen.
+Jede explizite zehnstellige GameID lädt Boxscore und Play-by-Play direkt vom bestehenden Deno-Server,
+auch wenn ein lokaler Snapshot existiert. Ein vorheriger Import ist nicht erforderlich. Ohne Parameter
+bleibt der lokale DEN–OKC-Snapshot der Standard, ohne Backend-Datenabruf. Ungültige IDs,
+unvollständige oder inkonsistente Daten führen zur Ladefehlermeldung, ohne anderes Ersatzspiel.
 Die Replay-Dauer ist eine verdichtete Animationsdauer und entspricht nicht 48 Minuten Spielzeit
 oder der tatsächlichen Dauer der Übertragung.
 
@@ -208,7 +209,9 @@ auf null gesetzten Koordinatenfeld einen verlässlichen Ort ableiten.
   den Zustand zu einem beliebigen Zeitpunkt. Kein Netzwerk-/DOM-Code in der Engine.
 - `js/replay-teams.js`: lokale Trikot-/Kontrastfarben für alle 30 NBA-Teams.
 - `scripts/import-game.js`: Deno-only Download und Normalisierung; keine Browser-Abhängigkeit.
-- `scripts/check-replay.js`: gemeinsame fachliche Prüfung für Import und Audit.
+- `js/replay-data.js`: gemeinsame Normalisierung für Browser und Importer, Browser-Datenabruf.
+- `js/replay-validation.js`: gemeinsame fachliche Prüfung für Browser, Import und Audit.
+- `scripts/check-replay.js`: kompatibler Re-Export der gemeinsamen Prüfung für CLI-Aufrufer.
 - `scripts/audit-replays.js`: automatische Entdeckung und Prüfung aller lokalen Replay-Snapshots.
 - `js/replay-shots.js`: `getShotStyle(action)` klassifiziert Wurffamilie und Descriptor-Merkmale;
   `animateShot()` baut Bewegungen, `flyBall()` tastet Ballflug vorab ab, `landPlayers()` setzt Posen zurück.
@@ -288,11 +291,12 @@ Timeline-Schritt 0.001 beibehalten oder bei einer Änderung bewusst gleichwertig
 
 ## Grenzen und noch offene Arbeit
 
-- Drei freigegebene lokale Spiele, alle 30 NBA-Teamlogos und -paletten, vier Viertel-Buttons.
-  Weitere abgeschlossene Spiele lassen sich per CLI importieren und per GameID lokal öffnen.
-  Noch keine automatische Aktualisierung oder direkte Browser-Deno-Verbindung.
-- Verlängerung ist nicht abgesichert: Viertellänge in der Kompilierung ist derzeit 720 Sekunden,
-  UI/Quarter-Handling ist auf vier Viertel ausgelegt. Nicht als OT-Unterstützung bezeichnen.
+- Drei freigegebene lokale Regression-Snapshots und alle 30 NBA-Teamlogos und -paletten.
+  Ohne Parameter läuft das lokale Beispiel, mit GameID werden abgeschlossene Spiele direkt vom
+  Backend geladen. Kein Polling, keine automatische Aktualisierung und keine Speicherung im Browser.
+- Reguläre Perioden verwenden 720 Sekunden, Verlängerungen 300 Sekunden. Sprungmarken und Labels
+  werden dynamisch erzeugt (Q1–Q4, OT1, OT2 usw.). Synthetische OT-Grenzen sind getestet; eine echte
+  OT-Partie ist noch nicht verifiziert. Nicht als vollständige OT-Abnahme bezeichnen.
 - Die Engine setzt unter anderem einen Sprungball mit verwertbaren Beteiligten, fünf Starter pro
   Team, passende PG–C-Starterpositionen, bekannte Personen und zusammenpassende Substitutionen voraus.
   Andere Spiele, fehlende Koordinaten, Korrekturen und seltene Events können diese Annahmen verletzen.
@@ -301,10 +305,10 @@ Timeline-Schritt 0.001 beibehalten oder bei einer Änderung bewusst gleichwertig
   Zonenverteidigung und exakte Off-ball-Wege sind dadurch weiterhin nicht rekonstruiert.
 - Die Wurfklassifikation nutzt derzeit strukturierte Subtypes und Descriptor-Text. Unbekannte
   Schreibweisen oder neue Kombinationen können bei der allgemeinen Animation landen.
-- Keine öffentliche Bereitstellung, kein Custom-Domain-Setup und kein Live-Datenanschluss im Rahmen
-  dieser Übergabe eingerichtet. Externe Änderungen nach diesem Datum bei Bedarf frisch prüfen.
+- Keine öffentliche Bereitstellung oder Custom-Domain eingerichtet. Der Browser lädt nun Daten
+  abgeschlossener Spiele vom vorhandenen Backend; keine Live-Spiel-Simulation. Externe Änderungen nach diesem Datum bei Bedarf frisch prüfen.
 - TEAM_COLORS liegt jetzt in replay-teams.js; die frühere REFERENCE_GAMES-Allowlist ist entfernt.
-  Viertel-/Overtime-Annahmen bleiben vor einer weiteren Verallgemeinerung zu prüfen.
+  Weitere Sonderfälle und echte OT-Spiele bleiben anhand ihrer Daten zu prüfen.
 - Keine neue Produkt-Roadmap als beschlossen behandeln. Der nächste Nutzerauftrag bestimmt den Umfang.
 
 ## Deno-Backend und mögliche spätere Integration
@@ -317,13 +321,13 @@ benachbarten Spielplan-Checkout in das Replay einbauen.
 
 Die vorhandene Origin-Liste erlaubt bei der Übergabe https://tehes.github.io,
 https://nba-spielplan.de und http://127.0.0.1:5500. Port 5501 und ein eigener Replay-Subdomain-Origin
-sind darin nicht enthalten. Eine spätere Verbindung braucht eine gezielte Änderung und Deployment
-im Backend-Repo. Der derzeitige Replay auf 5501 funktioniert ohne diese Änderung, da er ausschließlich
-lokale Snapshots lädt. Backend-Code, Zugangsdaten oder Betriebszustand wurden nicht übernommen.
+sind darin nicht enthalten. Die aktuelle Vorschau verwendet deshalb nach Freigabe des Ports durch
+den Nutzer http://127.0.0.1:5500. Für andere Origins ist weiterhin eine gezielte CORS-Änderung und
+Deployment im Backend-Repo nötig. Backend-Code und Konfiguration wurden nicht geändert.
 
 Der reproduzierbare CLI-Import weiterer abgeschlossener Spiele ist jetzt umgesetzt. Weitere
-denkbare Schritte: direkte GameID-Datenanbindung im Browser, robuste Behandlung unbekannter Actions, gezielte visuelle
-Verbesserungen und OT; danach bei Bedarf Hosting und Integration aus dem Spielplan.
+denkbare Schritte: robuste Behandlung weiterer Feed-Sonderfälle, gezielte visuelle Verbesserungen
+und echte OT-Abnahme; danach bei Bedarf Hosting und Integration aus dem Spielplan.
 Vor solchen Änderungen den bestehenden Prototyp zeigen/prüfen und seinen bewusst schlanken Umfang
 bewahren. Keine Menüs, Statistikseiten, Analytics, Frameworks oder PWA-Funktionen ungefragt ergänzen.
 
@@ -342,8 +346,8 @@ für 5501 wird dadurch nicht ersetzt. Nicht versuchen, diesen Header im Frontend
 Bei einem fehlgeschlagenen Refresh bleibt die bisherige Replay-Datei bestehen; die Roharchive können
 bereits aktualisiert sein. Fehlermeldung beachten und keinen erfolgreichen Refresh behaupten.
 
-Erst nach erfolgreicher Prüfung wird data/replay-GAME_ID.json geschrieben. Danach funktioniert
-`/?game=GAME_ID` ohne Codeänderung. Der Gesamtaudit entdeckt alle solchen Dateien automatisch,
+Erst nach erfolgreicher Prüfung wird data/replay-GAME_ID.json als Regression-Snapshot geschrieben.
+`/?game=GAME_ID` lädt unabhängig davon direkt vom Backend und benötigt keinen Import. Der Gesamtaudit entdeckt alle solchen Dateien automatisch,
 prüft auch Wurfvarianten, Zwischenstände, aktive Ballbesitzer, Lineups und interpolierte Zustände,
 und liefert bei Fehlern Exitcode 1. Bei neuen Anforderungen aussagekräftige Prüfungen ergänzen.
 
@@ -429,8 +433,9 @@ Offensiv-Rebounds. Alle Wurf-, Rebound-, Lineup-, Score- und Seeking-Prüfungen 
 Die drei Referenzspiele bestehen nach der Spacing-Anpassung 18.226 Keyframes in 1.356 Szenen. Die Animationsdauern oben sind
 aktualisiert; ältere Audit-Zahlen in vorherigen Abschnitten beschreiben den damaligen Stand.
 
-Die lokale Vorschau und Browserprüfung verwenden Port 5502. Port 5500 wird parallel für ein
-anderes Projekt genutzt und darf für diese Arbeit nicht verändert oder übernommen werden.
+Die lokale Vorschau und Browserprüfung verwendeten zunächst Port 5502. Für die direkte
+Backend-Anbindung hat der Nutzer Port 5500 ausdrücklich freigegeben; die Vorschau läuft nun auf
+http://127.0.0.1:5500. Port 5050 bleibt für das parallel laufende Projekt unangetastet.
 
 
 ## Stabile Matchups bereits im Aufbau
@@ -480,3 +485,25 @@ Zusätzlich geprüft werden eine erhaltene Innenposition, ausreichende durchschn
 seltene enge Angreiferpaare sowie Weglänge und Geschwindigkeit der kleinen Korrekturen.
 Chrome MCP wurde lokal auf Port 5502 für Stichproben der Court-Darstellung und des Scrubbings genutzt.
 Die Bewegung bleibt eine schematische Ergänzung; reale Verteidiger dürfen ihrem Gegenspieler nahe sein.
+
+
+## Direkte GameID-Anbindung (24.10.2026)
+
+`?game=GAME_ID` lädt die vorhandenen `/boxscore/`- und `/playbyplay/`-Endpunkte parallel.
+Normalisierung, Kompilierung und die vollständige gemeinsame Prüfung müssen erfolgreich sein,
+bevor Controls freigegeben werden. Es werden weder die Prüfungen gelockert noch lokale Dateien,
+localStorage oder Daten anderer Spiele als stiller Ersatz geschrieben. Das bisherige CLI-Archivieren
+bleibt optional; sein Normalisierungscode wurde nach js/replay-data.js verschoben, die Prüfung nach
+js/replay-validation.js. Die Engine bleibt unabhängig von DOM und Netzwerk.
+
+Chrome MCP auf Port 5500: DAL–IND 0022600095 direkt vom Backend geladen, FINAL 121:105 und
+Neustart geprüft, ohne lokalen Snapshot-Abruf. Weitere direkte Backend-Datensätze bestehen den
+Audit: 0022600001–0022600006, 0022600097, 0022600102 und 0022600103.
+Nicht jedes beliebige Spiel ist bereits rekonstruierbar: 0022600096 scheitert in der Formationsplanung,
+0022600098 an einer Fadeaway-Prüfung, 0022600099 an Lineup-Prüfungen und 0022600100/0022600101
+an Personen, die dem Roster unbekannt sind. Diese Fälle sind offengelegt und nicht durch Abschalten
+von Prüfungen behoben. HOU–SAS bleibt der dokumentierte abgelehnte Referenzfall.
+
+scripts/replay-data_test.js prüft lokale Standardauswahl gegenüber direkter GameID-Anbindung,
+HTTP-Fehler ohne Ersatzspiel, Ablehnung laufender Spiele und falscher Feed-IDs, den HOU–SAS-Fehlerfall
+sowie synthetische Grenzen zweier Verlängerungen. Echte OT-Partien bleiben eine offene Abnahme.

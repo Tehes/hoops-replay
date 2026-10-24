@@ -970,7 +970,8 @@ function compileScene(replay, scene, index, state, data) {
 	} else {
 		scene.eventAt = 0.3;
 		if (scene.kind === "period") {
-			scene.banner = action.subType === "end" ? `Q${action.period} · 0:00` : `Q${action.period}`;
+			const periodLabel = action.period > 4 ? `OT${action.period - 4}` : `Q${action.period}`;
+			scene.banner = action.subType === "end" ? `${periodLabel} · 0:00` : periodLabel;
 			if (action.subType === "start" && action.period > 1) {
 				state.restart = "sideline";
 			}
@@ -1069,7 +1070,11 @@ export function compileReplay(data) {
 		scene.frames = [];
 		scene.swaps = [];
 		scene.clockTo = clockSeconds(scene.action.clock);
-		scene.clockFrom = previous?.action.period === scene.action.period ? previous.clockTo : 720;
+		scene.clockFrom = previous?.action.period === scene.action.period
+			? previous.clockTo
+			: scene.action.period > 4
+			? 300
+			: 720;
 		if (scene.kind === "period" && scene.action.subType === "start") {
 			replay.quarters.push({ period: scene.action.period, time: scene.start });
 		}

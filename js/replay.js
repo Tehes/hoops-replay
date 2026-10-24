@@ -1,8 +1,9 @@
+import { loadReplayData } from "./replay-data.js";
+import { checkReplay } from "./replay-validation.js";
 import { compileReplay, getReplayFrame } from "./replay-engine.js";
 import { getJerseyColors, TEAM_COLORS, TEAM_NAMES } from "./replay-teams.js";
 
 const WORLD = { width: 110, height: 65, left: 8, top: 9 };
-const DEFAULT_GAME = "0022600007";
 const ACTION_DURATION = 5;
 let actionEvents = [];
 let displayedAction = undefined;
@@ -34,7 +35,8 @@ const previousButton = document.querySelector("#previous");
 const nextButton = document.querySelector("#next");
 const speedSelect = document.querySelector("#speed");
 const elapsed = document.querySelector("#elapsed");
-const quarterButtons = document.querySelectorAll("#quarters button");
+const quarters = document.querySelector("#quarters");
+const quarterTemplate = document.querySelector("#quarter-template");
 const awayTeamEl = document.querySelector(".team.away");
 const homeTeamEl = document.querySelector(".team.home");
 const actionDisplay = document.querySelector(".action-display");
@@ -480,7 +482,11 @@ function render() {
 	renderAction(frame);
 	awayScore.textContent = frame.score[0];
 	homeScore.textContent = frame.score[1];
-	periodEl.textContent = currentTime === replay.duration ? "FINAL" : `Q${frame.period}`;
+	periodEl.textContent = currentTime === replay.duration
+		? "FINAL"
+		: frame.period > 4
+		? `OT${frame.period - 4}`
+		: `Q${frame.period}`;
 	clockEl.textContent = formatTime(frame.clock);
 	timeline.value = currentTime;
 	elapsed.value = `${formatTime(currentTime)} / ${formatTime(replay.duration)}`;
@@ -562,13 +568,13 @@ async function init() {
 		if (requestedGame !== null && !/^\d{10}$/.test(requestedGame)) {
 			throw new Error("Game ID must contain ten digits.");
 		}
-		const gameId = requestedGame ?? DEFAULT_GAME;
-		const response = await fetch(`./data/replay-${gameId}.json`);
-		if (!response.ok) {
-			throw new Error(`Replay data: HTTP ${response.status}`);
-		}
-		game = await response.json();
+		game = await loadReplayData(requestedGame);
 		replay = compileReplay(game);
+		const report = checkReplay(game, replay);
+		if (report.errors.length) {
+			console.error("Replay validation failed:", report.errors);
+			throw new Error(`Replay data is inconsistent (${report.errors.length} validation errors).`);
+		}
 		actionEvents = replay.scenes.filter((scene) => scene.action.description).map((scene) => ({
 			time: scene.start + scene.eventAt,
 			label: scene.banner || "",
@@ -605,10 +611,13 @@ async function init() {
 		for (const control of document.querySelectorAll(".playback button, .playback input, .playback select")) {
 			control.disabled = false;
 		}
-		quarterButtons.forEach((button, index) => {
-			button.style.left = `${replay.quarters[index].time / replay.duration * 100}%`;
-			button.addEventListener("click", () => seek(replay.quarters[index].time));
-		});
+		for (const quarter of replay.quarters) {
+			const button = quarterTemplate.content.firstElementChild.cloneNode(true);
+			button.textContent = quarter.period > 4 ? `OT${quarter.period - 4}` : `Q${quarter.period}`;
+			button.style.left = `${quarter.time / replay.duration * 100}%`;
+			button.addEventListener("click", () => seek(quarter.time));
+			quarters.append(button);
+		}
 		playButton.addEventListener("click", () => {
 			if (currentTime >= replay.duration) {
 				seek(0);
@@ -643,8 +652,9 @@ async function init() {
 		loadState.hidden = true;
 		render();
 	} catch (error) {
+		replay = null;
 		console.error("Court Replay could not be prepared:", error);
-		loadState.textContent = "Replay konnte nicht geladen werden. Bitte lade die Seite erneut.";
+		loadState.textContent = `Replay could not be loaded. ${error.message}`;
 	}
 }
 

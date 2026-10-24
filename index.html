@@ -38,12 +38,8 @@
 				<div class="timeline">
 					<input id="timeline" type="range" min="0" max="1" value="0" step="0.001" title="Zeitpunkt im Replay"
 						disabled>
-					<div id="quarters">
-						<button type="button" data-period="1" disabled>Q1</button>
-						<button type="button" data-period="2" disabled>Q2</button>
-						<button type="button" data-period="3" disabled>Q3</button>
-						<button type="button" data-period="4" disabled>Q4</button>
-					</div>
+					<div id="quarters"></div>
+					<template id="quarter-template"><button type="button"></button></template>
 				</div>
 				<div class="transport">
 					<output id="elapsed">0:00 / 0:00</output>

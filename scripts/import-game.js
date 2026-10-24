@@ -1,9 +1,7 @@
 import { checkReplay } from "./check-replay.js";
-import { TEAM_COLORS } from "../js/replay-teams.js";
+import { API_BASE, normalizeGame } from "../js/replay-data.js";
 
-const API_BASE = "https://nba-spielplan.tehes.deno.net";
 const ROOT = new URL("../data/", import.meta.url);
-const SLOTS = ["PG", "SG", "SF", "PF", "C"];
 
 async function fetchFeed(path) {
 	// This backend checks Origin for server-side clients as well as browsers.
@@ -14,85 +12,6 @@ async function fetchFeed(path) {
 		throw new Error(`${path}: HTTP ${response.status}`);
 	}
 	return await response.json();
-}
-
-function normalizeTeam(team, home) {
-	if (!TEAM_COLORS[team.teamTricode] || !Array.isArray(team.players)) {
-		throw new Error(`Unsupported team or missing roster: ${team.teamTricode}`);
-	}
-	const players = team.players.map((player) => ({
-		id: player.personId,
-		name: player.name,
-		number: player.jerseyNum,
-		position: player.position || "",
-		starter: player.starter === "1",
-		minutes: player.statistics?.minutes || "PT00M00.00S",
-	}));
-	const starters = players.filter((player) => player.starter);
-	if (starters.length !== 5) {
-		throw new Error(`${team.teamTricode}: expected five starters.`);
-	}
-	const available = new Set(SLOTS);
-	const unresolved = [];
-	for (const player of starters) {
-		if (available.has(player.position)) {
-			available.delete(player.position);
-		} else {
-			unresolved.push(player);
-		}
-	}
-	// A formation needs five unique slots; these are schematic roles, not tracking facts.
-	for (const player of unresolved) {
-		player.sourcePosition = player.position;
-		player.position = available.values().next().value;
-		player.positionSource = "schematic";
-		available.delete(player.position);
-		console.warn(`${team.teamTricode}: schematic ${player.position} slot for ${player.name}.`);
-	}
-	return {
-		id: team.teamId,
-		code: team.teamTricode,
-		name: team.teamName,
-		home,
-		score: team.score,
-		players,
-	};
-}
-
-function normalizeGame(gameId, boxscore, playByPlay) {
-	const game = boxscore.game;
-	if (game?.gameId !== gameId || playByPlay.game?.gameId !== gameId) {
-		throw new Error("Feed game IDs do not match the requested game.");
-	}
-	if (game.gameStatus !== 3) {
-		throw new Error("Only completed games can be imported.");
-	}
-	if (game.period > 4) {
-		throw new Error("Overtime is not supported by the replay yet. Raw feeds were saved.");
-	}
-	if (!Array.isArray(playByPlay.game.actions) || !playByPlay.game.actions.length) {
-		throw new Error("Missing play-by-play actions.");
-	}
-	const date = new Date(game.gameTimeUTC);
-	if (!Number.isFinite(date.getTime())) {
-		throw new Error("Missing or invalid game date.");
-	}
-	const year = date.getUTCFullYear() - (date.getUTCMonth() < 6 ? 1 : 0);
-	return {
-		gameId,
-		date: game.gameTimeUTC,
-		arena: game.arena?.arenaName || "",
-		season: `${year}-${String(year + 1).slice(-2)}`,
-		sources: {
-			playByPlay: `${API_BASE}/playbyplay/${gameId}`,
-			boxscore: `${API_BASE}/boxscore/${gameId}`,
-			captured: new Date().toISOString(),
-			rawPlayByPlay: `raw/playbyplay-${gameId}.json`,
-			rawBoxscore: `raw/boxscore-${gameId}.json`,
-		},
-		teams: [normalizeTeam(game.awayTeam, false), normalizeTeam(game.homeTeam, true)],
-		actions: playByPlay.game.actions,
-	};
 }
 
 async function init() {
@@ -128,6 +47,8 @@ async function init() {
 	await Deno.writeTextFile(rawBoxscore, `${JSON.stringify(boxscore, null, 4)}\n`, writeOptions);
 	await Deno.writeTextFile(rawPlayByPlay, `${JSON.stringify(playByPlay, null, 4)}\n`, writeOptions);
 	const data = normalizeGame(gameId, boxscore, playByPlay);
+	data.sources.rawPlayByPlay = `raw/playbyplay-${gameId}.json`;
+	data.sources.rawBoxscore = `raw/boxscore-${gameId}.json`;
 	const report = checkReplay(data);
 	if (report.errors.length) {
 		throw new Error(

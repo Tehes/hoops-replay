@@ -16,12 +16,13 @@ limits, and developer handoff. Coding rules live in [AGENTS.md](AGENTS.md).
 Serve the repository with a static web server. For example, if Python 3 is installed:
 
 ```sh
-python3 -m http.server 5501 --bind 127.0.0.1
+python3 -m http.server 5500 --bind 127.0.0.1
 ```
 
-Open [DEN at OKC](http://127.0.0.1:5501/) or
-[NYK at BOS](http://127.0.0.1:5501/?game=0022600008).
-Port 5501 allows the schedule project to keep running on port 5500.
+Open [DEN at OKC](http://127.0.0.1:5500/) or
+[NYK at BOS](http://127.0.0.1:5500/?game=0022600008).
+Use exactly `127.0.0.1:5500` for backend loading: this origin is already allowed by the backend.
+Other localhost ports and `localhost` are different origins. No backend/CORS configuration was changed.
 Opening index.html directly from the filesystem will not load modules and data correctly.
 
 ## Reference games and data
@@ -32,8 +33,12 @@ Opening index.html directly from the filesystem will not load modules and data c
 | 0022600008 | New York at Boston | NYK 103–107 BOS |
 | 0022600094 | Atlanta at Charlotte | ATL 128–81 CHA |
 
-The default game is DEN–OKC. Any ten-digit `?game=GAME_ID` loads the corresponding local snapshot.
-An invalid ID or a missing snapshot shows a loading error; it does not silently switch games.
+Without a `game` parameter, the app opens the bundled DEN–OKC example without fetching game data
+from the backend. With `?game=GAME_ID`, any ten-digit NBA game ID is loaded directly from the
+existing backend's boxscore and play-by-play endpoints, even if a local snapshot exists.
+For example: [DAL at IND](http://127.0.0.1:5500/?game=0022600095). No import or saved replay is required.
+The game must be completed and have compatible, consistent liveData feeds. Invalid IDs, unfinished
+games, unavailable data, and failed replay checks show an error, without switching games.
 Each data file includes source URLs. Both snapshots contain the play-by-play, player/team metadata,
 and boxscore information needed by the replay. Team logos and the favicon are local; player photos load directly from the NBA CDN.
 
@@ -46,10 +51,12 @@ restarts preserve current positions. Pick-and-roll/pop or screens require explic
 The choreography is computed
 before playback. Different shot types use different approaches, player poses, and ball flights.
 
-The browser loads local JSON only. The command-line importer downloads the NBA feeds from the
-schedule project's existing Deno Deploy backend. No backend or deployment configuration was changed.
-Direct browser loading from that backend and allowing a future replay domain via CORS are separate
-follow-up work. The importer already downloads both feeds and produces local snapshots.
+The browser normalizes and validates both backend feeds before enabling playback. It computes the
+choreography in memory and does not write snapshots or raw feeds. The optional command-line importer
+remains available for archiving data and adding regression fixtures. Browser loading and the importer
+share normalization and validation. Regulation periods use 12 minutes; overtime periods use 5 minutes,
+with dynamic Q1–Q4 / OT1 / OT2 controls. OT boundaries have synthetic coverage; a real OT game has
+not yet been verified. A future replay domain will need its own backend CORS permission.
 No Service Worker, analytics, or placeholder API is included in this app.
 
 ## Import another completed game
@@ -61,13 +68,14 @@ deno run --allow-net=nba-spielplan.tehes.deno.net --allow-read --allow-write=dat
 ```
 
 This example is already included, so the command refuses to overwrite it. Substitute another completed
-NBA game ID, or add `--overwrite` to explicitly refresh an existing import. Then open
-`http://127.0.0.1:5501/?game=GAME_ID`. No frontend allowlist or additional team assets are required.
+NBA game ID, or add `--overwrite` to explicitly refresh an existing import. The resulting snapshot
+is for the local regression audit; `?game=GAME_ID` still requests current backend data.
+No frontend allowlist or additional team assets are required.
 
 The importer saves the original responses to `data/raw/boxscore-GAME_ID.json` and
 `data/raw/playbyplay-GAME_ID.json`. It checks completion, IDs, rosters, coordinates, scene scores,
 ball owners, interpolation, and shot behavior before writing `data/replay-GAME_ID.json`.
-Overtime is currently rejected. Unsupported or inconsistent games remain raw data for investigation;
+Unsupported or inconsistent games remain raw data for investigation;
 a successful final score alone is insufficient. A failed refresh leaves any prior replay snapshot in place.
 The two older reference snapshots predate this importer and do not have raw-response archives here.
 
@@ -82,8 +90,8 @@ deno run --allow-read=data scripts/audit-replays.js
 ```
 
 It discovers `data/replay-*.json` automatically and exits unsuccessfully on validation errors.
-Raw archives are intentionally excluded. `scripts/check-replay.js` supplies the same checks for
-both the importer and the audit, so new imports must pass the same regression criteria.
+Raw archives are intentionally excluded. `js/replay-validation.js` supplies the same checks for the
+browser, importer, and audit; `scripts/check-replay.js` re-exports it for existing CLI callers.
 
 ## Files
 
@@ -93,6 +101,8 @@ both the importer and the audit, so new imports must pass the same regression cr
 - `js/replay-engine.js`: event interpretation, formations, matchups, and scene compilation.
 - `js/replay-shots.js`: shot profiles, player movement, and ball trajectories.
 - `js/replay-teams.js`: schematic jersey palettes for all 30 NBA teams.
+- `js/replay-data.js`: shared feed normalization and browser game loading.
+- `js/replay-validation.js`: shared replay integrity and animation checks.
 - `data/replay-*.json`: self-contained reference games with source attribution.
 - `data/raw/`: archived original responses, including a rejected import example.
 - `scripts/`: Deno-only import and regression-check tools; never loaded by the browser.
@@ -118,12 +128,13 @@ or quarter/final banners cover the court.
 ## Development checks
 
 Deno runs the import/audit tools and the existing format/lint checks; it is not a browser runtime.
-Playing an already stored snapshot only requires a static server.
+The default example only requires a static server. Explicit game IDs also require backend access.
 
 ```sh
-deno fmt --check js/replay.js js/replay-engine.js js/replay-shots.js js/replay-teams.js scripts/ css/replay.css index.html
-deno check js/replay.js js/replay-engine.js js/replay-shots.js js/replay-teams.js scripts/*.js
-deno lint js/replay.js js/replay-engine.js js/replay-shots.js js/replay-teams.js scripts/
+deno fmt --check js/ scripts/ css/replay.css index.html
+deno check js/*.js scripts/*.js
+deno lint js/ scripts/
+deno test --allow-read=data scripts/replay-data_test.js
 git diff --check
 ```
 
