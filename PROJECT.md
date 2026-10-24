@@ -47,6 +47,10 @@ festgelegt. Der Nutzer findet den Prototyp interessant, möchte aber weiter erku
   Ein späteres Foul, ein Steal oder ein Block darf bereits frühere schematische Matchups beeinflussen.
   Das ist bewusst erlaubt; es handelt sich nicht um eine kausale Live-Simulation.
 - Vanilla HTML/CSS/JavaScript, ohne Framework, zusätzliche Dependencies oder Build-Schritt.
+- Ziel für die weitere Entwicklung: `?game=<GameID>` soll ein abgeschlossenes Spiel vom bestehenden
+  Deno-Server laden und simulieren können. Alle NBA-Teams benötigen lokale Assets und Farben.
+  Schon jetzt muss ein reproduzierbarer Download als lokale JSON-Dateien möglich sein, damit sich
+  die Regressionstests um weitere echte Spiele erweitern lassen.
 - Datenfeeds dürfen weiterhin vom Deno-Deploy-Backend des Spielplans kommen.
 - Langfristig ist etwa replay.nba-spielplan.de mit einer Verknüpfung aus dem Spielplan denkbar.
   Domain, Hosting und konkrete Integration sind noch nicht eingerichtet oder abschließend beschlossen.
@@ -104,9 +108,12 @@ geprüften NBA-Datenstand. Beide gehören laut Snapshot zur Saison 2026–27.
 | --- | --- | --- | --- | --- | --- | --- |
 | 0022600007 | DEN bei OKC | 2026-10-23 01:30 | 84:96 | 613 | 462 | 1392,113 s |
 | 0022600008 | NYK bei BOS | 2026-10-23 23:00 | 103:107 | 563 | 434 | 1363,758 s |
+| 0022600094 | ATL bei CHA | 2026-10-23 23:00 | 128:81 | 600 | 460 | 1448,255 s |
 
 Ohne Parameter startet DEN–OKC. `?game=0022600008` startet NYK–BOS mit Boston-Homecourt.
-Unbekannte IDs fallen aktuell auf DEN–OKC zurück. Der Parameter ist keine allgemeine NBA-Spielsuche.
+Jede zehnstellige GameID lädt jetzt die entsprechende lokale Datei. Eine nicht vorhandene Datei
+oder ungültige ID führt zur Ladefehlermeldung; kein stiller Fallback auf ein anderes Spiel. Ohne
+Parameter bleibt DEN–OKC der Standard. Der direkte Browser-Abruf vom Deno-Server ist noch offen.
 Die Replay-Dauer ist eine verdichtete Animationsdauer und entspricht nicht 48 Minuten Spielzeit
 oder der tatsächlichen Dauer der Übertragung.
 
@@ -124,7 +131,13 @@ oder der tatsächlichen Dauer der Übertragung.
   Nicht jedes Ereignis enthält alle diese Felder; nicht jeder Wert ist belegt.
 
 Die Dateien sind für den Replay aufbereitete Snapshots, keine vollständigen unbearbeiteten
-Boxscore-Responses. Ein Import-/Normalisierungsskript ist aktuell nicht im Repo enthalten.
+Boxscore-Responses. `scripts/import-game.js` lädt jetzt beide Rohfeeds vom bestehenden Deno-Server und normalisiert
+weitere abgeschlossene Spiele. Die Rohantworten bleiben unter `data/raw/` erhalten. Die ursprünglichen
+zwei Snapshots wurden noch ohne diesen Importer erstellt; für sie fehlen die Roharchive im Repo.
+Der Saisonwert neuer Importe wird aus dem Spieldatum abgeleitet, nicht als Feed-Feld ausgegeben.
+Fehlende oder doppelte Starterpositionen erhalten eindeutige schematische PG–C-Slots; ursprüngliche
+Positionen werden dann mit `sourcePosition` und `positionSource: "schematic"` kenntlich gemacht.
+Die Teamfarben sind Darstellungs-Paletten, keine behaupteten spielspezifischen Uniformdaten.
 
 Quellmuster in den Snapshots:
 
@@ -151,11 +164,15 @@ auf null gesetzten Koordinatenfeld einen verlässlichen Ort ableiten.
 
 - `index.html`: ausschließlich Court/Scoreboard/Controls; Timeline mit `step="0.001"`.
 - `css/replay.css`: Layout und Darstellung.
-- `js/replay.js`: Daten laden, Teamfarben und vier lokale Logos, Canvas zeichnen, Wiedergabe,
+- `js/replay.js`: Daten laden, Teamfarben und 30 lokale Logos, Canvas zeichnen, Wiedergabe,
   Keyboard, Namen und Resize. `init()`, `render()`, `seek()`, `tick()` sind zentrale Einstiegspunkte.
 - `js/replay-engine.js`: `compileReplay(data)` berechnet Szenen, Keyframes, Lineups, Besitz,
   Matchups, Marker, Angriffs- und Viertelgrenzen. `getReplayFrame(replay, time)` interpoliert daraus
   den Zustand zu einem beliebigen Zeitpunkt. Kein Netzwerk-/DOM-Code in der Engine.
+- `js/replay-teams.js`: lokale Trikot-/Kontrastfarben für alle 30 NBA-Teams.
+- `scripts/import-game.js`: Deno-only Download und Normalisierung; keine Browser-Abhängigkeit.
+- `scripts/check-replay.js`: gemeinsame fachliche Prüfung für Import und Audit.
+- `scripts/audit-replays.js`: automatische Entdeckung und Prüfung aller lokalen Replay-Snapshots.
 - `js/replay-shots.js`: `getShotStyle(action)` klassifiziert Wurffamilie und Descriptor-Merkmale;
   `animateShot()` baut Bewegungen, `flyBall()` tastet Ballflug vorab ab, `landPlayers()` setzt Posen zurück.
 
@@ -214,12 +231,12 @@ Port 5501 geladen: lokale Assets, richtige Homecourts, Endstände FINAL 84:96 un
 Restart nach Spielende und keine Warnungen/Fehler in der geprüften Browserkonsole.
 Dies ist keine Safari-/iPhone-Abnahme und keine Prüfung einer öffentlichen Deployment-URL.
 
-Ein zusätzlicher temporärer Deno-Audit prüfte 10.276 Keyframes in 896 Szenen und 37 Wurfprofilen
+Beim ursprünglichen Umzug prüfte ein zusätzlicher temporärer Deno-Audit 10.276 Keyframes in 896 Szenen und 37 Wurfprofilen
 beider Spiele ohne Fehler. Geprüft wurden unter anderem endliche Spieler-/Ballpositionen und Posen,
 Lineups, Score-Abfolge, Zuordnung der Aktionen, gültige Ballbesitzer, Schussorte, Landungen,
-Lob/Tip/Putback/Bankshot-Eigenschaften sowie technische Freiwürfe. Das Audit-Skript war ein temporäres
-Werkzeug außerhalb des Repos und ist keine mitgelieferte Test-Suite. Ein neuer Checkout darf sich
-nicht auf Dateien unter /tmp oder auf den ursprünglichen Chat verlassen.
+Lob/Tip/Putback/Bankshot-Eigenschaften sowie technische Freiwürfe. Dieser Audit wurde anschließend in `scripts/check-replay.js` und `scripts/audit-replays.js`
+dauerhaft ins Repo übernommen und wird auch zur Importfreigabe verwendet. Kein Checkout muss
+sich auf Dateien unter /tmp oder auf diesen Chat verlassen.
 
 Die reproduzierbaren Befehle und eine manuelle Checkliste mit konkreten Spielsituationen stehen
 in README.md. Beim Prüfen direkt zum Ende scrubben: Die Engine rundet Szenenzeiten auf drei
@@ -228,8 +245,9 @@ Timeline-Schritt 0.001 beibehalten oder bei einer Änderung bewusst gleichwertig
 
 ## Grenzen und noch offene Arbeit
 
-- Nur zwei lokale Spiele, vier Teamfarben/Logos, vier Viertel-Buttons. Keine Auswahl beliebiger
-  Spiele, keine allgemeine Roster-/Feed-Pipeline und keine automatische Aktualisierung.
+- Drei freigegebene lokale Spiele, alle 30 NBA-Teamlogos und -paletten, vier Viertel-Buttons.
+  Weitere abgeschlossene Spiele lassen sich per CLI importieren und per GameID lokal öffnen.
+  Noch keine automatische Aktualisierung oder direkte Browser-Deno-Verbindung.
 - Verlängerung ist nicht abgesichert: Viertellänge in der Kompilierung ist derzeit 720 Sekunden,
   UI/Quarter-Handling ist auf vier Viertel ausgelegt. Nicht als OT-Unterstützung bezeichnen.
 - Die Engine setzt unter anderem einen Sprungball mit verwertbaren Beteiligten, fünf Starter pro
@@ -241,7 +259,8 @@ Timeline-Schritt 0.001 beibehalten oder bei einer Änderung bewusst gleichwertig
   Schreibweisen oder neue Kombinationen können bei der allgemeinen Animation landen.
 - Keine öffentliche Bereitstellung, kein Custom-Domain-Setup und kein Live-Datenanschluss im Rahmen
   dieser Übergabe eingerichtet. Externe Änderungen nach diesem Datum bei Bedarf frisch prüfen.
-- TEAM_COLORS, REFERENCE_GAMES und UI-Annahmen vor einer Verallgemeinerung gemeinsam prüfen.
+- TEAM_COLORS liegt jetzt in replay-teams.js; die frühere REFERENCE_GAMES-Allowlist ist entfernt.
+  Viertel-/Overtime-Annahmen bleiben vor einer weiteren Verallgemeinerung zu prüfen.
 - Keine neue Produkt-Roadmap als beschlossen behandeln. Der nächste Nutzerauftrag bestimmt den Umfang.
 
 ## Deno-Backend und mögliche spätere Integration
@@ -258,8 +277,43 @@ sind darin nicht enthalten. Eine spätere Verbindung braucht eine gezielte Ände
 im Backend-Repo. Der derzeitige Replay auf 5501 funktioniert ohne diese Änderung, da er ausschließlich
 lokale Snapshots lädt. Backend-Code, Zugangsdaten oder Betriebszustand wurden nicht übernommen.
 
-Denkbare nächste Schritte, ausdrücklich noch keine beauftragte Umsetzung: reproduzierbarer Import
-weiterer abgeschlossener Spiele; robuste Behandlung bislang unbekannter Actions; gezielte visuelle
-Verbesserungen; OT; danach bei Bedarf Datenanbindung, Hosting und Integration aus dem Spielplan.
+Der reproduzierbare CLI-Import weiterer abgeschlossener Spiele ist jetzt umgesetzt. Weitere
+denkbare Schritte: direkte GameID-Datenanbindung im Browser, robuste Behandlung unbekannter Actions, gezielte visuelle
+Verbesserungen und OT; danach bei Bedarf Hosting und Integration aus dem Spielplan.
 Vor solchen Änderungen den bestehenden Prototyp zeigen/prüfen und seinen bewusst schlanken Umfang
 bewahren. Keine Menüs, Statistikseiten, Analytics, Frameworks oder PWA-Funktionen ungefragt ergänzen.
+
+## Ergänzung: Weitere Spiele importieren und testen (24.10.2026)
+
+Vom Repo-Root aus:
+
+```sh
+deno run --allow-net=nba-spielplan.tehes.deno.net --allow-read --allow-write=data scripts/import-game.js GAME_ID
+deno run --allow-read=data scripts/audit-replays.js
+```
+
+GAME_ID durch zehn Ziffern ersetzen. Bestehende Dateien nur mit `--overwrite` erneuern. Der Importer
+setzt den vom Backend geforderten Origin-Header als serverseitiger Client; eine Browser-CORS-Freigabe
+für 5501 wird dadurch nicht ersetzt. Nicht versuchen, diesen Header im Frontend zu setzen.
+Bei einem fehlgeschlagenen Refresh bleibt die bisherige Replay-Datei bestehen; die Roharchive können
+bereits aktualisiert sein. Fehlermeldung beachten und keinen erfolgreichen Refresh behaupten.
+
+Erst nach erfolgreicher Prüfung wird data/replay-GAME_ID.json geschrieben. Danach funktioniert
+`/?game=GAME_ID` ohne Codeänderung. Der Gesamtaudit entdeckt alle solchen Dateien automatisch,
+prüft auch Wurfvarianten, Zwischenstände, aktive Ballbesitzer, Lineups und interpolierte Zustände,
+und liefert bei Fehlern Exitcode 1. Bei neuen Anforderungen aussagekräftige Prüfungen ergänzen.
+
+ATL–CHA (0022600094) wurde über diesen Weg importiert und mit Chrome MCP geprüft: Wiedergabe,
+Teamlogos und FINAL 128:81, keine Fehler/Warnungen in der geprüften Konsole. Alle drei freigegebenen
+Spiele bestehen zusammen 15.716 Keyframes in 1.356 Szenen mit 39 vorkommenden Wurfprofilen.
+Doppelte und ungültige Importanfragen wurden ohne Änderungen an gespeicherten Daten abgewiesen.
+
+HOU–SAS (0022600009, Endstand 114:110) bleibt ein bewusst nicht freigegebener Rohdatenfall:
+Die erfassten Feed-Antworten enthalten widersprüchliche Ereigniszeiten und Zwischenstände in der
+vorliegenden Reihenfolge. Die Kompilierung trifft zwar den Endstand, der Audit meldet aber 25 Fehler,
+unter anderem bei Zwischenständen und Ballbesitz ausgewechselter Spieler. Deshalb existieren nur
+`data/raw/boxscore-0022600009.json` und `data/raw/playbyplay-0022600009.json`, kein Replay-Snapshot.
+Nicht durch Sortieren nach actionNumber oder Abschalten von Prüfungen „reparieren“. Vor einer
+Korrektur anhand der archivierten Daten klären, welche Feed-Angabe tatsächlich falsch ist.
+Ein weiterer Abruf 0022600010 erhielt HTTP 403; das belegt keine allgemeine Nichterreichbarkeit
+des Backends oder aller NBA-Daten. Den vorhandenen Spielplan zur Auswahl abgeschlossener IDs nutzen.

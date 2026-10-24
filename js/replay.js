@@ -1,13 +1,8 @@
 import { compileReplay, getReplayFrame } from "./replay-engine.js";
+import { TEAM_COLORS } from "./replay-teams.js";
 
 const WORLD = { width: 110, height: 68, left: 8, top: 9 };
-const TEAM_COLORS = {
-	DEN: { shirt: "#0e2240", trim: "#fec524", ink: "#ffffff" },
-	OKC: { shirt: "#ef3b24", trim: "#007ac1", ink: "#ffffff" },
-	NYK: { shirt: "#006bb6", trim: "#f58426", ink: "#ffffff" },
-	BOS: { shirt: "#007a33", trim: "#ffffff", ink: "#ffffff" },
-};
-const REFERENCE_GAMES = ["0022600007", "0022600008"];
+const DEFAULT_GAME = "0022600007";
 const ICON_TITLES = {
 	foul: "Foul",
 	block: "Block",
@@ -634,7 +629,10 @@ async function init() {
 	new ResizeObserver(resizeCourt).observe(canvas);
 	try {
 		const requestedGame = new URLSearchParams(globalThis.location.search).get("game");
-		const gameId = REFERENCE_GAMES.includes(requestedGame) ? requestedGame : REFERENCE_GAMES[0];
+		if (requestedGame !== null && !/^\d{10}$/.test(requestedGame)) {
+			throw new Error("Game ID must contain ten digits.");
+		}
+		const gameId = requestedGame ?? DEFAULT_GAME;
 		const response = await fetch(`./data/replay-${gameId}.json`);
 		if (!response.ok) {
 			throw new Error(`Replay data: HTTP ${response.status}`);
