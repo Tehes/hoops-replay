@@ -200,10 +200,12 @@ function findOpenSpace(origin, occupied, lane = null, interior = false, guard = 
 function planFormation(replay, index, offense, direction, lineup, state) {
 	let evidence = null;
 	let evidenceIndex = -1;
+	// The current lineup can only anchor finishes before its next substitution.
 	for (let i = index; i < replay.scenes.length; i++) {
 		const candidate = replay.scenes[i];
 		if (
 			candidate.action.period !== replay.scenes[index].action.period ||
+			(candidate.kind === "substitution" && candidate.related.some((action) => action.teamId === offense)) ||
 			(candidate.kind === "rebound" && candidate.action.teamId !== offense) ||
 			(["2pt", "3pt", "turnover", "freethrow"].includes(candidate.kind) && candidate.action.teamId !== offense)
 		) {

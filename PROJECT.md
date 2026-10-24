@@ -499,11 +499,30 @@ js/replay-validation.js. Die Engine bleibt unabhängig von DOM und Netzwerk.
 Chrome MCP auf Port 5500: DAL–IND 0022600095 direkt vom Backend geladen, FINAL 121:105 und
 Neustart geprüft, ohne lokalen Snapshot-Abruf. Weitere direkte Backend-Datensätze bestehen den
 Audit: 0022600001–0022600006, 0022600097, 0022600102 und 0022600103.
-Nicht jedes beliebige Spiel ist bereits rekonstruierbar: 0022600096 scheitert in der Formationsplanung,
-0022600098 an einer Fadeaway-Prüfung, 0022600099 an Lineup-Prüfungen und 0022600100/0022600101
+Nicht jedes beliebige Spiel ist bereits rekonstruierbar: 0022600098 scheitert an einer
+Fadeaway-Prüfung, 0022600099 an Lineup-Prüfungen und 0022600100/0022600101
 an Personen, die dem Roster unbekannt sind. Diese Fälle sind offengelegt und nicht durch Abschalten
 von Prüfungen behoben. HOU–SAS bleibt der dokumentierte abgelehnte Referenzfall.
 
 scripts/replay-data_test.js prüft lokale Standardauswahl gegenüber direkter GameID-Anbindung,
 HTTP-Fehler ohne Ersatzspiel, Ablehnung laufender Spiele und falscher Feed-IDs, den HOU–SAS-Fehlerfall
 sowie synthetische Grenzen zweier Verlängerungen. Echte OT-Partien bleiben eine offene Abnahme.
+
+
+## Formationsplanung über Auswechslungen (24.10.2026)
+
+MIN–ORL 0022600096 scheiterte an einem Engine-Fehler, nicht an nachgewiesen falschen Feed-Daten:
+Vor dem Foul bei Q3 8:44 verwendete die Vorausplanung da Silvas späteren Wurf bei 8:39, obwohl er
+noch nicht auf dem Feld stand. Er wird zwischen den Freiwürfen für Banchero eingewechselt. Beide
+Abschlussbeteiligten fehlten in der aktuellen Aufstellung, wodurch die Passgasse undefiniert war.
+
+Die Suche nach einem künftigen Abschluss endet jetzt vor der nächsten Auswechslung des angreifenden
+Teams. So beziehen sich Positionsanker auf die aktuelle Aufstellung. Wechsel des verteidigenden
+Teams begrenzen diese Suche nicht. Die bestehende Slot-Übernahme und Matchup-Behandlung bleiben
+unverändert; Vorauswissen innerhalb dieses Aufstellungsfensters bleibt ausdrücklich erlaubt.
+
+Ein fokussierter Test mit Foul, Freiwürfen, Wechsel, Offensiv-Rebound und Abschluss des eingewechselten
+Spielers reproduziert den ursprünglichen Absturz und prüft anschließend die korrekte aktive Aufstellung
+sowie den vollständigen Audit. MIN–ORL wird mit Chrome MCP auf Port 5500 geprüft, einschließlich
+da Silvas Eintritt und Abschluss, direktem Seeking und FINAL 115:93. Die drei vorhandenen
+Regression-Snapshots bestehen unverändert alle Prüfungen. Keine Prüfung wurde gelockert.
