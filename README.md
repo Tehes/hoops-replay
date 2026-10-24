@@ -35,7 +35,7 @@ Opening index.html directly from the filesystem will not load modules and data c
 The default game is DEN–OKC. Any ten-digit `?game=GAME_ID` loads the corresponding local snapshot.
 An invalid ID or a missing snapshot shows a loading error; it does not silently switch games.
 Each data file includes source URLs. Both snapshots contain the play-by-play, player/team metadata,
-and boxscore information needed by the replay. All required logos and the favicon are local.
+and boxscore information needed by the replay. Team logos and the favicon are local; player photos load directly from the NBA CDN.
 
 Shot coordinates come from the recorded events. Formations, defensive matchups, passes, rebounds,
 and running paths are schematic reconstructions, not tracking data.
@@ -97,6 +97,9 @@ both the importer and the audit, so new imports must pass the same regression cr
 - `data/raw/`: archived original responses, including a rejected import example.
 - `scripts/`: Deno-only import and regression-check tools; never loaded by the browser.
 - `img/NBA/`: local logos for all 30 NBA teams.
+Player photos are linked directly by player ID:
+`https://cdn.nba.com/headshots/nba/latest/260x190/PLAYER_ID.png`.
+They are not downloaded into the repository. Unavailable photos use the local team logo.
 
 All runtime paths are relative, including when hosted under a GitHub Pages repository path.
 The entry point is index.html; the old replay.html route is no longer used.
@@ -105,7 +108,12 @@ The entry point is index.html; the old replay.html route is no longer used.
 
 Play/pause, playback speed, timeline scrubbing, quarter jumps, and previous/next possession.
 Space toggles playback; arrow keys move between possessions. Tap a jersey to show the player's name.
-Made shots show circles and +2/+3 markers; misses show crosses. Event markers fade with replay time.
+The jumbotron keeps scores and game time visible. Its lower panel shows the player's photo and the
+scene's original play-by-play description at the event time for up to five replay seconds, replaced
+by the next event. Pausing freezes the panel; scrubbing reconstructs it directly.
+Made shots show green dots and +1/+2/+3 markers; misses show red crosses. Shot markers fade with
+replay time. Other events, quarter transitions, and game end appear in the jumbotron; no event icons
+or quarter/final banners cover the court.
 
 ## Development checks
 

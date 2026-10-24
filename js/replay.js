@@ -3,20 +3,9 @@ import { getJerseyColors, TEAM_COLORS, TEAM_NAMES } from "./replay-teams.js";
 
 const WORLD = { width: 110, height: 65, left: 8, top: 9 };
 const DEFAULT_GAME = "0022600007";
-const ICON_TITLES = {
-	foul: "Foul",
-	block: "Block",
-	steal: "Steal",
-	turnover: "Ballverlust",
-	rebound: "Rebound",
-	substitution: "Auswechslung",
-	jumpball: "Sprungball",
-	timeout: "Auszeit",
-	violation: "Regelverstoß",
-	"shot-clock": "Wurfuhr abgelaufen",
-	technical: "Technisches Foul",
-	challenge: "Challenge",
-};
+const ACTION_DURATION = 5;
+let actionEvents = [];
+let displayedAction = undefined;
 let replay = null;
 let game = null;
 let currentTime = 0;
@@ -48,6 +37,10 @@ const elapsed = document.querySelector("#elapsed");
 const quarterButtons = document.querySelectorAll("#quarters button");
 const awayTeamEl = document.querySelector(".team.away");
 const homeTeamEl = document.querySelector(".team.home");
+const actionDisplay = document.querySelector(".action-display");
+const actionPhoto = document.querySelector("#action-photo");
+const actionPlayer = document.querySelector("#action-player");
+const actionDescription = document.querySelector("#action-description");
 
 function roundedRect(context, x, y, width, height, radius) {
 	const r = Math.min(radius, width / 2, height / 2);
@@ -182,18 +175,6 @@ function drawCourt() {
 		c.fillText(label.text.toUpperCase(), 0, 0);
 		c.restore();
 	}
-	c.textAlign = "center";
-	c.fillStyle = "#536572";
-	c.font = "600 0.9px system-ui";
-	const date = game
-		? new Date(game.date).toLocaleDateString("en-GB", {
-			day: "2-digit",
-			month: "short",
-			year: "numeric",
-			timeZone: "America/New_York",
-		}).toUpperCase()
-		: "22 OCT 2026";
-	c.fillText(`${game?.teams[0].code || "DEN"} · ${home?.code || "OKC"}    /    ${date}`, 47, -5.2);
 }
 
 function resizeCourt() {
@@ -251,7 +232,9 @@ function drawNames(frame) {
 	const small = canvas.getBoundingClientRect().width < 600;
 	const ids = small ? frame.participants.slice(0, 2) : frame.participants;
 	const visible = new Set([...ids, selectedPlayer].filter(Boolean));
-	const occupied = frame.markers.map((marker) => ({
+	const occupied = frame.markers.filter((marker) => marker.kind === "made" || marker.kind === "miss").map((
+		marker,
+	) => ({
 		x: marker.x - 4,
 		y: marker.y - 10,
 		width: 8,
@@ -294,117 +277,6 @@ function drawNames(frame) {
 	}
 }
 
-function drawEventIcon(kind, x, y, size) {
-	ctx.save();
-	ctx.translate(x, y);
-	ctx.scale(size, size);
-	ctx.strokeStyle = ["foul", "violation", "technical", "shot-clock"].includes(kind) ? "#f6bc55" : "#f1f4f6";
-	ctx.lineWidth = 0.19;
-	ctx.lineCap = "round";
-	ctx.lineJoin = "round";
-	ctx.beginPath();
-	if (kind === "foul") {
-		ctx.arc(-0.3, 0.2, 0.65, 0, Math.PI * 2);
-		ctx.moveTo(0.15, -0.3);
-		ctx.lineTo(1, -0.3);
-		ctx.lineTo(1, 0.2);
-		ctx.lineTo(0.35, 0.5);
-		ctx.moveTo(-0.7, -0.9);
-		ctx.lineTo(-0.9, -1.2);
-		ctx.moveTo(0, -0.9);
-		ctx.lineTo(0.1, -1.3);
-	} else if (kind === "substitution") {
-		ctx.moveTo(-1, -0.5);
-		ctx.lineTo(1, -0.5);
-		ctx.lineTo(0.5, -1);
-		ctx.moveTo(1, -0.5);
-		ctx.lineTo(0.5, 0);
-		ctx.moveTo(1, 0.6);
-		ctx.lineTo(-1, 0.6);
-		ctx.lineTo(-0.5, 1.1);
-		ctx.moveTo(-1, 0.6);
-		ctx.lineTo(-0.5, 0.1);
-	} else if (kind === "turnover") {
-		ctx.arc(0, 0, 0.95, -Math.PI * 0.8, Math.PI * 0.7);
-		ctx.lineTo(-1, 0.7);
-		ctx.moveTo(-0.55, 0.75);
-		ctx.lineTo(-0.45, 1.15);
-		ctx.moveTo(-0.3, -0.3);
-		ctx.lineTo(0.3, 0.3);
-		ctx.moveTo(0.3, -0.3);
-		ctx.lineTo(-0.3, 0.3);
-	} else if (kind === "steal") {
-		ctx.arc(0.5, -0.6, 0.5, 0, Math.PI * 2);
-		ctx.moveTo(-1, 1);
-		ctx.lineTo(-0.65, 0.1);
-		ctx.lineTo(-0.65, -0.8);
-		ctx.quadraticCurveTo(-0.65, -1.15, -0.4, -0.8);
-		ctx.lineTo(-0.3, 0.1);
-		ctx.lineTo(0.8, 0.1);
-		ctx.quadraticCurveTo(1.3, 0.65, 0.25, 1.1);
-	} else if (kind === "violation") {
-		ctx.moveTo(0, -1.2);
-		ctx.lineTo(1.2, 0.9);
-		ctx.lineTo(-1.2, 0.9);
-		ctx.closePath();
-		ctx.moveTo(0, -0.5);
-		ctx.lineTo(0, 0.2);
-		ctx.moveTo(0, 0.6);
-		ctx.lineTo(0, 0.61);
-	} else if (kind === "block") {
-		ctx.moveTo(-0.9, -0.9);
-		ctx.lineTo(0, -1.2);
-		ctx.lineTo(0.9, -0.9);
-		ctx.lineTo(0.7, 0.5);
-		ctx.lineTo(0, 1.1);
-		ctx.lineTo(-0.7, 0.5);
-		ctx.closePath();
-		ctx.moveTo(-0.45, 0.4);
-		ctx.lineTo(0.5, -0.6);
-	} else if (kind === "shot-clock") {
-		ctx.arc(0, 0, 1.05, 0, Math.PI * 2);
-		ctx.moveTo(0, -0.7);
-		ctx.lineTo(0, 0);
-		ctx.lineTo(0.65, 0.3);
-		ctx.moveTo(-0.3, -1.35);
-		ctx.lineTo(0.3, -1.35);
-	} else if (kind === "technical") {
-		ctx.rect(-1.1, -1.1, 2.2, 2.2);
-		ctx.moveTo(-0.6, -0.55);
-		ctx.lineTo(0.6, -0.55);
-		ctx.moveTo(0, -0.55);
-		ctx.lineTo(0, 0.65);
-	} else if (kind === "challenge") {
-		ctx.rect(-1.2, -0.9, 2.4, 1.65);
-		ctx.moveTo(-0.3, -0.5);
-		ctx.lineTo(0.5, -0.1);
-		ctx.lineTo(-0.3, 0.3);
-		ctx.closePath();
-		ctx.moveTo(-0.6, 1.1);
-		ctx.lineTo(0.6, 1.1);
-	} else if (kind === "timeout") {
-		ctx.moveTo(-1, -0.8);
-		ctx.lineTo(1, -0.8);
-		ctx.moveTo(0, -0.8);
-		ctx.lineTo(0, 1);
-	} else if (kind === "jumpball") {
-		ctx.arc(0, -0.8, 0.4, 0, Math.PI * 2);
-		ctx.moveTo(-0.7, 1);
-		ctx.lineTo(-0.7, -0.3);
-		ctx.lineTo(-1, 0);
-		ctx.moveTo(0.7, 1);
-		ctx.lineTo(0.7, -0.3);
-		ctx.lineTo(1, 0);
-	} else {
-		ctx.arc(0, 0, 0.55, 0, Math.PI * 2);
-		ctx.moveTo(1.1, 0);
-		ctx.arc(0, 0, 1.1, 0, Math.PI * 1.6);
-		ctx.lineTo(0.8, -0.7);
-	}
-	ctx.stroke();
-	ctx.restore();
-}
-
 function drawShotMarkers(frame) {
 	const pixelScale = scale / (globalThis.devicePixelRatio || 1);
 	const markerSize = Math.max(1, 5 / pixelScale);
@@ -436,44 +308,26 @@ function drawShotMarkers(frame) {
 	}
 }
 
-function drawMarkers(frame) {
+function drawScoreMarkers(frame) {
 	const pixelScale = scale / (globalThis.devicePixelRatio || 1);
 	const markerSize = Math.max(1, 5 / pixelScale);
 	for (const marker of frame.markers) {
+		if (marker.kind !== "made" || !marker.value) {
+			continue;
+		}
 		const age = frame.time - marker.time;
 		const remaining = marker.end - frame.time;
 		ctx.save();
-		ctx.globalAlpha = Math.min(
-			1,
-			remaining / (marker.kind === "made" || marker.kind === "miss" ? 1 : 0.65),
-			age / 0.08 + 0.2,
-		);
-		if (marker.kind === "made" || marker.kind === "miss") {
-			if (marker.value) {
-				ctx.font = `850 ${2.4 * markerSize}px system-ui`;
-				ctx.textAlign = "center";
-				ctx.textBaseline = "middle";
-				ctx.lineWidth = 0.65 * markerSize;
-				ctx.strokeStyle = "#f2dbb4";
-				const y = marker.y - (4 + Math.min(age, 1) * 1.3) * markerSize;
-				ctx.strokeText(marker.value, marker.x, y);
-				ctx.fillStyle = "#13694e";
-				ctx.fillText(marker.value, marker.x, y);
-			}
-		} else {
-			const y = marker.y - 4.2 * markerSize;
-			ctx.fillStyle = "#101820ef";
-			roundedRect(
-				ctx,
-				marker.x - 2.1 * markerSize,
-				y - 2.1 * markerSize,
-				4.2 * markerSize,
-				4.2 * markerSize,
-				0.9,
-			);
-			ctx.fill();
-			drawEventIcon(marker.kind, marker.x, y, 1.3 * markerSize);
-		}
+		ctx.globalAlpha = Math.min(1, remaining, age / 0.08 + 0.2);
+		ctx.font = `850 ${2.4 * markerSize}px system-ui`;
+		ctx.textAlign = "center";
+		ctx.textBaseline = "middle";
+		ctx.lineWidth = 0.65 * markerSize;
+		ctx.strokeStyle = "#f2dbb4";
+		const y = marker.y - (4 + Math.min(age, 1) * 1.3) * markerSize;
+		ctx.strokeText(marker.value, marker.x, y);
+		ctx.fillStyle = "#13694e";
+		ctx.fillText(marker.value, marker.x, y);
 		ctx.restore();
 	}
 }
@@ -557,6 +411,48 @@ function formatTime(seconds) {
 	return `${Math.floor(rounded / 60)}:${String(rounded % 60).padStart(2, "0")}`;
 }
 
+function renderAction(frame) {
+	let active = null;
+	for (let index = actionEvents.length - 1; index >= 0; index--) {
+		const event = actionEvents[index];
+		if (event.time <= frame.time) {
+			if (frame.time - event.time < ACTION_DURATION) {
+				active = event;
+			}
+			break;
+		}
+	}
+	if (displayedAction === active) {
+		return;
+	}
+	displayedAction = active;
+	const action = active?.action;
+	const player = action && playerById.get(action.personId);
+	const team = action && teamById.get(player?.teamId || action.teamId);
+	actionDisplay.style.setProperty("--event-color", team ? TEAM_COLORS[team.code].trim : "var(--accent-color)");
+	actionPlayer.textContent = active?.label || player?.name || (team ? TEAM_NAMES[team.code] : "HOOPS REPLAY");
+	if (action) {
+		actionDescription.textContent = action.description;
+	} else {
+		const date = new Date(game.date).toLocaleDateString("en-GB", {
+			day: "2-digit",
+			month: "short",
+			year: "numeric",
+			timeZone: "America/New_York",
+		}).toUpperCase();
+		actionDescription.textContent = `${game.teams[0].code} @ ${game.teams[1].code} · ${date}`;
+	}
+	actionPhoto.hidden = !team;
+	actionPhoto.alt = player?.name || team?.name || "";
+	if (team) {
+		actionPhoto.src = player
+			? `https://cdn.nba.com/headshots/nba/latest/260x190/${player.id}.png`
+			: `./img/NBA/${team.code}.svg`;
+	} else {
+		actionPhoto.removeAttribute("src");
+	}
+}
+
 function render() {
 	ctx.setTransform(1, 0, 0, 1, 0, 0);
 	ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -576,20 +472,12 @@ function render() {
 	for (const position of frame.players.filter((player) => player.opacity > 0.01).sort((a, b) => a.y - b.y)) {
 		drawPlayer(position);
 	}
-	drawMarkers(frame);
+	drawScoreMarkers(frame);
 	drawBall(frame);
 	drawNames(frame);
-	if (frame.banner) {
-		ctx.fillStyle = "#101820e8";
-		roundedRect(ctx, 36, 20.5, 22, 9, 1);
-		ctx.fill();
-		ctx.fillStyle = "#f1f4f6";
-		ctx.textAlign = "center";
-		ctx.textBaseline = "middle";
-		ctx.font = "750 2.7px system-ui";
-		ctx.fillText(frame.banner, 47, 25);
-	}
+
 	ctx.restore();
+	renderAction(frame);
 	awayScore.textContent = frame.score[0];
 	homeScore.textContent = frame.score[1];
 	periodEl.textContent = currentTime === replay.duration ? "FINAL" : `Q${frame.period}`;
@@ -662,8 +550,7 @@ function selectPlayer(event) {
 	} else {
 		selectedPlayer = null;
 	}
-	const marker = currentFrame.markers.find((item) => Math.hypot(item.x - x, item.y - 4.2 - y) < 3);
-	canvas.title = marker ? ICON_TITLES[marker.kind] || "Wurf" : "Court Replay – Spieler für Namen antippen";
+
 	render();
 }
 
@@ -682,6 +569,11 @@ async function init() {
 		}
 		game = await response.json();
 		replay = compileReplay(game);
+		actionEvents = replay.scenes.filter((scene) => scene.action.description).map((scene) => ({
+			time: scene.start + scene.eventAt,
+			label: scene.banner || "",
+			action: scene.action,
+		})).sort((a, b) => a.time - b.time);
 		playerById = new Map(replay.players.map((player) => [player.id, player]));
 		teamById = new Map(game.teams.map((team) => [team.id, team]));
 		for (const [index, element] of [awayTeamEl, homeTeamEl].entries()) {
@@ -691,6 +583,18 @@ async function init() {
 			element.querySelector("img").alt = team.name;
 		}
 		document.title = `Court Replay · ${game.teams[0].code} @ ${game.teams[1].code}`;
+		actionPhoto.addEventListener("error", () => {
+			if (actionPhoto.getAttribute("src")?.startsWith("https://cdn.nba.com/headshots/")) {
+				console.warn(`Player photo unavailable: ${actionPhoto.getAttribute("src")}`);
+				const action = displayedAction.action;
+				const player = playerById.get(action.personId);
+				const team = teamById.get(player?.teamId || action.teamId);
+				actionPhoto.src = `./img/NBA/${team.code}.svg`;
+			} else {
+				console.warn("Action team logo could not be loaded.");
+				actionPhoto.hidden = true;
+			}
+		});
 		homeLogo.addEventListener("load", () => {
 			drawCourt();
 			render();

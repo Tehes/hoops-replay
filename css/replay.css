@@ -53,7 +53,56 @@ input:focus-visible {
 
 #replay {
 	width: min(100%, 1320px);
-	max-width: min(1320px, calc((100dvh - 210px) * 110 / 65));
+	max-width: min(1320px, calc((100dvh - 310px) * 110 / 65));
+}
+
+.jumbotron {
+	max-width: 760px;
+	margin: 0 auto 6px;
+	overflow: hidden;
+	border: 1px solid var(--line-color);
+	border-radius: var(--radius);
+	background: #0a1017;
+	box-shadow: 0 8px 24px #00000040, inset 0 2px var(--accent-color);
+}
+
+.action-display {
+	--event-color: var(--accent-color);
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	min-height: 88px;
+	padding: 0 20px;
+	border-top: 1px solid var(--line-color);
+	border-left: 3px solid var(--event-color);
+	background: radial-gradient(ellipse at left bottom, #263544, #0a1017 75%);
+}
+.action-display img {
+	flex: 0 0 auto;
+	width: 104px;
+	height: 76px;
+	object-fit: contain;
+	align-self: end;
+}
+.action-display img[hidden] {
+	display: none;
+}
+.action-copy {
+	min-width: 0;
+	padding: 10px 0;
+}
+.action-copy strong {
+	display: block;
+	color: var(--accent-color);
+	font-size: 12px;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+.action-copy p {
+	margin: 5px 0 0;
+	font-size: 14px;
+	line-height: 1.35;
+	overflow-wrap: anywhere;
 }
 
 .scoreboard {
@@ -61,7 +110,8 @@ input:focus-visible {
 	align-items: center;
 	justify-content: center;
 	gap: 36px;
-	margin-bottom: 6px;
+	padding: 12px 16px;
+	margin-bottom: 0;
 	font-variant-numeric: tabular-nums;
 }
 
@@ -215,12 +265,27 @@ input:focus-visible {
 }
 
 @media (max-width: 600px) {
+	.action-display {
+		gap: 8px;
+		min-height: 86px;
+		padding: 0 10px;
+	}
+	.action-display img {
+		width: 82px;
+		height: 70px;
+	}
+	.action-copy strong {
+		font-size: 10px;
+	}
+	.action-copy p {
+		font-size: 12px;
+	}
 	body {
 		padding: 16px 4px;
 	}
 	.scoreboard {
 		gap: 17px;
-		margin-bottom: 14px;
+		padding: 10px 6px;
 	}
 	.team {
 		gap: 7px;
@@ -253,11 +318,33 @@ input:focus-visible {
 }
 
 @media (max-height: 500px) and (orientation: landscape) {
+	.scoreboard {
+		padding: 6px 10px;
+	}
+	.action-display {
+		min-height: 60px;
+		gap: 8px;
+		padding: 0 8px;
+	}
+	.action-display img {
+		width: 65px;
+		height: 52px;
+	}
+	.action-copy {
+		padding: 6px 0;
+	}
+	.action-copy strong {
+		font-size: 9px;
+	}
+	.action-copy p {
+		margin-top: 3px;
+		font-size: 11px;
+	}
 	body {
 		padding: 8px 16px;
 	}
 	#replay {
-		max-width: calc((100dvh - 120px) * 110 / 65);
+		max-width: calc((100dvh - 194px) * 110 / 65);
 	}
 	.scoreboard {
 		gap: 20px;

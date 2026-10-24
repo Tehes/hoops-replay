@@ -32,8 +32,21 @@ festgelegt. Der Nutzer findet den Prototyp interessant, möchte aber weiter erku
 
 ## Beschlossene Produktentscheidungen
 
-- Eigenständige HTML-Seite, ausschließlich Replay und dazugehörige Steuerung. Derzeit keine Menüs,
-  keine zusätzlichen Inhaltsbereiche und kein Tickertext als tragende Erklärung des Spielverlaufs.
+- Eigenständige HTML-Seite, ausschließlich Replay und dazugehörige Steuerung. Keine Menüs oder
+  zusätzlichen Inhaltsbereiche. Eine flache Jumbotron-Anzeige ersetzt das bisherige Scoreboard:
+  Score, Viertel und Uhr bleiben dauerhaft sichtbar. Darunter erscheinen ab dem Ereigniszeitpunkt
+  Spielerfoto, Name und der originale englische PbP-Text der Szene, bis zum nächsten Ereignis oder
+  maximal fünf Replay-Sekunden. Pause und Seeking bestimmen die Anzeige ohne eigene Timer.
+  Ohne aktive Aktion zeigt die Fläche das Matchup und Spieldatum (z. B. NYK @ BOS · 23 OCT 2026),
+  weiterhin nach America/New_York datiert. Die kleine Spiel-/Datumszeile am Court entfällt.
+  Teamereignisse verwenden das Teamlogo;
+  fehlt ein Spielerfoto, dient ebenfalls das Teamlogo als Ersatz. Bei zusammengefassten Aktionen
+  wird der originale Text der Hauptaktion gezeigt, keine generierte Zusammenfassung.
+  Spielerfotos werden ausdrücklich direkt über die Spieler-ID vom NBA-CDN verlinkt:
+  https://cdn.nba.com/headshots/nba/latest/260x190/<personId>.png. Keine Fotos im Repo speichern.
+  Diese vom Nutzer gewünschte Ausnahme von lokalen Assets gilt für Spielerfotos; Teamlogos bleiben
+  lokal. Die Fotos benötigen eine Netzwerkverbindung und zeigen den aktuellen CDN-Stand,
+  keine historischen Uniformen. Nicht verfügbare Fotos werden durch das Teamlogo ersetzt.
 - Ganzes Spielfeld, waagerecht. Logo und Farben in den Zonen machen den Homecourt erkennbar.
   Außen links steht der vollständige Name des Heimteams aus TEAM_NAMES (Stadt und Team), rechts der Arenaname. Beide Beschriftungen werden
   hochkant gedreht, aber niemals gespiegelt. Unter dem Court steht kein zusätzlicher Arenaname;
@@ -52,8 +65,12 @@ festgelegt. Der Nutzer findet den Prototyp interessant, möchte aber weiter erku
 - Treffer erhalten kleine ausgefüllte grüne Punkte, Fehlwürfe kleine rote Kreuze auf dem Court.
   Diese Wurfmarker werden unterhalb der Trikots gezeichnet, als stünden die Spieler darauf.
   Sie bleiben 4,2 Sekunden Replay-Zeit sichtbar, mit Ausblenden über die letzte Sekunde.
-  Direkte Werte wie +1, +2 oder +3 bleiben am Wurfort erkennbar. Fouls und andere Ereignisse
-  erhalten passende Symbole auf dem Feld.
+  Direkte Werte wie +1, +2 oder +3 bleiben am Wurfort erkennbar. Alle anderen Ereignisse werden
+  im Jumbotron erklärt: keine Ereignis-Icons oder schwebenden Icon-Kästchen auf dem Court.
+  Viertelbeginn, Viertelende und Spielende stehen ebenfalls im Jumbotron mit dem bisherigen
+  Bannertext als Überschrift und dem originalen PbP-Text darunter, ohne Banner über dem Spielfeld.
+  Die Engine behält ihre Ereignismarker und Bannerdaten intern; die Darstellung nutzt auf dem
+  Court ausschließlich Wurfmarker und Punktewerte.
 - Markierungen verschwinden nach kurzer Replay-Zeit, damit der Court übersichtlich bleibt.
   Pause und Seeking müssen ihre Sichtbarkeit konsistent erhalten.
 - Dunk, Layup und weitere Wurfarten sollen sichtbar unterschiedliche Animationen erhalten.
