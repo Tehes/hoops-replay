@@ -3,6 +3,10 @@
 This file defines **how AI agents must work in this repository**.\
 It is binding. When in doubt, choose the most conservative option and change less, not more.
 
+Before making changes, read [PROJECT.md](PROJECT.md) for product decisions, the data contract,
+implementation limits, and the developer handoff. Use [README.md](README.md) for local setup and
+verification. Keep PROJECT.md aligned when these decisions or implementation boundaries change.
+
 ---
 
 ## Core Principles

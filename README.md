@@ -6,6 +6,9 @@ Built with vanilla HTML, CSS, and JavaScript. No dependencies or build step.
 The prototype originated in [nba-spielplan](https://github.com/Tehes/nba-spielplan).
 This repository is now its independent home.
 
+Read [PROJECT.md](PROJECT.md) for the product vision, reconstruction rules, architecture, known
+limits, and developer handoff. Coding rules live in [AGENTS.md](AGENTS.md).
+
 ## Run locally
 
 Serve the repository with a static web server. For example, if Python 3 is installed:
