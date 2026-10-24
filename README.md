@@ -25,6 +25,20 @@ Use exactly `127.0.0.1:5500` for backend loading: this origin is already allowed
 Other localhost ports and `localhost` are different origins. No backend/CORS configuration was changed.
 Opening index.html directly from the filesystem will not load modules and data correctly.
 
+## Replay a game from NBA.com
+
+1. Open a completed game's match page on [NBA.com](https://www.nba.com/games).
+2. Copy the ten-digit Game ID from the match URL. For example, in
+   `https://www.nba.com/game/tor-vs-was-0022600097`, the Game ID is `0022600097`.
+   Keep all digits, including the leading zeros.
+3. Append `?game=GAME_ID` to the Hoops Replay URL, replacing `GAME_ID` with the copied ID.
+   For the example above, open [TOR at WAS](http://127.0.0.1:5500/?game=0022600097):
+   `http://127.0.0.1:5500/?game=0022600097`.
+
+The replay loads the game directly; no command-line import is needed. The game must be completed
+and its feeds must pass the replay checks. If the URL already contains query parameters, append
+`&game=GAME_ID` instead, or replace the existing `game` value to switch games.
+
 ## Reference games and data
 
 | Game ID | Matchup | Final score |
