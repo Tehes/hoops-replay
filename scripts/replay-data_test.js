@@ -174,3 +174,62 @@ Deno.test("formation lookahead stops before an offensive substitution introduces
 	);
 	assert(checkReplay(data, replay).errors.length === 0, "substitution scenario failed replay validation");
 });
+
+Deno.test("same-clock substitution chains display only the final lineup while preserving all actions", async () => {
+	const data = await readData("replay-0022600007.json");
+	const [away, home] = data.teams;
+	const returning = home.players.filter((player) => player.starter).at(-1);
+	const temporary = home.players.find((player) => !player.starter);
+	const outgoing = away.players.filter((player) => player.starter).at(-1);
+	const incoming = away.players.find((player) => !player.starter);
+	data.actions = data.actions.slice(0, 3);
+	const last = data.actions.at(-1);
+	away.score = Number(last.scoreAway);
+	home.score = Number(last.scoreHome);
+	let actionNumber = Math.max(...data.actions.map((action) => action.actionNumber));
+	let orderNumber = Math.max(...data.actions.map((action) => action.orderNumber));
+	for (
+		const [teamId, personId, subType] of [
+			[home.id, returning.id, "out"],
+			[home.id, temporary.id, "in"],
+			[away.id, outgoing.id, "out"],
+			[away.id, incoming.id, "in"],
+			[home.id, temporary.id, "out"],
+			[home.id, returning.id, "in"],
+		]
+	) {
+		data.actions.push({
+			actionNumber: ++actionNumber,
+			orderNumber: ++orderNumber,
+			actionType: "substitution",
+			subType,
+			teamId,
+			personId,
+			period: last.period,
+			clock: last.clock,
+			scoreAway: last.scoreAway,
+			scoreHome: last.scoreHome,
+		});
+	}
+	const replay = compileReplay(data);
+	const scene = replay.scenes.at(-1);
+	const finalFrame = getReplayFrame(replay, replay.duration);
+	assert(scene.related.length === 6, "grouped feed actions were lost");
+	assert(
+		finalFrame.players.filter((player) => player.opacity === 1).length === 10,
+		"final frame must show exactly ten players",
+	);
+	assert(
+		finalFrame.players.find((player) => player.id === temporary.id).opacity === 0,
+		"temporary substitute remained visible",
+	);
+	assert(
+		finalFrame.players.find((player) => player.id === returning.id).opacity === 1,
+		"returning player disappeared",
+	);
+	assert(
+		scene.lineups[away.id].includes(incoming.id) && !scene.lineups[away.id].includes(outgoing.id),
+		"other team's actual change was lost",
+	);
+	assert(checkReplay(data, replay).errors.length === 0, "substitution chain failed replay validation");
+});

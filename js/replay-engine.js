@@ -913,27 +913,33 @@ function compileScene(replay, scene, index, state, data) {
 		for (const team of data.teams) {
 			const outs = scene.related.filter((a) => a.teamId === team.id && a.subType === "out");
 			const ins = scene.related.filter((a) => a.teamId === team.id && a.subType === "in");
-			outs.forEach((out, i) => {
-				const incoming = ins[i];
-				const lineup = state.lineups[team.id];
-				const slot = lineup.indexOf(out.personId);
-				const previous = { ...state.positions[out.personId] };
-				Object.assign(state.positions[out.personId], { x: 43 + i * 3, y: 52 });
-				Object.assign(state.positions[incoming.personId], { x: 43 + i * 3, y: 55, opacity: 0 });
-				scene.swaps.push({ out: out.personId, in: incoming.personId, slot, teamId: team.id, previous });
-				lineup[slot] = incoming.personId;
+			const lineup = state.lineups[team.id];
+			const previousLineup = lineup.slice();
+			for (let i = 0; i < outs.length; i++) {
+				lineup[lineup.indexOf(outs[i].personId)] = ins[i].personId;
+			}
+			// Same-clock changes may bring a player back; animate only the final slot occupants.
+			previousLineup.forEach((outId, slot) => {
+				const incomingId = lineup[slot];
+				if (outId === incomingId) {
+					return;
+				}
+				const previous = { ...state.positions[outId] };
+				Object.assign(state.positions[outId], { x: 43 + slot * 3, y: 52 });
+				Object.assign(state.positions[incomingId], { x: 43 + slot * 3, y: 55, opacity: 0 });
+				scene.swaps.push({ out: outId, in: incomingId, slot, teamId: team.id, previous });
 				if (state.matchups) {
-					if (state.matchups[out.personId] !== undefined) {
-						state.matchups[incoming.personId] = state.matchups[out.personId];
-						delete state.matchups[out.personId];
+					if (state.matchups[outId] !== undefined) {
+						state.matchups[incomingId] = state.matchups[outId];
+						delete state.matchups[outId];
 					}
 					for (const defender of Object.keys(state.matchups)) {
-						if (state.matchups[defender] === out.personId) {
-							state.matchups[defender] = incoming.personId;
+						if (state.matchups[defender] === outId) {
+							state.matchups[defender] = incomingId;
 						}
 					}
 				}
-				if (state.ball.owner === out.personId) {
+				if (state.ball.owner === outId) {
 					state.ball = { x: previous.x + 1, y: previous.y + 0.8, z: 0.5, owner: null, dribble: false };
 					state.restart = "sideline";
 				}

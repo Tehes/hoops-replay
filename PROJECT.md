@@ -500,8 +500,8 @@ Chrome MCP auf Port 5500: DAL–IND 0022600095 direkt vom Backend geladen, FINAL
 Neustart geprüft, ohne lokalen Snapshot-Abruf. Weitere direkte Backend-Datensätze bestehen den
 Audit: 0022600001–0022600006, 0022600097, 0022600102 und 0022600103.
 Nicht jedes beliebige Spiel ist bereits rekonstruierbar: 0022600098 scheitert an einer
-Fadeaway-Prüfung, 0022600099 an Lineup-Prüfungen und 0022600100/0022600101
-an Personen, die dem Roster unbekannt sind. Diese Fälle sind offengelegt und nicht durch Abschalten
+Fadeaway-Prüfung und 0022600100/0022600101 an Personen, die dem Roster unbekannt sind.
+Der zunächst bei 0022600099 gemeldete Lineup-Fehler ist unten als Engine-Korrektur dokumentiert. Diese Fälle sind offengelegt und nicht durch Abschalten
 von Prüfungen behoben. HOU–SAS bleibt der dokumentierte abgelehnte Referenzfall.
 
 scripts/replay-data_test.js prüft lokale Standardauswahl gegenüber direkter GameID-Anbindung,
@@ -526,3 +526,22 @@ Spielers reproduziert den ursprünglichen Absturz und prüft anschließend die k
 sowie den vollständigen Audit. MIN–ORL wird mit Chrome MCP auf Port 5500 geprüft, einschließlich
 da Silvas Eintritt und Abschluss, direktem Seeking und FINAL 115:93. Die drei vorhandenen
 Regression-Snapshots bestehen unverändert alle Prüfungen. Keine Prüfung wurde gelockert.
+
+
+## Wechselketten mit identischer Spielzeit (24.10.2026)
+
+CHI–MIL 0022600099 scheiterte an der Darstellung zusammengefasster Auswechslungen: Bei Q1 2:53
+enthält der Feed Green raus / Herro rein und danach Herro raus / Green rein, zusätzlich zu einem
+Wechsel des anderen Teams. Die Engine aktualisierte zwar die Aufstellung, animierte aber beide
+Zwischenschritte gleichzeitig und ließ Herro zusätzlich sichtbar. Das verursachte 98 Auditfehler.
+
+Jetzt werden die Wechsel pro Team zunächst in Feed-Reihenfolge auf die Slots angewandt. Animiert
+werden nur die Unterschiede zwischen ursprünglicher und endgültiger Aufstellung. Geschlossene
+Wechselketten erzeugen keinen zusätzlichen sichtbaren Spieler, der tatsächliche Wechsel des anderen
+Teams bleibt erhalten. Alle Originalereignisse bleiben in der Szene und im Audit repräsentiert.
+Die bestehenden Prüfungen wurden nicht verändert. Die Endaufstellung bleibt auch bei Seeking korrekt.
+
+Ein Regressionstest mit Rückwechsel und gleichzeitigem Wechsel des Gegners reproduziert vorher den
+zusätzlichen sichtbaren Spieler und prüft danach zehn aktive Spieler sowie den vollständigen Audit.
+CHI–MIL wird über den Backend-Abruf in Chrome MCP auf Port 5500 geprüft; die drei lokalen
+Referenzspiele und alle sieben Tests bestehen weiter. Keine weiteren Feed-Fälle wurden mitgeändert.
