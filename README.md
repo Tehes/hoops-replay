@@ -85,7 +85,8 @@ anchor field goals; boxscore data supplies players and starting lineups. The rep
 formations, defensive matchups, passes, rebounds, and running paths to connect the events.
 Defensive assignments remain stable within an attack and follow substitutions. Where suitable, the buildup
 includes short dribble routes or connecting passes. These are schematic additions, not recorded pass
-sequences or evidence of a specific play.
+sequences or evidence of a specific play. For a shot directly following an offensive rebound, an eligible
+next shooter can move toward the receiving position during the preceding action.
 
 - **Schematic movement:** Player locations between recorded events are estimates. The replay does
   not show the ten players' actual positions or claim to reproduce specific plays without evidence.

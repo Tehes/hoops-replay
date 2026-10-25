@@ -165,9 +165,9 @@ geprüften NBA-Datenstand. Beide gehören laut Snapshot zur Saison 2026–27.
 
 | ID | Spiel | Datum im Snapshot (UTC) | Endstand | Aktionen | Szenen | Replay-Dauer |
 | --- | --- | --- | --- | --- | --- | --- |
-| 0022600007 | DEN bei OKC | 2026-10-23 01:30 | 84:96 | 613 | 462 | 2333,096 s |
-| 0022600008 | NYK bei BOS | 2026-10-23 23:00 | 103:107 | 563 | 434 | 2350,521 s |
-| 0022600094 | ATL bei CHA | 2026-10-23 23:00 | 128:81 | 600 | 460 | 2363,237 s |
+| 0022600007 | DEN bei OKC | 2026-10-23 01:30 | 84:96 | 613 | 462 | 2328,775 s |
+| 0022600008 | NYK bei BOS | 2026-10-23 23:00 | 103:107 | 563 | 434 | 2350,292 s |
+| 0022600094 | ATL bei CHA | 2026-10-23 23:00 | 128:81 | 600 | 460 | 2360,720 s |
 
 Ohne Parameter startet DEN–OKC. `?game=0022600008` startet NYK–BOS mit Boston-Homecourt.
 Jede explizite zehnstellige GameID lädt Boxscore und Play-by-Play direkt vom bestehenden Deno-Server,
@@ -920,3 +920,42 @@ Endstand FINAL 84:96 und Rücksprung geprüft; keine Fehler oder Warnungen in de
 Die vier Dauern betragen jetzt 2333,096 / 2350,521 / 2363,237 / 2515,147 Sekunden
 (DEN–OKC / NYK–BOS / ATL–CHA / BKN–CLE). Beispielsweise wächst DEN–OKC von 33:22 auf 38:53.
 Die Bewegungen und ihre Zwischenpositionen bleiben schematisch; dies ist keine Tracking-Simulation.
+
+
+### Anspielstation vor einem Folgeabschluss vorbereiten (25.10.2026)
+
+Bei einem direkt folgenden Feldwurf nach einem kontinuierlich verknüpften persönlichen
+Offensiv-Rebound berücksichtigt die Planung bereits im vorausgehenden Abschluss den nächsten
+Schützen. `planContinuation()` verwendet dessen belegte Wurfposition und die vorhandene
+Anlaufgeometrie. Die Startformation hält diesen Spieler auf der passenden Seite, mit einem
+kurzen Restweg. Während der Vorbereitung und des Abschlusses läuft er weiter zur Empfangsposition;
+sein bestehender Mannverteidiger folgt. Ein langer Restweg wird über längere Zeit verteilt,
+nicht durch zusätzliche Geschwindigkeit erzwungen. Ballbesitz und Ballflüge bleiben getrennt.
+
+Der aktuelle Schütze, Assistgeber, PG und Rebounder werden dafür nicht verschoben. Freie
+Ballzirkulation und kleine Spacing-Korrekturen verwenden den laufenden Empfänger nicht zusätzlich.
+Tip-ins, Putbacks, Rückfeldwürfe und Heaves behalten ihre eigene Choreografie. Vorausgeplant wird
+jeweils der nächste unmittelbar folgende Abschluss; dazwischen dürfen nur eigenständige
+Block-Annotationen liegen. Fouls, Timeouts, Auswechslungen, Verstöße, Besitz-/Periodenwechsel und
+Treffer sperren diese Verbindung. Der späte Rebound-Anlauf und die Fangphase bleiben erhalten.
+Es werden keine gemessenen Off-ball-Laufwege oder belegten Spielzüge behauptet.
+
+`formation.continuation` enthält den folgenden Schützen und Zielpunkt, `scene.continuationMove`
+zusätzlich Ursprung, Beginn und Dauer der Bewegung. Die Bewegung läuft über die bestehenden
+Keyframes, ohne nachträgliches Umschreiben von Scores, Ereignissen oder Wurfflugzeiten.
+Wo keine sichere Verbindung besteht, bleibt der bisherige Aufbau erhalten.
+
+DEN–OKC, Aktionen 40 → 41 → 43: Johnson befindet sich beim Rebound bereits an der
+Empfangsposition seines Eckendreiers. Der bisherige Restweg von etwa 43 Court-Fuß nach dem
+Rebound entfällt. Die Positionierung beginnt im gemeinsamen Aufbau und setzt sich während
+Gordons Abschluss fort. Die Fälle sind über die Aktionslinks und Zurückspulen reproduzierbar.
+
+Verifiziert: 30 Regressionstests und die vier vollständigen Spiel-Audits. Die Tests prüfen
+26 vorbereitete Empfängerbewegungen über alle vier Referenzspiele, Geschwindigkeit, folgende
+Verteidiger, freie Ballbesitzfolge, Positionskontinuität, Seeking, unveränderte Quelldaten und
+Grenzen durch Unterbrechungen, Wechsel, Treffer und Defensiv-Rebounds.
+Die Dauern betragen jetzt 2328,775 / 2350,292 / 2360,720 / 2512,693 Sekunden
+(DEN–OKC / NYK–BOS / ATL–CHA / BKN–CLE).
+Deno-Typprüfung, Lint, Formatprüfung und `git diff --check` bestehen. Der Gesamtaudit umfasst
+26.016 Keyframes ohne Fehler. Chrome MCP: Aktionen 40 → 41 → 43 mit Wiedergabe und Pause
+visuell geprüft; Endstand FINAL 84:96 und Rücksprung geprüft, ohne Fehler/Warnungen in der Konsole.

@@ -1224,3 +1224,126 @@ Deno.test("buildup overlaps player travel, bounds speed and positions the shoote
 	}
 	assert(simultaneous > 200, "buildup did not overlap multiple player routes");
 });
+
+Deno.test("next receivers move during the preceding shot without anticipating its rebound", async () => {
+	let moves = 0;
+	for (const id of ["0022600007", "0022600008", "0022600094", "0022600105"]) {
+		const data = await readData(`replay-${id}.json`);
+		const original = JSON.stringify(data);
+		const replay = compileReplay(data);
+		for (const scene of replay.scenes) {
+			const move = scene.continuationMove;
+			if (!move) {
+				continue;
+			}
+			const rebound = replay.scenes[scene.reboundSceneIndex];
+			const next = replay.scenes.find((item) => item.action.actionNumber === move.actionNumber);
+			assert(rebound.action.subType === "offensive", "receiver planning crossed a possession change");
+			assert(next.action.personId === move.playerId, "route is not backed by the next shooter");
+			assert(
+				![scene.action.personId, scene.action.assistPersonId, rebound.action.personId].includes(move.playerId),
+				"receiver planning moved a current participant or the rebounder",
+			);
+			const frames = scene.frames.filter((frame) => frame.time >= move.startAt);
+			let distance = 0;
+			for (let i = 1; i < frames.length; i++) {
+				const previous = frames[i - 1].players.find((player) => player.id === move.playerId);
+				const current = frames[i].players.find((player) => player.id === move.playerId);
+				const step = Math.hypot(current.x - previous.x, current.y - previous.y);
+				assert(step <= (frames[i].time - frames[i - 1].time) * 5 + 0.00001, "receiver route rushed");
+				assert(frames[i].ball.owner !== move.playerId, "moving receiver took the ball before the rebound");
+				const defenderId = Number(
+					Object.keys(scene.matchups).find((id) => scene.matchups[id] === move.playerId),
+				);
+				const defender = frames[i].players.find((player) => player.id === defenderId);
+				assert(
+					Math.hypot(defender.x - current.x, defender.y - current.y) < 4.5,
+					"receiver lost their defender",
+				);
+				distance += step;
+			}
+			assert(distance > 0.1, "receiver did not move during the preceding action");
+			const arrival = scene.frames.at(-1).players.find((player) => player.id === move.playerId);
+			const retained = rebound.frames.at(-1).players.find((player) => player.id === move.playerId);
+			const following = next.frames[0].players.find((player) => player.id === move.playerId);
+			assert(
+				Math.hypot(arrival.x - retained.x, arrival.y - retained.y) < 0.00001 &&
+					Math.hypot(arrival.x - following.x, arrival.y - following.y) < 0.00001,
+				"receiver position jumped across the rebound",
+			);
+			const time = scene.start + (move.startAt + scene.frames.at(-1).time) / 2;
+			const frame = getReplayFrame(replay, time);
+			getReplayFrame(replay, replay.duration);
+			assert(JSON.stringify(getReplayFrame(replay, time)) === JSON.stringify(frame), "receiver seeking changed");
+			moves++;
+		}
+		if (id === "0022600007") {
+			const shot = replay.scenes.find((scene) => scene.action.actionNumber === 40);
+			const next = replay.scenes.find((scene) => scene.action.actionNumber === 43);
+			const move = shot.continuationMove;
+			assert(move?.playerId === next.action.personId, "Johnson's second-chance shot was not anticipated");
+			const release = shot.frames.find((frame) => frame.time === shot.releaseAt)
+				.players.find((player) => player.id === move.playerId);
+			assert(Math.hypot(release.x - move.from.x, release.y - move.from.y) > 1, "Johnson started too late");
+			const ready = next.frames[0].players.find((player) => player.id === move.playerId);
+			assert(
+				Math.hypot(ready.x - next.shotEntry.x, ready.y - next.shotEntry.y) < 1,
+				"Johnson still needs the long cross-court route after Gordon's rebound",
+			);
+		}
+		assert(JSON.stringify(data) === original, "receiver planning changed recorded data");
+		assert(checkReplay(data, replay).errors.length === 0, "receiver planning failed replay validation");
+	}
+	assert(moves > 10, "missing real second-chance sequences");
+});
+
+Deno.test("receiver lookahead stops at interruptions, lineup changes and possession boundaries", async () => {
+	const source = await readData("replay-0022600007.json");
+	for (
+		const boundary of ["timeout", "foul", "turnover", "substitution", "period", "defensive rebound", "made shot"]
+	) {
+		const data = structuredClone(source);
+		const next = data.actions.find((action) => action.actionNumber === 43);
+		data.actions = data.actions.filter((action) => action.orderNumber <= next.orderNumber);
+		const shot = data.actions.find((action) => action.actionNumber === 40);
+		const rebound = data.actions.find((action) => action.actionNumber === 41);
+		const team = data.teams.find((item) => item.id === shot.teamId);
+		if (boundary === "period") {
+			next.period++;
+		} else if (boundary === "defensive rebound") {
+			const opponent = data.teams.find((item) => item.id !== team.id);
+			Object.assign(rebound, {
+				subType: "defensive",
+				teamId: opponent.id,
+				personId: opponent.players.find((player) => player.starter).id,
+			});
+		} else if (boundary === "made shot") {
+			shot.shotResult = "Made";
+		} else {
+			const event = {
+				...rebound,
+				actionNumber: 900000,
+				orderNumber: (rebound.orderNumber + next.orderNumber) / 2,
+				actionType: boundary,
+				subType: "",
+			};
+			if (boundary === "substitution") {
+				const replacement = team.players.find((player) => !player.starter);
+				event.personId = next.personId;
+				event.subType = "out";
+				data.actions.push({
+					...event,
+					actionNumber: event.actionNumber + 1,
+					orderNumber: event.orderNumber + 1,
+					subType: "in",
+					personId: replacement.id,
+				});
+				next.personId = replacement.id;
+			}
+			data.actions.push(event);
+		}
+		const replay = compileReplay(data);
+		const first = replay.scenes.find((scene) => scene.action.actionNumber === 40);
+		assert(!first.continuationMove && !first.formation.continuation, `lookahead crossed ${boundary}`);
+	}
+});
