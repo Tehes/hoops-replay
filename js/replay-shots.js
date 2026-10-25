@@ -56,13 +56,10 @@ export function flyBall(state, record, target, height, duration, curve = 0, move
 	}
 }
 
-export function animateShot(state, scene, shot, hoop, direction, record, contacts, matchups) {
-	scene.approachAt = scene.frames.at(-1).time;
+export function getShotEntry(scene, shot, hoop, direction) {
 	const action = scene.action;
 	const style = scene.shotStyle;
-	const shooter = state.positions[action.personId];
 	const side = Math.sign(shot.y - hoop.y) || (action.actionNumber % 2 ? 1 : -1);
-	const direct = style.tip || style.putback;
 	const rimFinish = style.family === "dunk" || style.family === "layup";
 	const approachLength = style.running ? 12 : style.driving || style.cutting || style.pullup ? 7 : rimFinish ? 4 : 0;
 	const entry = {
@@ -81,6 +78,19 @@ export function animateShot(state, scene, shot, hoop, direction, record, contact
 		// A step-back entry must not establish frontcourt possession before a backcourt release.
 		entry.x = direction === 1 ? Math.min(entry.x, 46) : Math.max(entry.x, 48);
 	}
+	return entry;
+}
+
+export function animateShot(state, scene, shot, hoop, direction, record, contacts, matchups) {
+	scene.approachAt = scene.frames.at(-1).time;
+	const action = scene.action;
+	const style = scene.shotStyle;
+	const shooter = state.positions[action.personId];
+	const side = Math.sign(shot.y - hoop.y) || (action.actionNumber % 2 ? 1 : -1);
+	const direct = style.tip || style.putback;
+	const rimFinish = style.family === "dunk" || style.family === "layup";
+	const approachLength = style.running ? 12 : style.driving || style.cutting || style.pullup ? 7 : rimFinish ? 4 : 0;
+	const entry = getShotEntry(scene, shot, hoop, direction);
 	if (style.family === "heave") {
 		Object.assign(shooter, entry);
 		if (state.ball.owner !== action.personId) {

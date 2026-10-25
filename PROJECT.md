@@ -1,6 +1,6 @@
 # Hoops Replay — Produktkontext und Entwicklerübergabe
 
-Stand: 24. Oktober 2026. Diese Datei hält die Entscheidungen und den geprüften Stand des
+Stand: 25. Oktober 2026. Diese Datei hält die Entscheidungen und den geprüften Stand des
 ursprünglichen Entwicklungsdialogs fest. Sie soll zusammen mit dem Code eine Weiterentwicklung
 ermöglichen, ohne Zugriff auf diesen Chat zu benötigen.
 
@@ -165,9 +165,9 @@ geprüften NBA-Datenstand. Beide gehören laut Snapshot zur Saison 2026–27.
 
 | ID | Spiel | Datum im Snapshot (UTC) | Endstand | Aktionen | Szenen | Replay-Dauer |
 | --- | --- | --- | --- | --- | --- | --- |
-| 0022600007 | DEN bei OKC | 2026-10-23 01:30 | 84:96 | 613 | 462 | 1361,923 s |
-| 0022600008 | NYK bei BOS | 2026-10-23 23:00 | 103:107 | 563 | 434 | 1336,018 s |
-| 0022600094 | ATL bei CHA | 2026-10-23 23:00 | 128:81 | 600 | 460 | 1420,665 s |
+| 0022600007 | DEN bei OKC | 2026-10-23 01:30 | 84:96 | 613 | 462 | 2333,096 s |
+| 0022600008 | NYK bei BOS | 2026-10-23 23:00 | 103:107 | 563 | 434 | 2350,521 s |
+| 0022600094 | ATL bei CHA | 2026-10-23 23:00 | 128:81 | 600 | 460 | 2363,237 s |
 
 Ohne Parameter startet DEN–OKC. `?game=0022600008` startet NYK–BOS mit Boston-Homecourt.
 Jede explizite zehnstellige GameID lädt Boxscore und Play-by-Play direkt vom bestehenden Deno-Server,
@@ -873,3 +873,44 @@ freien Ball, Turnover-Zeitpunkt, beide Spielrichtungen und reproduzierbares Seek
 Deno-Typprüfung, Lint, Formatprüfung und `git diff --check` bestehen. Chrome MCP auf Port 5500:
 Ajay Mitchells Fehlpass in DEN–OKC bei Q1 3:11 visuell geprüft, über den Pass abgespielt, pausiert
 und zum Endstand sowie zurück gesucht.
+
+
+### Gleichzeitiger Aufbau mit wegabhängiger Dauer (25.10.2026)
+
+Die Spieler laufen im Aufbau gemeinsam statt große Strecken in festen 0,3–0,85 Sekunden
+abzuarbeiten und erst danach das übrige Budget zu nutzen. Die längste sichtbare Spielerstrecke
+bestimmt die Mindestdauer eines Bewegungsabschnitts: maximal 18 Court-Fuß pro Replay-Sekunde
+im Mittel, bei der vorhandenen Smoothstep-Interpolation maximal 27 in der Spitze bei 1×.
+Freies Zeitbudget erlaubt einen langsameren Aufbau; die bestehende Reserve für den Abschluss
+bleibt erhalten. Reicht das verdichtete Budget für den Laufweg nicht, verlängert sich die Szene.
+Diese Grenze gilt für die markierten Aufbau-/Rotationsabschnitte, nicht pauschal für Freiwurf-
+Aufstellungen, Auswechslungen, Kontaktanimationen oder den späten Rebound-Anlauf.
+
+Beim Einwurf übernimmt der nächstgelegene aktive Mitspieler außer dem PG den Einwurf.
+Die übrigen Spieler beginnen gleichzeitig mit dem Vorrücken. Nach dem Einwurf laufen Guard,
+Einwerfer und Mitspieler gemeinsam weiter; der bisherige feste Zwischenstopp des Guards an der
+Mittellinie entfällt. Nach defensivem Rebound oder Steal bleibt der Fänger während der
+Outlet-Vorbereitung am Fangort, während sich die anderen bereits bewegen. Matchups bleiben
+bestehen; defensive Wege gehören zur gemeinsamen Laufphase.
+
+Reguläre Feldwurfschützen laufen bereits im Aufbau zum Anlauf-/Empfangspunkt der bestehenden
+Abschlussanimation. `getShotEntry()` teilt dieselbe Geometrie zwischen Aufbau und Abschluss;
+belegte Wurfkoordinaten und Ballflüge werden nicht gestreckt. Tip-ins, Putbacks und Heaves
+behalten ihre gesonderte Behandlung. `scene.buildupMoves` enthält die gemeinsamen Zeitintervalle,
+`scene.shotEntry` den vorgezogenen Anlaufpunkt. Seeking bleibt vollständig vorkompiliert.
+
+Laufwege verbrauchen nun einen größeren Teil des vorhandenen Budgets. Optionale Dribbelrouten
+und Passfolgen entstehen deshalb seltener. Zwei verbindende Pässe sind bereits ab vier statt
+sechs verbleibenden Replay-Sekunden erlaubt; die bisherigen Empfänger-, Längen- und
+Korridorprüfungen bleiben erhalten. Shot-clock-Tests prüfen das Zeitbudget einschließlich
+Laufbewegung statt ausschließlich zusätzlicher Wartezeit.
+
+Verifiziert: 27 Tests und vier vollständige Spiel-Audits mit 26.009 Keyframes ohne Fehler;
+Deno-Typprüfung, Lint, Formatprüfung und `git diff --check` bestehen. Der neue Regressionstest
+prüft die Weg-/Zeitgrenze, gleichzeitige Bewegung mehrerer Spieler, die frühe Schützenposition,
+die auffälligen DEN–OKC-Aktionen 95 und 566 sowie unveränderte Quelldaten und Seeking.
+Chrome MCP auf Port 5500: beide Situationen mit Play/Pause und Seeking, gemeinsamer Feldwechsel,
+Endstand FINAL 84:96 und Rücksprung geprüft; keine Fehler oder Warnungen in der Konsole.
+Die vier Dauern betragen jetzt 2333,096 / 2350,521 / 2363,237 / 2515,147 Sekunden
+(DEN–OKC / NYK–BOS / ATL–CHA / BKN–CLE). Beispielsweise wächst DEN–OKC von 33:22 auf 38:53.
+Die Bewegungen und ihre Zwischenpositionen bleiben schematisch; dies ist keine Tracking-Simulation.

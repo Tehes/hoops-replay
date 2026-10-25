@@ -22,6 +22,8 @@ Without a Game ID in the URL, the app opens the bundled DEN–OKC example.
 ## Features
 
 - **Full-court replay:** Follow both teams as numbered jerseys on a court with the home team's logo and colors.
+- **Coordinated movement:** Players advance together during inbounds and possession changes. Shooters move into
+  receiving positions during the buildup, with travel time based on route length and the available time budget.
 - **Play-by-play display:** See the score, game clock, player photos, and original event descriptions.
 - **Different shot animations:** Dunks, layups, jump shots, and other finishes have different movements and ball flights.
 - **Shot markers:** Made shots appear as green dots; misses appear as red crosses. Markers fade with replay time.
@@ -33,7 +35,7 @@ Without a Game ID in the URL, the app opens the bundled DEN–OKC example.
 ## How to Use
 
 1. Open a replay and press **Play**.
-2. Use the speed selector to slow down or speed up playback.
+2. Use the speed selector to slow down or speed up playback (0.5×, 1×, 1.5×, 2× or 4×).
 3. Drag the timeline to any point, select a quarter, or use the previous/next buttons to move between possessions.
 4. Tap or click a jersey to show the player's name.
 
@@ -63,6 +65,7 @@ If your link already contains a `game` value, replace it rather than adding a se
 Add `&action=ACTION_NUMBER` to a game link to open the replay paused at that event, for example:
 [DEN at OKC, action 17](https://tehes.github.io/hoops-replay/?game=0022600007&action=17).
 Press **Play** to continue from there.
+The link starts at the event itself. Scrub back a few seconds before pressing Play to watch its buildup.
 
 The number is the event's `actionNumber` from the NBA play-by-play data (also stored in local
 `data/replay-<gameId>.json` snapshots). It is an event ID, not its position in the event list,
@@ -80,9 +83,15 @@ An invalid or unknown action number leaves the replay at the beginning and logs 
 Play-by-play supplies the events, their order, scores, and involved players. Recorded shot coordinates
 anchor field goals; boxscore data supplies players and starting lineups. The replay adds schematic
 formations, defensive matchups, passes, rebounds, and running paths to connect the events.
+Defensive assignments remain stable within an attack and follow substitutions. Where suitable, the buildup
+includes short dribble routes or connecting passes. These are schematic additions, not recorded pass
+sequences or evidence of a specific play.
 
 - **Schematic movement:** Player locations between recorded events are estimates. The replay does
   not show the ten players' actual positions or claim to reproduce specific plays without evidence.
+- **Condensed time:** Even at 1×, playback is not real time. Gaps between recorded game-clock times guide
+  the buildup, and the displayed clock reaches each recorded event time. Players can move simultaneously;
+  long routes can extend a scene when the condensed budget is too short. Shot flights keep their own timing.
 - **Completed games only:** There is no live replay mode. A game must have compatible, consistent
   play-by-play and boxscore feeds. Invalid or unsupported games show an error instead of a substitute game.
 - **Team colors:** Court colors and uniforms use fixed team palettes, not the game's actual court
@@ -98,18 +107,19 @@ formations, defensive matchups, passes, rebounds, and running paths to connect t
 
 Built with vanilla HTML, CSS, and JavaScript modules. No dependencies, frameworks, or build step.
 Deno is used for the optional import and verification tools; the frontend runs in the browser.
+Read [PROJECT.md](PROJECT.md) for product decisions, the data contract and implementation limits,
+and [AGENTS.md](AGENTS.md) for repository working rules.
 
 ### Run Locally
 
-Serve the repository with a static server, for example:
+Use the project's existing local preview and open the replay in the browser.
+The page needs to be served over HTTP rather than opened directly as a file.
 
-```sh
-python3 -m http.server 5500 --bind 127.0.0.1
-```
-
-Open [http://127.0.0.1:5500/](http://127.0.0.1:5500/).
-Use this exact origin for loading games by ID: the backend allows `127.0.0.1:5500`.
-Other ports and `localhost` are different origins. Opening `index.html` directly will not load modules and data correctly.
+For changes to a specific sequence, use action links in the local preview to reproduce and inspect
+the relevant situation. For example, `?action=95` and `?action=566` select two movement examples in
+the bundled DEN–OKC game. Scrub back before the event to watch the buildup, then check playback,
+pause and repeated seeking. Use `?game=GAME_ID&action=ACTION_NUMBER` for another game.
+Include the relevant local action links when presenting a change so its behavior can be reviewed directly.
 
 ### Project Structure
 
@@ -144,6 +154,22 @@ deno run --allow-net=nba-spielplan.tehes.deno.net --allow-read --allow-write=dat
 It saves the raw feeds under `data/raw/` and writes a playable `data/replay-GAME_ID.json` only after
 validation succeeds. Existing files are preserved unless `--overwrite` is explicitly passed.
 Loading `?game=GAME_ID` still requests backend data, even when a local fixture exists.
+Raw feeds are saved before validation, so a failed import can leave raw archives without a playable snapshot.
+
+### Reference Games
+
+Four playable snapshots are included for repeatable regression checks:
+
+| Game ID | Matchup | Final score (away–home) |
+| --- | --- | --- |
+| `0022600007` | DEN at OKC | 84–96 |
+| `0022600008` | NYK at BOS | 103–107 |
+| `0022600094` | ATL at CHA | 128–81 |
+| `0022600105` | BKN at CLE | 121–125 |
+
+Only DEN–OKC is selected locally by default. Explicit `?game=` links request the backend.
+Files under `data/raw/` also include unsupported or inconsistent cases; their presence does not mean
+that a game passed validation.
 
 ### Development Checks
 
@@ -158,6 +184,8 @@ git diff --check
 
 The audit discovers all local replay snapshots and checks scores, lineups, ball ownership, coordinates,
 interpolation, and shot behavior. Raw archives are excluded.
+The regression tests also cover simultaneous buildup, travel speed, early shooter positioning,
+passes, rebounds, substitutions and synthetic overtime cases.
 
 For a browser check, load a game, play and pause, scrub across halftime, and seek to the final score.
 Check the controls and court on both mobile and desktop widths.

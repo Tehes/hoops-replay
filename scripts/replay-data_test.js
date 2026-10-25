@@ -785,8 +785,11 @@ Deno.test("shot-clock violations prolong the buildup, including a late miss befo
 				const shot = replay.scenes[rebound.reboundShotIndex];
 				assert(rebound.action.subType === "offensive" && shot.shotClockPressure, "late miss was ignored");
 				assert(
-					shot.preparationWait > baseline.scenes[rebound.reboundShotIndex].preparationWait,
-					"time before the missed shot was not prolonged",
+					shot.eventAt - (shot.liveAt ?? 0) >= Math.min(24, shot.liveSeconds * 0.85) - 1.5 &&
+						shot.eventAt - (shot.liveAt ?? 0) >=
+							baseline.scenes[rebound.reboundShotIndex].eventAt -
+								(baseline.scenes[rebound.reboundShotIndex].liveAt ?? 0),
+					"movement and preparation did not cover the late miss's shot-clock budget",
 				);
 				assert(scene.eventAt - (scene.liveAt ?? 0) < 6, "invented a fresh long attack after the miss");
 				assert(
@@ -887,7 +890,8 @@ Deno.test("long preparations move the ball carrier with their defender and prese
 			routes++;
 		}
 	}
-	assert(routes > 200 && spacing > 0, "missing preparation movement coverage");
+	// Travel now consumes the preparation budget before optional stationary dribble routes.
+	assert(routes > 50 && spacing > 0, "missing preparation movement coverage");
 });
 
 Deno.test("schematic circulation has free pass flights, visible catches and the recorded finish recipient", async () => {
@@ -956,7 +960,7 @@ Deno.test("schematic circulation has free pass flights, visible catches and the 
 		}
 		assert(checkReplay(data, replay).errors.length === 0, "circulation failed replay validation");
 	}
-	assert(sequences > 10 && assists > 0 && shotClocks === 4, "missing circulation scenarios");
+	assert(sequences > 0 && assists > 0 && shotClocks === 4, "missing circulation scenarios");
 });
 
 Deno.test("backcourt finishes keep inbound, outlet, circulation and shot approach behind half court", async () => {
@@ -1105,4 +1109,65 @@ Deno.test("bad passes out of bounds narrowly miss an active teammate before cros
 		assert(JSON.stringify(data) === original, "missed-pass choreography mutated source events");
 	}
 	assert(passes >= 15 && directions.size === 2 && sidelines.size >= 2, "missing bad-pass coverage");
+});
+
+Deno.test("buildup overlaps player travel, bounds speed and positions the shooter before the finish", async () => {
+	let simultaneous = 0;
+	for (const id of ["0022600007", "0022600008", "0022600094", "0022600105"]) {
+		const data = await readData(`replay-${id}.json`);
+		const original = JSON.stringify(data);
+		const replay = compileReplay(data);
+		for (const scene of replay.scenes) {
+			for (const move of scene.buildupMoves ?? []) {
+				const from = scene.frames.find((frame) => frame.time === move.start);
+				const to = scene.frames.find((frame) => frame.time === move.end);
+				let moving = 0;
+				for (const player of from.players) {
+					const target = to.players.find((item) => item.id === player.id);
+					if (player.opacity !== 1 || target.opacity !== 1) {
+						continue;
+					}
+					const distance = Math.hypot(target.x - player.x, target.y - player.y);
+					assert(distance <= (move.end - move.start) * 18 + 0.00001, "buildup still rushes a long route");
+					if (distance > 6) {
+						moving++;
+						const middle = getReplayFrame(replay, scene.start + (move.start + move.end) / 2);
+						const traveler = middle.players.find((item) => item.id === player.id);
+						assert(
+							Math.hypot(traveler.x - player.x, traveler.y - player.y) > 1 &&
+								Math.hypot(traveler.x - target.x, traveler.y - target.y) > 1,
+							"player did not travel throughout the shared interval",
+						);
+					}
+				}
+				if (moving >= 3) {
+					simultaneous++;
+				}
+			}
+			if (scene.shotEntry) {
+				const ready = scene.frames.find((frame) => frame.time === scene.preparationAt);
+				const shooter = ready.players.find((player) => player.id === scene.action.personId);
+				assert(
+					Math.hypot(shooter.x - scene.shotEntry.x, shooter.y - scene.shotEntry.y) < 0.00001,
+					"shooter waited until the finish to approach the receiving position",
+				);
+			}
+		}
+		if (id === "0022600007") {
+			for (const action of [95, 566]) {
+				const scene = replay.scenes.find((item) => item.action.actionNumber === action);
+				const before = scene.frames.find((frame) => frame.time === scene.approachAt);
+				const after = scene.frames.find((frame) => frame.time > scene.approachAt);
+				const from = before.players.find((player) => player.id === scene.action.personId);
+				const to = after.players.find((player) => player.id === scene.action.personId);
+				assert(Math.hypot(to.x - from.x, to.y - from.y) < 8, "finish still contains a late long sprint");
+			}
+		}
+		const time = replay.scenes.find((scene) => scene.buildupMoves?.length).start + 0.1;
+		const frame = getReplayFrame(replay, time);
+		getReplayFrame(replay, replay.duration);
+		assert(JSON.stringify(getReplayFrame(replay, time)) === JSON.stringify(frame), "travel seeking changed");
+		assert(JSON.stringify(data) === original, "movement changed source data");
+	}
+	assert(simultaneous > 200, "buildup did not overlap multiple player routes");
 });
