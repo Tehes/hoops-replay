@@ -64,8 +64,56 @@ export const TEAM_NAMES = {
 	WAS: "Washington Wizards",
 };
 
+export const WNBA_TEAM_COLORS = {
+	ATL: { shirt: "#e3173e", trim: "#4891ce", ink: "#ffffff" },
+	CHI: { shirt: "#4d90cd", trim: "#ffd520", ink: "#101820" },
+	CON: { shirt: "#f05023", trim: "#0a2240", ink: "#101820" },
+	DAL: { shirt: "#c4d600", trim: "#002b5c", ink: "#101820" },
+	GSV: { shirt: "#b896d4", trim: "#000000", ink: "#101820" },
+	IND: { shirt: "#e2293a", trim: "#20305d", ink: "#ffffff" },
+	LAS: { shirt: "#552583", trim: "#fdb927", ink: "#ffffff" },
+	LVA: { shirt: "#000000", trim: "#a7a8aa", ink: "#ffffff" },
+	MIN: { shirt: "#315c98", trim: "#9c9e9f", ink: "#ffffff" },
+	NYL: { shirt: "#87d5b5", trim: "#100f0d", ink: "#101820" },
+	PDX: { shirt: "#010101", trim: "#c8102e", ink: "#ffffff" },
+	PHX: { shirt: "#fa4b0a", trim: "#3c286e", ink: "#101820" },
+	SEA: { shirt: "#2c5235", trim: "#fee11a", ink: "#ffffff" },
+	TOR: { shirt: "#b8ccea", trim: "#441e36", ink: "#101820" },
+	WAS: { shirt: "#002b5c", trim: "#c4ced4", ink: "#ffffff" },
+};
+
+export const WNBA_TEAM_NAMES = {
+	ATL: "Atlanta Dream",
+	CHI: "Chicago Sky",
+	CON: "Connecticut Sun",
+	DAL: "Dallas Wings",
+	GSV: "Golden State Valkyries",
+	IND: "Indiana Fever",
+	LAS: "Los Angeles Sparks",
+	LVA: "Las Vegas Aces",
+	MIN: "Minnesota Lynx",
+	NYL: "New York Liberty",
+	PDX: "Portland Fire",
+	PHX: "Phoenix Mercury",
+	SEA: "Seattle Storm",
+	TOR: "Toronto Tempo",
+	WAS: "Washington Mystics",
+};
+
+export function getTeamColors(team) {
+	return (team.league === "wnba" ? WNBA_TEAM_COLORS : TEAM_COLORS)[team.code];
+}
+
+export function getTeamName(team) {
+	return (team.league === "wnba" ? WNBA_TEAM_NAMES : TEAM_NAMES)[team.code];
+}
+
+export function getTeamLogo(team) {
+	return `./img/${team.league === "wnba" ? "WNBA" : "NBA"}/${team.code}.svg`;
+}
+
 export function getJerseyColors(team) {
-	const colors = TEAM_COLORS[team.code];
+	const colors = getTeamColors(team);
 	if (team.home) {
 		return { shirt: "#ffffff", trim: colors.shirt, ink: colors.shirt };
 	}

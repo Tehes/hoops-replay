@@ -1,4 +1,5 @@
 import { animateShot, flyBall, getShotEntry, getShotStyle, landPlayers } from "./replay-shots.js";
+import { getLeague } from "./replay-leagues.js";
 
 const SLOT_ORDER = ["PG", "SG", "SF", "PF", "C"];
 const FALLBACK_SPACING = [[62, 25], [70, 10], [73, 40], [79, 17], [83, 31]];
@@ -360,6 +361,7 @@ function planFormation(replay, index, offense, direction, lineup, state) {
 			},
 			{ x: direction === 1 ? 88.75 : 5.25, y: 25 },
 			direction,
+			replay.league.threePointRadius,
 		)
 		: null;
 	const assistSlot = evidence ? lineup.indexOf(evidence.assistPersonId) : -1;
@@ -1003,7 +1005,7 @@ function prepareRebound(replay, scene, index, state) {
 	scene.reboundApproach = { sceneIndex: scene.reboundShotIndex, start, end, playerId: id, target };
 }
 
-function planShootingFoul(scenes, index, position, hoop, direction) {
+function planShootingFoul(scenes, index, position, hoop, direction, threePointRadius) {
 	const action = scenes[index].action;
 	let freeThrows = action.qualifiers?.includes("3freethrow")
 		? 3
@@ -1046,8 +1048,8 @@ function planShootingFoul(scenes, index, position, hoop, direction) {
 	}
 	const y = Math.max(freeThrows === 2 ? 4 : 2, Math.min(freeThrows === 2 ? 46 : 48, position.y));
 	const offsetY = Math.abs(y - hoop.y);
-	// The corner line is straight; the rest is a 23.75-foot arc around the basket.
-	const boundary = offsetY >= 22 ? 0 : Math.sqrt(23.75 ** 2 - offsetY ** 2);
+	// Both leagues keep the corner line 22 feet from the basket's centerline.
+	const boundary = offsetY >= 22 ? 0 : Math.sqrt(threePointRadius ** 2 - offsetY ** 2);
 	const depth = (hoop.x - position.x) * direction;
 	const targetDepth = freeThrows === 2
 		? Math.max(1, Math.min(boundary - 1.5, depth))
@@ -1060,7 +1062,7 @@ function prepareShootingFoul(state, scene, replay, index, hoop, direction, recor
 	const shooter = state.positions[shooterId];
 	const plan = scene.formation.foulActionNumber === scene.action.actionNumber
 		? scene.formation.foulPlan
-		: planShootingFoul(replay.scenes, index, shooter, hoop, direction);
+		: planShootingFoul(replay.scenes, index, shooter, hoop, direction, replay.league.threePointRadius);
 	scene.foulPoint = { ...plan.point };
 	scene.foulApproachAt = scene.frames.at(-1).time;
 	if (plan.freeThrows === 1) {
@@ -1711,6 +1713,7 @@ export function compileReplay(data) {
 		}
 	}
 	const replay = {
+		league: getLeague(data.gameId),
 		scenes: buildScenes(data.actions),
 		formations: [],
 		markers: [],
@@ -1731,7 +1734,7 @@ export function compileReplay(data) {
 			? previous.clockTo
 			: scene.action.period > 4
 			? 300
-			: 720;
+			: replay.league.periodSeconds;
 		scene.liveSeconds = Math.max(0, scene.clockFrom - scene.clockTo);
 		if (scene.kind === "period" && scene.action.subType === "start") {
 			replay.quarters.push({ period: scene.action.period, time: scene.start });

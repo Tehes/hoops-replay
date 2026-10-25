@@ -5,7 +5,8 @@ Imports
 import { loadReplayData } from "./replay-data.js";
 import { checkReplay } from "./replay-validation.js";
 import { compileReplay, getReplayFrame } from "./replay-engine.js";
-import { getJerseyColors, TEAM_COLORS, TEAM_NAMES } from "./replay-teams.js";
+import { getJerseyColors, getTeamColors, getTeamLogo, getTeamName } from "./replay-teams.js";
+import { getLeague } from "./replay-leagues.js";
 
 /* --------------------------------------------------------------------------------------------------
 Constants and state
@@ -74,7 +75,7 @@ function roundedRect(context, x, y, width, height, radius) {
 
 function drawCourt() {
 	const home = game?.teams.find((team) => team.home);
-	const colors = home ? TEAM_COLORS[home.code] : NEUTRAL_COURT;
+	const colors = home ? getTeamColors(home) : NEUTRAL_COURT;
 	courtBackground = document.createElement("canvas");
 	courtBackground.width = canvas.width;
 	courtBackground.height = canvas.height;
@@ -138,12 +139,13 @@ function drawCourt() {
 		c.arc(5.25, 25, 4, -Math.PI / 2, Math.PI / 2);
 		c.stroke();
 		c.strokeStyle = "#28303c";
-		const angle = Math.asin(22 / 23.75);
-		const cornerX = 5.25 + Math.sqrt(23.75 ** 2 - 22 ** 2);
+		const radius = game ? getLeague(game.gameId).threePointRadius : 23.75;
+		const angle = Math.asin(22 / radius);
+		const cornerX = 5.25 + Math.sqrt(radius ** 2 - 22 ** 2);
 		c.beginPath();
 		c.moveTo(0, 3);
 		c.lineTo(cornerX, 3);
-		c.arc(5.25, 25, 23.75, -angle, angle);
+		c.arc(5.25, 25, radius, -angle, angle);
 		c.lineTo(0, 47);
 		c.stroke();
 		c.strokeStyle = "#80909d";
@@ -184,7 +186,7 @@ function drawCourt() {
 	}
 	for (
 		const label of [
-			{ x: -1.25, y: 40, angle: -Math.PI / 2, text: home ? TEAM_NAMES[home.code] : "" },
+			{ x: -1.25, y: 40, angle: -Math.PI / 2, text: home ? getTeamName(home) : "" },
 			{ x: 95.25, y: 10, angle: Math.PI / 2, text: game?.arena || "" },
 		]
 	) {
@@ -453,8 +455,8 @@ function renderAction(frame) {
 	const action = active?.action;
 	const player = action && playerById.get(action.personId);
 	const team = action && teamById.get(player?.teamId || action.teamId);
-	actionDisplay.style.setProperty("--event-color", team ? TEAM_COLORS[team.code].trim : "var(--accent-color)");
-	actionPlayer.textContent = active?.label || player?.name || (team ? TEAM_NAMES[team.code] : "HOOPS REPLAY");
+	actionDisplay.style.setProperty("--event-color", team ? getTeamColors(team).trim : "var(--accent-color)");
+	actionPlayer.textContent = active?.label || player?.name || (team ? getTeamName(team) : "HOOPS REPLAY");
 	if (action) {
 		actionDescription.textContent = action.description;
 	} else {
@@ -470,8 +472,10 @@ function renderAction(frame) {
 	actionPhoto.alt = player?.name || team?.name || "";
 	if (team) {
 		actionPhoto.src = player
-			? `https://cdn.nba.com/headshots/nba/latest/260x190/${player.id}.png`
-			: `./img/NBA/${team.code}.svg`;
+			? `https://cdn.${team.league === "wnba" ? "wnba" : "nba"}.com/headshots/${
+				team.league || "nba"
+			}/latest/260x190/${player.id}.png`
+			: getTeamLogo(team);
 	} else {
 		actionPhoto.removeAttribute("src");
 	}
@@ -635,18 +639,18 @@ async function init() {
 		for (const [index, element] of [awayTeamEl, homeTeamEl].entries()) {
 			const team = game.teams[index];
 			element.querySelector("span").textContent = team.code;
-			element.querySelector("img").src = `./img/NBA/${team.code}.svg`;
+			element.querySelector("img").src = getTeamLogo(team);
 			element.querySelector("img").alt = team.name;
 			element.querySelector("img").hidden = false;
 		}
 		document.title = `Hoops Replay · ${game.teams[0].code} @ ${game.teams[1].code}`;
 		actionPhoto.addEventListener("error", () => {
-			if (actionPhoto.getAttribute("src")?.startsWith("https://cdn.nba.com/headshots/")) {
+			if (/^https:\/\/cdn\.(nba|wnba)\.com\/headshots\//.test(actionPhoto.getAttribute("src") || "")) {
 				console.warn(`Player photo unavailable: ${actionPhoto.getAttribute("src")}`);
 				const action = displayedAction.action;
 				const player = playerById.get(action.personId);
 				const team = teamById.get(player?.teamId || action.teamId);
-				actionPhoto.src = `./img/NBA/${team.code}.svg`;
+				actionPhoto.src = getTeamLogo(team);
 			} else {
 				console.warn("Action team logo could not be loaded.");
 				actionPhoto.hidden = true;
@@ -657,7 +661,7 @@ async function init() {
 			render();
 		});
 		homeLogo.addEventListener("error", () => console.warn("Homecourt logo could not be loaded."));
-		homeLogo.src = `./img/NBA/${game.teams.find((team) => team.home).code}.svg`;
+		homeLogo.src = getTeamLogo(game.teams.find((team) => team.home));
 		timeline.max = replay.duration;
 		for (const control of document.querySelectorAll(".playback button, .playback input, .playback select")) {
 			control.disabled = false;

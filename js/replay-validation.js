@@ -1,4 +1,5 @@
 import { attackDirection, compileReplay, getReplayFrame } from "./replay-engine.js";
+import { getLeague } from "./replay-leagues.js";
 
 export function checkReplay(data, replay = compileReplay(data)) {
 	const id = data.gameId;
@@ -213,7 +214,8 @@ export function checkReplay(data, replay = compileReplay(data)) {
 	for (let t = 0; t < replay.duration; t += 0.2) {
 		const frame = getReplayFrame(replay, t);
 		check(
-			Number.isFinite(frame.clock) && frame.clock >= 0 && frame.clock <= (frame.period > 4 ? 300 : 720),
+			Number.isFinite(frame.clock) && frame.clock >= 0 &&
+				frame.clock <= (frame.period > 4 ? 300 : getLeague(data.gameId).periodSeconds),
 			`${id} clock at ${t}`,
 		);
 		check(

@@ -1,11 +1,12 @@
-import { TEAM_COLORS } from "./replay-teams.js";
+import { getTeamColors } from "./replay-teams.js";
+import { getLeague } from "./replay-leagues.js";
 
 export const API_BASE = "https://nba-spielplan.tehes.deno.net";
 const DEFAULT_GAME = "0022600007";
 const SLOTS = ["PG", "SG", "SF", "PF", "C"];
 
-function normalizeTeam(team, home) {
-	if (!TEAM_COLORS[team.teamTricode] || !Array.isArray(team.players)) {
+function normalizeTeam(team, home, league) {
+	if (!getTeamColors({ code: team.teamTricode, league }) || !Array.isArray(team.players)) {
 		throw new Error(`Unsupported team or missing roster: ${team.teamTricode}`);
 	}
 	const players = team.players.map((player) => ({
@@ -39,6 +40,7 @@ function normalizeTeam(team, home) {
 	}
 	return {
 		id: team.teamId,
+		league,
 		code: team.teamTricode,
 		name: team.teamName,
 		home,
@@ -84,17 +86,20 @@ export function normalizeGame(gameId, boxscore, playByPlay) {
 		throw new Error("Missing or invalid game date.");
 	}
 	const year = date.getUTCFullYear() - (date.getUTCMonth() < 6 ? 1 : 0);
+	const league = getLeague(gameId).id;
+	const query = league === "wnba" ? "?league=wnba" : "";
 	return {
 		gameId,
+		league,
 		date: game.gameTimeUTC,
 		arena: game.arena?.arenaName || "",
-		season: `${year}-${String(year + 1).slice(-2)}`,
+		season: league === "wnba" ? String(date.getUTCFullYear()) : `${year}-${String(year + 1).slice(-2)}`,
 		sources: {
-			playByPlay: `${API_BASE}/playbyplay/${gameId}`,
-			boxscore: `${API_BASE}/boxscore/${gameId}`,
+			playByPlay: `${API_BASE}/playbyplay/${gameId}${query}`,
+			boxscore: `${API_BASE}/boxscore/${gameId}${query}`,
 			captured: new Date().toISOString(),
 		},
-		teams: [normalizeTeam(game.awayTeam, false), normalizeTeam(game.homeTeam, true)],
+		teams: [normalizeTeam(game.awayTeam, false, league), normalizeTeam(game.homeTeam, true, league)],
 		actions: playByPlay.game.actions.map(normalizeShotCoordinates),
 	};
 }
@@ -107,18 +112,20 @@ export async function loadReplayData(gameId) {
 		}
 		return await response.json();
 	}
+	const league = getLeague(gameId).id;
+	const query = league === "wnba" ? "?league=wnba" : "";
 	const feeds = await Promise.all(["boxscore", "playbyplay"].map(async (endpoint) => {
 		let response;
 		try {
-			response = await fetch(`${API_BASE}/${endpoint}/${gameId}`);
+			response = await fetch(`${API_BASE}/${endpoint}/${gameId}${query}`);
 		} catch (error) {
 			console.warn(`Replay ${endpoint} request failed:`, error);
 			throw new Error(
-				"NBA data could not be reached. Check the connection and the backend CORS permission for this site's origin.",
+				`${league.toUpperCase()} data could not be reached. Check the connection and the backend CORS permission for this site's origin.`,
 			);
 		}
 		if (!response.ok) {
-			throw new Error(`NBA ${endpoint}: HTTP ${response.status}`);
+			throw new Error(`${league.toUpperCase()} ${endpoint}: HTTP ${response.status}`);
 		}
 		return await response.json();
 	}));

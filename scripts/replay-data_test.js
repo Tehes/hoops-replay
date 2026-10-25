@@ -1,6 +1,7 @@
 import { loadReplayData, normalizeGame } from "../js/replay-data.js";
 import { attackDirection, clockSeconds, compileReplay, getReplayFrame } from "../js/replay-engine.js";
 import { checkReplay } from "../js/replay-validation.js";
+import { getTeamColors, getTeamLogo, getTeamName } from "../js/replay-teams.js";
 
 const DATA = new URL("../data/", import.meta.url);
 
@@ -40,6 +41,50 @@ Deno.test("default uses the local example; an explicit ID always loads both back
 			"explicit ID must use the backend only",
 		);
 		assert(checkReplay(game).errors.length === 0, "normalized backend feeds failed validation");
+	} finally {
+		globalThis.fetch = originalFetch;
+	}
+});
+
+Deno.test("WNBA feeds use their league, teams, season and ten-minute quarters", async () => {
+	const boxscore = await readData("raw/boxscore-1042600304.json");
+	const playByPlay = await readData("raw/playbyplay-1042600304.json");
+	const original = JSON.stringify([boxscore, playByPlay]);
+	const originalFetch = globalThis.fetch;
+	const requests = [];
+	globalThis.fetch = (url) => {
+		requests.push(String(url));
+		return Promise.resolve(Response.json(String(url).includes("boxscore/") ? boxscore : playByPlay));
+	};
+	try {
+		const data = await loadReplayData("1042600304");
+		assert(
+			requests.length === 2 && requests.every((url) => url.endsWith("/1042600304?league=wnba")),
+			"wrong league endpoint",
+		);
+		assert(data.league === "wnba" && data.season === "2026", "wrong WNBA season");
+		assert(data.sources.boxscore === requests[0] && data.sources.playByPlay === requests[1], "wrong source URLs");
+		const atlanta = data.teams.find((team) => team.code === "ATL");
+		assert(getTeamName(atlanta) === "Atlanta Dream", "WNBA team became an NBA team");
+		assert(getTeamName({ code: "ATL" }) === "Atlanta Hawks", "old NBA snapshots lost their team");
+		assert(getTeamColors(atlanta).shirt === "#e3173e", "wrong WNBA palette");
+		assert(getTeamLogo(atlanta) === "./img/WNBA/ATL.svg", "wrong WNBA logo");
+		assert(getTeamLogo({ code: "ATL" }) === "./img/NBA/ATL.svg", "wrong NBA logo");
+		const replay = compileReplay(data);
+		for (const quarter of replay.quarters) {
+			const frame = getReplayFrame(replay, quarter.time);
+			assert(frame.clock === 600, "WNBA quarter did not start at 10:00");
+			const next = replay.scenes.find((scene) => scene.action.period === quarter.period && scene.clockTo < 600);
+			assert(next.clockFrom === 600, "first live gap added two NBA minutes");
+		}
+		const end = getReplayFrame(replay, replay.duration);
+		assert(JSON.stringify(end.score) === "[67,62]", "wrong WNBA final score");
+		const at = replay.duration / 2;
+		const middle = JSON.stringify(getReplayFrame(replay, at));
+		getReplayFrame(replay, 0);
+		assert(JSON.stringify(getReplayFrame(replay, at)) === middle, "WNBA seeking changed state");
+		assert(checkReplay(data, replay).errors.length === 0, "WNBA game failed validation");
+		assert(JSON.stringify([boxscore, playByPlay]) === original, "normalization mutated WNBA feeds");
 	} finally {
 		globalThis.fetch = originalFetch;
 	}
@@ -179,36 +224,38 @@ Deno.test("unlisted people in technical fouls remain team events without changin
 });
 
 Deno.test("synthetic overtime boundaries use five-minute clocks and OT labels, including multiple OT", async () => {
-	const data = await readData("replay-0022600007.json");
-	const end = data.actions.find((action) => action.actionType === "game");
-	data.actions = data.actions.filter((action) => action.actionType !== "game");
-	let orderNumber = Math.max(...data.actions.map((action) => action.orderNumber));
-	let actionNumber = Math.max(...data.actions.map((action) => action.actionNumber));
-	for (const period of [5, 6]) {
-		for (const subType of ["start", "end"]) {
-			data.actions.push({
-				...end,
-				actionNumber: ++actionNumber,
-				orderNumber: ++orderNumber,
-				actionType: "period",
-				subType,
-				period,
-				clock: subType === "start" ? "PT05M00.00S" : "PT00M00.00S",
-			});
+	for (const file of ["replay-0022600007.json", "replay-1042600304.json"]) {
+		const data = await readData(file);
+		const end = data.actions.find((action) => action.actionType === "game");
+		data.actions = data.actions.filter((action) => action.actionType !== "game");
+		let orderNumber = Math.max(...data.actions.map((action) => action.orderNumber));
+		let actionNumber = Math.max(...data.actions.map((action) => action.actionNumber));
+		for (const period of [5, 6]) {
+			for (const subType of ["start", "end"]) {
+				data.actions.push({
+					...end,
+					actionNumber: ++actionNumber,
+					orderNumber: ++orderNumber,
+					actionType: "period",
+					subType,
+					period,
+					clock: subType === "start" ? "PT05M00.00S" : "PT00M00.00S",
+				});
+			}
 		}
+		data.actions.push({ ...end, actionNumber: ++actionNumber, orderNumber: ++orderNumber, period: 6 });
+		const replay = compileReplay(data);
+		for (const period of [5, 6]) {
+			const quarter = replay.quarters.find((quarter) => quarter.period === period);
+			const frame = getReplayFrame(replay, quarter.time);
+			assert(frame.clock === 300 && frame.scene.banner === `OT${period - 4}`, `incorrect OT${period - 4} start`);
+			const endScene = replay.scenes.find((scene) =>
+				scene.action.period === period && scene.action.subType === "end"
+			);
+			assert(endScene.banner === `OT${period - 4} · 0:00`, "incorrect overtime end label");
+		}
+		assert(checkReplay(data, replay).errors.length === 0, "synthetic overtime boundaries failed validation");
 	}
-	data.actions.push({ ...end, actionNumber: ++actionNumber, orderNumber: ++orderNumber, period: 6 });
-	const replay = compileReplay(data);
-	for (const period of [5, 6]) {
-		const quarter = replay.quarters.find((quarter) => quarter.period === period);
-		const frame = getReplayFrame(replay, quarter.time);
-		assert(frame.clock === 300 && frame.scene.banner === `OT${period - 4}`, `incorrect OT${period - 4} start`);
-		const endScene = replay.scenes.find((scene) =>
-			scene.action.period === period && scene.action.subType === "end"
-		);
-		assert(endScene.banner === `OT${period - 4} · 0:00`, "incorrect overtime end label");
-	}
-	assert(checkReplay(data, replay).errors.length === 0, "synthetic overtime boundaries failed validation");
 });
 
 Deno.test("formation lookahead stops before an offensive substitution introduces the later shooter", async () => {
@@ -550,7 +597,14 @@ Deno.test("timeouts and period breaks clear the court, preserve bench substituti
 });
 
 Deno.test("shooting fouls respect two-point and three-point territory in both directions", async () => {
-	for (const file of ["replay-0022600007.json", "replay-0022600008.json", "replay-0022600094.json"]) {
+	for (
+		const file of [
+			"replay-0022600007.json",
+			"replay-0022600008.json",
+			"replay-0022600094.json",
+			"replay-1042600304.json",
+		]
+	) {
 		const data = await readData(file);
 		for (const reverse of [false, true]) {
 			const changed = structuredClone(data);
@@ -570,7 +624,8 @@ Deno.test("shooting fouls respect two-point and three-point territory in both di
 				const offense = changed.teams.find((team) => team.id !== action.teamId).id;
 				const direction = attackDirection(changed, offense, action.period);
 				const hoopX = direction === 1 ? 88.75 : 5.25;
-				const outside = Math.abs(victim.y - 25) > 22 || Math.hypot(victim.x - hoopX, victim.y - 25) > 23.75;
+				const outside = Math.abs(victim.y - 25) > 22 ||
+					Math.hypot(victim.x - hoopX, victim.y - 25) > replay.league.threePointRadius;
 				if (action.qualifiers.includes("2freethrow") || action.qualifiers.includes("3freethrow")) {
 					assert(
 						outside === action.qualifiers.includes("3freethrow"),

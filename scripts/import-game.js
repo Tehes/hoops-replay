@@ -1,5 +1,6 @@
 import { checkReplay } from "./check-replay.js";
 import { API_BASE, normalizeGame } from "../js/replay-data.js";
+import { getLeague } from "../js/replay-leagues.js";
 
 const ROOT = new URL("../data/", import.meta.url);
 
@@ -38,9 +39,10 @@ async function init() {
 			throw new Error(`${file.pathname} already exists. Use --overwrite to replace it.`);
 		}
 	}
+	const query = getLeague(gameId).id === "wnba" ? "?league=wnba" : "";
 	const [boxscore, playByPlay] = await Promise.all([
-		fetchFeed(`boxscore/${gameId}`),
-		fetchFeed(`playbyplay/${gameId}`),
+		fetchFeed(`boxscore/${gameId}${query}`),
+		fetchFeed(`playbyplay/${gameId}${query}`),
 	]);
 	await Deno.mkdir(new URL("raw/", ROOT), { recursive: true });
 	const writeOptions = { createNew: !overwrite };
