@@ -77,11 +77,23 @@ export function animateShot(state, scene, shot, hoop, direction, record, contact
 		entry.x = hoop.x - direction * 4;
 		entry.y = hoop.y - side * 6;
 	}
+	if ((shot.x - 47) * direction < 0) {
+		// A step-back entry must not establish frontcourt possession before a backcourt release.
+		entry.x = direction === 1 ? Math.min(entry.x, 46) : Math.max(entry.x, 48);
+	}
 	if (style.family === "heave") {
-		Object.assign(shooter, shot);
+		Object.assign(shooter, entry);
+		if (state.ball.owner !== action.personId) {
+			record(0.2);
+			const passer = state.positions[state.ball.owner];
+			const distance = Math.hypot(passer.x - shooter.x, passer.y - shooter.y);
+			flyBall(state, record, { x: shooter.x + 1, y: shooter.y + 0.8, z: 0.5 }, 0.6, 0.35 + distance / 60);
+		}
 		state.ball.owner = action.personId;
 		state.ball.dribble = style.running;
-		record(0.25);
+		record(0.1);
+		Object.assign(shooter, shot);
+		record(style.running ? 0.4 : 0.15);
 	} else if (direct) {
 		// Tip-ins and putbacks use the ball already secured in the preceding rebound scene.
 		Object.assign(shooter, shot);

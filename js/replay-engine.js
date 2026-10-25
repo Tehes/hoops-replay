@@ -237,7 +237,7 @@ function planMatchups(scenes, index, offense, state, data) {
 }
 
 // Search open court space while retaining the previous side and a short route there.
-function findOpenSpace(origin, occupied, lane = null, interior = false, guard = false) {
+function findOpenSpace(origin, occupied, lane = null, interior = false, guard = false, backcourt = false) {
 	const score = ([x, y]) => {
 		let cost = Math.hypot(x - origin[0], y - origin[1]) ** 2 * 0.045;
 		for (const [otherX, otherY] of occupied) {
@@ -254,7 +254,7 @@ function findOpenSpace(origin, occupied, lane = null, interior = false, guard = 
 	};
 	let best = origin.slice();
 	let bestScore = interior && Math.hypot(best[0] - 88.75, best[1] - 25) > 12 ? Infinity : score(best);
-	for (let x = 58; x <= 88; x += 5) {
+	for (let x = backcourt ? 8 : 58; x <= (backcourt ? 43 : 88); x += 5) {
 		for (let y = 5; y <= 45; y += 5) {
 			if ((interior && Math.hypot(x - 88.75, y - 25) > 12) || (guard && x > 68)) {
 				continue;
@@ -281,7 +281,8 @@ function planFormation(replay, index, offense, direction, lineup, state) {
 			candidate.action.period !== replay.scenes[index].action.period ||
 			(candidate.kind === "substitution" && candidate.related.some((action) => action.teamId === offense)) ||
 			(candidate.kind === "rebound" && candidate.action.teamId !== offense) ||
-			(["2pt", "3pt", "turnover", "freethrow"].includes(candidate.kind) && candidate.action.teamId !== offense)
+			(["2pt", "3pt", "heave", "turnover", "freethrow"].includes(candidate.kind) &&
+				candidate.action.teamId !== offense)
 		) {
 			break;
 		}
@@ -292,7 +293,7 @@ function planFormation(replay, index, offense, direction, lineup, state) {
 			foulIndex = i;
 			break;
 		}
-		if (["2pt", "3pt"].includes(candidate.kind)) {
+		if (["2pt", "3pt", "heave"].includes(candidate.kind)) {
 			evidence = candidate.action;
 			evidenceIndex = i;
 			break;
@@ -329,13 +330,16 @@ function planFormation(replay, index, offense, direction, lineup, state) {
 	const assistSlot = evidence ? lineup.indexOf(evidence.assistPersonId) : -1;
 	const style = evidence ? getShotStyle(evidence) : foulPlan ? { driving: foulPlan.freeThrows === 2 } : null;
 	const shot = evidence
-		? { x: direction === 1 ? evidence.x * 0.94 : 94 - evidence.x * 0.94, y: evidence.y * 0.5 }
+		? evidence.actionType === "heave"
+			? { x: Math.max(1, Math.min(93, 88.75 - (evidence.shotDistance || 45))), y: 25 }
+			: { x: direction === 1 ? evidence.x * 0.94 : 94 - evidence.x * 0.94, y: evidence.y * 0.5 }
 		: foulPlan
 		? { x: direction === 1 ? foulPlan.point.x : 94 - foulPlan.point.x, y: foulPlan.point.y }
 		: null;
+	const backcourt = Boolean(shot && shot.x < 47);
 	let interiorSlot = -1;
 	// Plan only the space needed by the recorded finish; no template implies a real set play.
-	if (shot) {
+	if (shot && !backcourt) {
 		const side = Math.sign(shot.y - 25) || 1;
 		if (shooterSlot >= 0) {
 			const approach = style.running
@@ -388,7 +392,19 @@ function planFormation(replay, index, offense, direction, lineup, state) {
 			}
 		}
 	}
-	if (shooterSlot !== 0 && assistSlot !== 0 && interiorSlot !== 0) {
+	if (backcourt) {
+		// Keep outlets spread behind half court until the recorded long-range release.
+		lineup.forEach((_, slot) => {
+			slots[slot] = [Math.max(8, Math.min(41, shot.x + [0, 5, 9, -7, -12][slot])), [25, 8, 42, 13, 36][slot]];
+		});
+		if (shooterSlot >= 0) {
+			slots[shooterSlot] = [Math.max(2, shot.x - (style.running ? 12 : style.pullup ? 7 : 0)), shot.y];
+		}
+		if (assistSlot >= 0 && assistSlot !== shooterSlot) {
+			slots[assistSlot] = [Math.max(4, Math.min(40, shot.x - 9)), shot.y < 25 ? 34 : 16];
+		}
+	}
+	if (!backcourt && shooterSlot !== 0 && assistSlot !== 0 && interiorSlot !== 0) {
 		slots[0] = [Math.min(67, slots[0][0]), Math.max(13, Math.min(37, slots[0][1]))];
 	}
 	const priority = [...new Set([shooterSlot, assistSlot, interiorSlot, 0, 1, 2, 3, 4].filter((slot) => slot >= 0))];
@@ -404,7 +420,7 @@ function planFormation(replay, index, offense, direction, lineup, state) {
 				if (distance < 6) {
 					const angle = distance > 0.1 ? Math.atan2(dy, dx) : slot % 2 ? Math.PI / 2 : -Math.PI / 2;
 					slots[slot] = [
-						Math.max(54, Math.min(89, other[0] + Math.cos(angle) * 6)),
+						Math.max(backcourt ? 2 : 54, Math.min(backcourt ? 45 : 89, other[0] + Math.cos(angle) * 6)),
 						Math.max(4, Math.min(46, other[1] + Math.sin(angle) * 6)),
 					];
 				}
@@ -424,7 +440,8 @@ function planFormation(replay, index, offense, direction, lineup, state) {
 				occupied,
 				lane,
 				slot === interiorSlot,
-				slot === 0 && slot !== interiorSlot,
+				!backcourt && slot === 0 && slot !== interiorSlot,
+				backcourt,
 			);
 		}
 	}
@@ -432,7 +449,16 @@ function planFormation(replay, index, offense, direction, lineup, state) {
 		id: replay.formations.length,
 		offense,
 		period: replay.scenes[index].action.period,
-		kind: evidence ? "event-spacing" : foul ? "foul-spacing" : state.formation ? "continuity" : "fallback",
+		kind: backcourt
+			? "backcourt-spacing"
+			: evidence
+			? "event-spacing"
+			: foul
+			? "foul-spacing"
+			: state.formation
+			? "continuity"
+			: "fallback",
+		backcourt,
 		evidenceActionNumber: evidence?.actionNumber ?? null,
 		shooterId,
 		foulActionNumber: foul?.actionNumber ?? null,
@@ -550,11 +576,15 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 		if (restart) {
 			Object.assign(
 				state.positions[inbounder],
-				restart === "baseline" ? { x: direction === 1 ? -1.5 : 95.5, y: 30 } : { x: 47, y: 51.5 },
+				restart === "baseline"
+					? { x: direction === 1 ? -1.5 : 95.5, y: 30 }
+					: { x: state.formation.backcourt ? direction === 1 ? 34 : 60 : 47, y: 51.5 },
 			);
 			Object.assign(
 				state.positions[pg],
-				restart === "baseline" ? { x: direction === 1 ? 15 : 79, y: 28 } : { x: 47, y: 40 },
+				restart === "baseline"
+					? { x: direction === 1 ? 15 : 79, y: 28 }
+					: { x: state.formation.backcourt ? direction === 1 ? 34 : 60 : 47, y: 40 },
 			);
 			state.ball.owner = inbounder;
 			record(0.85);
@@ -564,7 +594,7 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 			scene.liveAt = scene.frames.at(-1).time;
 			const [x, y] = destinations[4];
 			Object.assign(state.positions[inbounder], { x: direction === 1 ? x : 94 - x, y });
-			if (!quickAdvance) {
+			if (!quickAdvance && !state.formation.backcourt) {
 				Object.assign(state.positions[pg], { x: 47, y: 28 });
 				record(0.6 * advanceScale);
 			}
@@ -577,14 +607,19 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 	} else {
 		// A named rebounder or stealer keeps the ball until the schematic outlet pass.
 		Object.assign(state.positions[carrier], origin);
-		Object.assign(state.positions[pg], { x: Math.max(12, Math.min(82, origin.x + direction * 6)), y: 25 });
+		Object.assign(state.positions[pg], {
+			x: direction === 1
+				? Math.max(12, Math.min(state.formation.backcourt ? 44 : 82, origin.x + 6))
+				: Math.max(state.formation.backcourt ? 50 : 12, Math.min(82, origin.x - 6)),
+			y: 25,
+		});
 		record(0.3);
 		if (carrier !== pg) {
 			state.ball.owner = pg;
 			record(0.4);
 		}
 		if (
-			!quickAdvance &&
+			!quickAdvance && !state.formation.backcourt &&
 			((direction === 1 && state.positions[pg].x < 47) || (direction === -1 && state.positions[pg].x > 47))
 		) {
 			Object.assign(state.positions[pg], { x: 47, y: 25 });
@@ -721,8 +756,15 @@ function pacePreparation(state, scene, time, finishDuration, record, direction) 
 			// Keep short routes clear of other players and the planned finish, without inventing a play.
 			const target = [1, -1, 0.5, -0.5].map((scale) => ({
 				x: Math.max(
-					direction === 1 && origin.x >= 47 ? 47 : 2,
-					Math.min(direction === -1 && origin.x <= 47 ? 47 : 92, origin.x + dx),
+					scene.formation.backcourt && direction === -1 ? 49 : direction === 1 && origin.x >= 47 ? 47 : 2,
+					Math.min(
+						scene.formation.backcourt && direction === 1
+							? 45
+							: direction === -1 && origin.x <= 47
+							? 47
+							: 92,
+						origin.x + dx,
+					),
 				),
 				y: Math.max(3, Math.min(47, origin.y + dy * scale)),
 			})).find((point) =>
@@ -1010,22 +1052,8 @@ function compileScene(replay, scene, index, state, data) {
 			: { x: action.x * 0.94, y: action.y * 0.5 };
 		scene.hoop = hoop;
 		scene.shotPoint = shot;
-		if (scene.kind === "heave") {
-			Object.assign(matchups, planMatchups(replay.scenes, index, offense, state, data).assignments);
-			// A last-second heave starts in the backcourt, without a complete half-court setup.
-			state.possession = offense;
-			if (state.restart) {
-				const inbounder = state.lineups[offense].find((id) => id !== action.personId);
-				Object.assign(state.positions[inbounder], { x: direction === 1 ? -1.5 : 95.5, y: 30 });
-				state.ball.owner = inbounder;
-				record(0.5);
-			}
-			state.restart = null;
-			state.needsAdvance = false;
-		} else {
-			prepareAttack(state, scene, offense, direction, matchups, record, data, replay, index);
-		}
-		if (namedRebound && scene.kind !== "heave") {
+		prepareAttack(state, scene, offense, direction, matchups, record, data, replay, index);
+		if (namedRebound && scene.kind !== "heave" && !scene.formation.backcourt) {
 			prepareReboundFormation(state, scene, namedRebound, hoop, record, data);
 		}
 		if (scene.kind !== "heave" && !scene.shotStyle.tip && !scene.shotStyle.putback) {
@@ -1045,7 +1073,14 @@ function compileScene(replay, scene, index, state, data) {
 					return;
 				}
 				const occupied = points.filter((_, other) => other !== slot).concat([finish]);
-				const target = findOpenSpace(points[slot], occupied, lane, false, slot === 0);
+				const target = findOpenSpace(
+					points[slot],
+					occupied,
+					lane,
+					false,
+					!scene.formation.backcourt && slot === 0,
+					scene.formation.backcourt,
+				);
 				const distance = Math.hypot(target[0] - points[slot][0], target[1] - points[slot][1]);
 				if (distance < 2) {
 					return;

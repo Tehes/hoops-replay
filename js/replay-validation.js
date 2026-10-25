@@ -20,7 +20,8 @@ export function checkReplay(data, replay = compileReplay(data)) {
 		check(
 			formation.slots.length === 5 && new Set(formation.slots.map((slot) => slot.join(","))).size === 5 &&
 				formation.slots.every(([x, y]) =>
-					Number.isFinite(x) && Number.isFinite(y) && x > 47 && x < 94 && y > 0 && y < 50
+					Number.isFinite(x) && Number.isFinite(y) &&
+					(formation.backcourt ? x > 0 && x < 47 : x > 47 && x < 94) && y > 0 && y < 50
 				),
 			`${id} distinct half-court formation slots ${formation.id}`,
 		);
@@ -32,7 +33,7 @@ export function checkReplay(data, replay = compileReplay(data)) {
 		check(
 			formation.evidenceActionNumber === null ||
 				(evidence && evidence.teamId === formation.offense && evidence.period === formation.period &&
-					["2pt", "3pt"].includes(evidence.actionType)),
+					["2pt", "3pt", "heave"].includes(evidence.actionType)),
 			`${id} formation evidence ${formation.id}`,
 		);
 		for (let slot = 0; slot < formation.slots.length; slot++) {
@@ -113,6 +114,17 @@ export function checkReplay(data, replay = compileReplay(data)) {
 			check(
 				!frame.ball.owner || frame.players.some((p) => p.id === frame.ball.owner && p.opacity > 0),
 				`${tag} hidden owner`,
+			);
+		}
+		if (scene.formation?.backcourt && scene.shotPoint) {
+			const direction = attackDirection(data, scene.attackTeam, scene.action.period);
+			check(
+				scene.frames.filter((frame) => frame.time >= (scene.liveAt ?? 0) && frame.time <= scene.releaseAt)
+					.every((frame) => {
+						const carrier = frame.players.find((player) => player.id === frame.ball.owner);
+						return ((carrier?.x ?? frame.ball.x) - 47) * direction < 0;
+					}),
+				`${tag} backcourt possession until release`,
 			);
 		}
 		for (const move of scene.spacingMoves || []) {

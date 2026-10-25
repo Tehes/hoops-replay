@@ -819,3 +819,27 @@ Typ-, Lint-, Formatprüfung der JavaScript-Dateien und `git diff --check` besteh
 Chrome MCP auf Port 5500 mit den lokalen BKN–CLE-Rohfeeds: Passflug vor Q1 11:34 visuell geprüft,
 Wiedergabe über Pass und Fang mit anschließender Pause sowie Seeking zum Verstoß, zum Endstand
 121:125 und zurück geprüft.
+
+### Aufbau vor Rückfeldwürfen (25.10.2026)
+
+Die Abschlussplanung berücksichtigt jetzt auch Heaves. Liegt der belegte Feldwurf beziehungsweise
+bei einem Heave der aus Distanz und Korbrichtung abgeleitete Wurfort in der eigenen Hälfte,
+verwendet die Engine `backcourt-spacing`: breite Anspielstationen in der eigenen Hälfte statt
+vorherigem Vorrücken in die Angriffshälfte. Einwurf, Outlet, vorbereitende Dribblings und
+Positionskorrekturen bleiben dort; die Mannverteidiger folgen weiterhin ihren Zuordnungen.
+Die normale korbnahe Aufstellung und offensive Rebound-Rotation entfallen bei diesem Aufbau.
+Step-back-/Fadeaway-Anläufe dürfen vor dem Rückfeldwurf keinen Ballbesitz im Vorfeld herstellen.
+Heaves erhalten bei einem anderen Ballhalter einen sichtbaren Pass zum Schützen und bei Running
+anschließend einen kurzen Anlauf. Die vorhandenen Wurforte und Flugprofile bleiben erhalten;
+zusätzliche Vorbereitung kann die verdichtete Replay-Dauer verlängern.
+
+Die Positionen und Verbindungen bleiben schematisch, ohne Behauptung eines belegten Spielzugs.
+Der Audit prüft die passende Hälfte der Formation und den Ballbesitz bis zur Wurfabgabe; bei
+gebundenem Ball ist hierfür die Position des Trägers maßgeblich, da die Grafik den Ball seitlich versetzt.
+Ein Regressionstest prüft beide Spielrichtungen vor und nach der Halbzeit, Grundlinien-/Seiteneinwurf,
+defensiven Rebound, assistierten Running-Pull-up und Step-back, Wurforte sowie reproduzierbares Seeking.
+
+Verifiziert: 25 Tests und vier Spiel-Audits mit 27.460 Keyframes ohne Fehler; Deno-Typprüfung,
+Lint, JavaScript-/HTML-/CSS-Formatprüfung und `git diff --check` bestehen. Chrome MCP am lokalen
+Server auf Port 5500: DEN–OKC, Rückfeld-Heaves in Q1 und Q3, Wiedergabe über den Q3-Wurf,
+Pause sowie Seeking zum Endstand und zurück geprüft.

@@ -958,3 +958,83 @@ Deno.test("schematic circulation has free pass flights, visible catches and the 
 	}
 	assert(sequences > 10 && assists > 0 && shotClocks === 4, "missing circulation scenarios");
 });
+
+Deno.test("backcourt finishes keep inbound, outlet, circulation and shot approach behind half court", async () => {
+	const source = await readData("replay-0022600007.json");
+	for (const period of [1, 3]) {
+		for (const restart of ["baseline", "rebound", "sideline"]) {
+			for (const descriptor of ["runningpullup", "stepback"]) {
+				const data = structuredClone(source);
+				const [away, home] = data.teams;
+				const starters = home.players.filter((player) => player.starter);
+				const shooter = starters[1].id;
+				const passer = starters[2].id;
+				const opponent = away.players.find((player) => player.starter).id;
+				const direction = attackDirection({ ...data, actions: [] }, home.id, period);
+				const common = { period, scoreAway: "0", scoreHome: "0", clock: "PT01M00.00S" };
+				const tip = source.actions.find((action) => action.actionType === "jumpball");
+				data.actions = [
+					{ actionType: "period", subType: "start", clock: "PT12M00.00S" },
+					{ ...tip, period, clock: common.clock, teamId: away.id, jumpBallRecoverdPersonId: opponent },
+					{
+						actionType: "2pt",
+						subType: "Jump Shot",
+						teamId: away.id,
+						personId: opponent,
+						x: direction === 1 ? 12 : 88,
+						y: 50,
+						isFieldGoal: 1,
+						shotResult: restart === "rebound" ? "Missed" : "Made",
+					},
+					...(restart === "rebound"
+						? [{ actionType: "rebound", subType: "defensive", teamId: home.id, personId: passer }]
+						: restart === "sideline"
+						? [{ actionType: "violation", subType: "kicked ball", teamId: away.id, personId: opponent }]
+						: []),
+					{
+						actionType: "3pt",
+						subType: "Jump Shot",
+						descriptor,
+						teamId: home.id,
+						personId: shooter,
+						assistPersonId: descriptor === "runningpullup" ? passer : undefined,
+						x: direction === 1 ? 48 : 52,
+						y: 38,
+						isFieldGoal: 1,
+						shotResult: "Missed",
+						clock: "PT00M36.00S",
+					},
+					{ actionType: "game", subType: "end", clock: "PT00M00.00S" },
+				].map((action, index) => ({ ...common, ...action, actionNumber: index + 1, orderNumber: index + 1 }));
+				const original = JSON.stringify(data);
+				const replay = compileReplay(data);
+				const scene = replay.scenes.find((item) => item.kind === "3pt");
+				assert(scene.formation.backcourt, "backcourt shot used a frontcourt setup");
+				assert(scene.preparationWait > 0, "fixture did not exercise preparation");
+				for (let t = scene.liveAt ?? 0; t <= scene.releaseAt; t += 0.05) {
+					const frame = getReplayFrame(replay, scene.start + t);
+					assert((frame.ball.x - 47) * direction < 0, `ball crossed half court before release: ${restart}`);
+					for (const player of frame.players.filter((item) => scene.lineups[home.id].includes(item.id))) {
+						assert((player.x - 47) * direction < 0, "attacker crossed half court before release");
+					}
+				}
+				const release = scene.frames.find((frame) => Math.abs(frame.time - scene.releaseAt) < 0.00001);
+				const player = release.players.find((item) => item.id === shooter);
+				assert(Math.abs(player.x - scene.action.x * 0.94) < 0.00001, "recorded release was moved");
+				assert(Math.abs(player.y - scene.action.y * 0.5) < 0.00001, "recorded release y was moved");
+				assert(
+					scene.frames.some((frame) => frame.time > scene.releaseAt && (frame.ball.x - 47) * direction > 0),
+					"shot never flew into the frontcourt",
+				);
+				const at = scene.start + scene.approachAt;
+				const frame = getReplayFrame(replay, at);
+				getReplayFrame(replay, replay.duration);
+				assert(
+					JSON.stringify(getReplayFrame(replay, at)) === JSON.stringify(frame),
+					"seeking changed backcourt setup",
+				);
+				assert(JSON.stringify(data) === original, "backcourt planning mutated source data");
+			}
+		}
+	}
+});
