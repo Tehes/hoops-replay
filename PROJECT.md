@@ -303,6 +303,13 @@ Play/Pause; 0,5×/1×/1,5×/2×/4×; Timeline; Viertelsprünge; vorheriger/näch
 Leertaste und Pfeiltasten; Trikot antippen für Namen. Play am Ende startet von vorn.
 Marker altern in Replay-Zeit, nicht in unabhängigen Wall-clock-Timern.
 
+`?action=<actionNumber>` öffnet das geladene Spiel pausiert am Ereigniszeitpunkt der zugehörigen
+Szene. Mit `?game=<GameID>&action=<actionNumber>` lässt sich eine konkrete Aktion teilen;
+ohne `game` bezieht sich die ID auf das lokale Standardspiel. Die Nummer ist die PbP-Ereignis-ID,
+kein Listenindex oder Zeitwert. Auch IDs aus `scene.related` führen zur gemeinsamen Szene;
+im Jumbotron bleibt der Text der Hauptaktion. Ungültige oder unbekannte IDs erzeugen eine
+Konsolenwarnung und belassen den Start bei null. Die URL wird bei der Wiedergabe nicht verändert.
+
 ## Verifikation bei der Übergabe
 
 Beim Umzug am 24.10.2026 liefen `deno fmt --check`, `deno check`, `deno lint` für die Replay-Dateien

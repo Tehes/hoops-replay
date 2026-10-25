@@ -58,6 +58,21 @@ Pressing Play at the end restarts the replay.
 The replay loads the game directly. No download or command-line import is needed.
 If your link already contains a `game` value, replace it rather than adding a second one.
 
+### Jump to an Action
+
+Add `&action=ACTION_NUMBER` to a game link to open the replay paused at that event, for example:
+[DEN at OKC, action 17](https://tehes.github.io/hoops-replay/?game=0022600007&action=17).
+Press **Play** to continue from there.
+
+The number is the event's `actionNumber` from the NBA play-by-play data (also stored in local
+`data/replay-<gameId>.json` snapshots). It is an event ID, not its position in the event list,
+a quarter, or a replay timestamp. Include `game` when sharing links to identify the correct game.
+For the bundled default game, `?action=17` works without a `game` parameter.
+
+Events combined into one replay scene, such as a shot and its block or simultaneous substitutions,
+jump to the same scene's event time; the display shows the main event's description.
+An invalid or unknown action number leaves the replay at the beginning and logs a console warning.
+
 ---
 
 ## How It Works & Limitations

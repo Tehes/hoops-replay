@@ -598,7 +598,8 @@ async function init() {
 	resizeCourt();
 	new ResizeObserver(resizeCourt).observe(canvas);
 	try {
-		const requestedGame = new URLSearchParams(globalThis.location.search).get("game");
+		const params = new URLSearchParams(globalThis.location.search);
+		const requestedGame = params.get("game");
 		if (requestedGame !== null && !/^\d{10}$/.test(requestedGame)) {
 			throw new Error("Game ID must contain ten digits.");
 		}
@@ -616,6 +617,19 @@ async function init() {
 			label: scene.banner || "",
 			action: scene.action,
 		})).sort((a, b) => a.time - b.time);
+		const requestedAction = params.get("action");
+		if (requestedAction !== null) {
+			const actionNumber = /^\d+$/.test(requestedAction) ? Number(requestedAction) : NaN;
+			const scene = replay.scenes.find((scene) =>
+				scene.action.actionNumber === actionNumber ||
+				scene.related.some((action) => action.actionNumber === actionNumber)
+			);
+			if (scene) {
+				currentTime = scene.start + scene.eventAt;
+			} else {
+				console.warn(`Replay action not found: ${requestedAction}`);
+			}
+		}
 		playerById = new Map(replay.players.map((player) => [player.id, player]));
 		teamById = new Map(game.teams.map((team) => [team.id, team]));
 		for (const [index, element] of [awayTeamEl, homeTeamEl].entries()) {
