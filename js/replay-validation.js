@@ -249,7 +249,8 @@ export function checkReplay(data, replay = compileReplay(data)) {
 		if (scene.spacingSource === "current") {
 			const direction = attackDirection(data, scene.attackTeam, scene.action.period);
 			for (const [slot, playerId] of scene.lineups[scene.attackTeam].entries()) {
-				const previous = scene.frames[0].players.find((player) => player.id === playerId);
+				const previous = (scene.frames.find((frame) => frame.time === scene.returnAt) || scene.frames[0])
+					.players.find((player) => player.id === playerId);
 				const [x, y] = scene.spacingDestinations[slot];
 				check(
 					Math.hypot(previous.x - (direction === 1 ? x : 94 - x), previous.y - y) < 0.00001,

@@ -616,3 +616,27 @@ prüft die Zuordnung und die Positions-/Ballkontinuität durch Block-Annotatione
 Chrome MCP auf http://127.0.0.1:5500: Wurf-, Anlauf- und Fangphase per Timeline, Seeking bis
 FINAL 84:96 und zurück zum Rebound sowie Play/Pause geprüft; Fangdarstellung visuell kontrolliert.
 Format-, Typ- und Lint-Prüfungen sowie `git diff --check` bestehen.
+
+## Court verlassen bei Unterbrechungen (25.10.2026)
+
+Timeouts (einschließlich Challenges) und Periodenenden lassen beide aktiven Fünfer zur oberen
+Seitenlinie laufen: zwei getrennte schematische Teamgruppen außerhalb des Courts. Der Ball bleibt
+ohne Besitzer auf dem Feld. Die Spieler bleiben durch nachfolgende Auswechslungen und Annotationen
+außerhalb. Vor der nächsten Spielaktion oder beim nächsten Periodenstart kehrt die aktuelle Aufstellung
+auf die gespeicherten Court-Positionen zurück; eingewechselte Spieler übernehmen dabei den gespeicherten
+Platz ihres Vorgängers. Das gilt auch über die Halbzeit und bei Verlängerungen. Nach Spielende bleiben
+beide Teams außerhalb. Bankplätze und Laufwege sind schematisch, keine belegten Arena-/Bankpositionen.
+
+Gehen und Rückkehr dauern jeweils zwei Replay-Sekunden, mit kurzer Haltephase außerhalb. Dadurch
+verlängern sich die Referenz-Replays auf 1412,923 / 1389,568 / 1464,865 Sekunden (DEN–OKC / NYK–BOS /
+ATL–CHA). Alle Bewegungen bleiben Teil der vorkompilierten Keyframes: Pause, Seeking und
+Geschwindigkeitswahl verwenden dieselbe Zeitbasis. `scene.returnAt` markiert den Rückkehrzeitpunkt;
+der Audit prüft die anschließende Positionskontinuität ab diesem Court-Zustand. Die Frame-Auswahl
+berücksichtigt Rundungsdifferenzen an Keyframe-Grenzen, damit exakt angesprungene Fangmomente auch
+nach den zusätzlichen Laufphasen ihren Ballbesitzer behalten.
+
+Alle 13 Regressionstests und der Audit der drei Referenzspiele mit 18.309 Keyframes bestehen,
+einschließlich Bankwechseln, Rückkehr, Endständen und bisherigen Wurf-/Rebound-Prüfungen.
+Format-, Typ-, Lint-Prüfung und `git diff --check` bestehen. Chrome MCP auf Port 5500 wurde für
+Timeout, Halbzeit, Rückkehr in Q3 und Seeking zum Spielende verwendet; die Darstellung der beiden
+Gruppen außerhalb des Courts wurde visuell geprüft.

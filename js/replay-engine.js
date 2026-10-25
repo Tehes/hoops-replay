@@ -649,6 +649,14 @@ function compileScene(replay, scene, index, state, data) {
 		scene.frames.push(snapshot(state, time));
 	};
 	record(0);
+	if (
+		state.breakPositions &&
+		(["2pt", "3pt", "heave", "freethrow", "rebound", "foul", "turnover", "steal", "jumpball", "violation"]
+			.includes(scene.kind) || (scene.kind === "period" && action.subType === "start"))
+	) {
+		returnToCourt(state, record);
+		scene.returnAt = time;
+	}
 	if (["2pt", "3pt", "heave"].includes(scene.kind)) {
 		followAttackers = true;
 		scene.shotStyle = getShotStyle(action);
@@ -968,8 +976,15 @@ function compileScene(replay, scene, index, state, data) {
 					return;
 				}
 				const previous = { ...state.positions[outId] };
-				Object.assign(state.positions[outId], { x: 43 + slot * 3, y: 52 });
-				Object.assign(state.positions[incomingId], { x: 43 + slot * 3, y: 55, opacity: 0 });
+				if (state.breakPositions) {
+					state.breakPositions[incomingId] = { ...state.breakPositions[outId] };
+				}
+				Object.assign(state.positions[outId], state.breakPositions ? previous : { x: 43 + slot * 3, y: 52 });
+				Object.assign(state.positions[incomingId], {
+					x: state.breakPositions ? previous.x : 43 + slot * 3,
+					y: state.breakPositions ? -6 : 55,
+					opacity: 0,
+				});
 				scene.swaps.push({ out: outId, in: incomingId, slot, teamId: team.id, previous });
 				if (state.matchups) {
 					if (state.matchups[outId] !== undefined) {
@@ -993,7 +1008,10 @@ function compileScene(replay, scene, index, state, data) {
 		addMarker(replay, scene, time, "substitution", { x: 47, y: 51 });
 		for (const swap of scene.swaps) {
 			state.positions[swap.out].opacity = 0;
-			Object.assign(state.positions[swap.in], { x: 47, y: 52, opacity: 1 });
+			Object.assign(
+				state.positions[swap.in],
+				state.breakPositions ? { ...swap.previous, opacity: 1 } : { x: 47, y: 52, opacity: 1 },
+			);
 		}
 		record(0.35);
 		for (const swap of scene.swaps) {
@@ -1019,7 +1037,7 @@ function compileScene(replay, scene, index, state, data) {
 		replay.attacks.push(scene.start);
 		record(0.5);
 	} else {
-		scene.eventAt = 0.3;
+		scene.eventAt = time + 0.3;
 		if (scene.kind === "period") {
 			const periodLabel = action.period > 4 ? `OT${action.period - 4}` : `Q${action.period}`;
 			scene.banner = action.subType === "end" ? `${periodLabel} · 0:00` : periodLabel;
@@ -1038,7 +1056,11 @@ function compileScene(replay, scene, index, state, data) {
 				state.restart = "sideline";
 			}
 		}
-		record(scene.kind === "timeout" ? 1.4 : 0.9);
+		if (scene.kind === "timeout" || (scene.kind === "period" && action.subType === "end")) {
+			leaveCourt(state, data, record);
+		} else {
+			record(0.9);
+		}
 	}
 	if (scene.eventAt === undefined) {
 		scene.eventAt = Math.max(0.01, time - 0.4);
@@ -1086,6 +1108,7 @@ export function compileReplay(data) {
 		needsAdvance: false,
 		formation: null,
 		matchups: null,
+		breakPositions: null,
 	};
 	for (const team of data.teams) {
 		lineups[team.id].forEach((id, slot) => {
@@ -1154,7 +1177,7 @@ export function getReplayFrame(replay, time) {
 	const local = bounded - scene.start;
 	const frames = scene.frames;
 	let frameIndex = 0;
-	while (frameIndex < frames.length - 2 && frames[frameIndex + 1].time <= local) {
+	while (frameIndex < frames.length - 2 && frames[frameIndex + 1].time <= local + 1e-9) {
 		frameIndex++;
 	}
 	const from = frames[frameIndex];

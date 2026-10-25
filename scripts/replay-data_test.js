@@ -407,3 +407,54 @@ Deno.test("invalid explicit references never fall back to an unrelated adjacent 
 		assert(checkReplay(data, replay).errors.length === 0, "rejected link damaged normal rebound handling");
 	}
 });
+
+Deno.test("timeouts and period breaks clear the court, preserve bench substitutions and return the current lineup", async () => {
+	for (const file of ["replay-0022600007.json", "replay-0022600008.json", "replay-0022600094.json"]) {
+		const data = await readData(file);
+		const replay = compileReplay(data);
+		let waiting = false;
+		let benchSwaps = 0;
+		let returns = 0;
+		for (const scene of replay.scenes) {
+			if (scene.returnAt !== undefined) {
+				assert(waiting, "return without an interruption");
+				const frame = getReplayFrame(replay, scene.start + scene.returnAt);
+				for (const id of Object.values(scene.lineups).flat()) {
+					const player = frame.players.find((player) => player.id === id);
+					assert(player.opacity === 1 && player.y >= 0 && player.y <= 52, "active player did not return");
+				}
+				const start = getReplayFrame(replay, scene.start);
+				assert(
+					start.players.filter((player) => player.opacity === 1).every((player) => player.y < 0),
+					"return did not start at the bench",
+				);
+				waiting = false;
+				returns++;
+			}
+			if (scene.kind === "timeout" || (scene.kind === "period" && scene.action.subType === "end")) {
+				waiting = true;
+			}
+			if (waiting) {
+				const frame = getReplayFrame(replay, scene.end - 0.1);
+				assert(frame.players.filter((player) => player.opacity === 1).length === 10, "lost active players");
+				assert(
+					frame.players.filter((player) => player.opacity > 0).every((player) => player.y < 0),
+					"players entered the court during the break",
+				);
+				assert(frame.ball.owner === null, "player took the ball to the bench");
+				if (scene.kind === "substitution") {
+					benchSwaps++;
+					for (const swap of scene.swaps) {
+						assert(
+							frame.players.find((p) => p.id === swap.out).opacity === 0,
+							"outgoing player stayed visible",
+						);
+						assert(frame.players.find((p) => p.id === swap.in).opacity === 1, "incoming player missing");
+					}
+				}
+			}
+		}
+		assert(returns > 4 && benchSwaps > 0, "fixture did not cover timeouts, quarters, halftime and bench swaps");
+		assert(checkReplay(data, replay).errors.length === 0, "break choreography failed replay validation");
+	}
+});
