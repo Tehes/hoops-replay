@@ -40,9 +40,12 @@ festgelegt. Der Nutzer findet den Prototyp interessant, möchte aber weiter erku
   neutrales Spielfeld ohne Teamlogo, Teamnamen oder Arena sichtbar. Erst erfolgreich geprüfte
   Daten bestimmen Teams, Logos, Court-Farben, Beschriftungen, Score und Spielzeit.
 - Eigenständige HTML-Seite mit Replay, zugehöriger Steuerung und einem dezenten englischen
-  Fußtext unter der Steuerung. Dieser erklärt echte PbP-Ereignisse und verfügbare Wurfkoordinaten
-  als Grundlage sowie schematisch ergänzte Positionen, Formationen, Matchups und Laufwege;
-  keine Rekonstruktion aus Tracking-Daten. Keine Menüs oder weiteren Inhaltsbereiche. Eine flache Jumbotron-Anzeige ersetzt das bisherige Scoreboard:
+  Fußtext unter der Steuerung. Dieser stellt zuerst die echten Eckpunkte heraus: Ereignisreihenfolge,
+  Spielstände, beteiligte Spieler, aufgezeichnete Spieluhrzeiten und verfügbare Wurfkoordinaten.
+  Er erklärt Positionen, Formationen, Matchups und Laufwege als plausibel ergänzte Darstellung;
+  keine Rekonstruktion aus Tracking-Daten. Er erklärt außerdem die zeitliche Verdichtung und die
+  Abstimmung der Spieluhr auf aufgezeichnete Ereignisse statt einer Echtzeitwiedergabe.
+  Keine Menüs oder weiteren Inhaltsbereiche. Eine flache Jumbotron-Anzeige ersetzt das bisherige Scoreboard:
   Score, Viertel und Uhr bleiben dauerhaft sichtbar. Darunter erscheinen ab dem Ereigniszeitpunkt
   Spielerfoto, Name und der originale englische PbP-Text der Szene, bis zum nächsten Ereignis oder
   maximal fünf Replay-Sekunden. Pause und Seeking bestimmen die Anzeige ohne eigene Timer.
