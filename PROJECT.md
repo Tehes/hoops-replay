@@ -677,3 +677,136 @@ Ballbesitz beim Dribbling und Positionskontinuität vor dem Kontakt. Format-, Ty
 1426,308 / 1403,933 / 1476,176 Sekunden (DEN–OKC / NYK–BOS / ATL–CHA).
 Chrome MCP auf Port 5500: Passflug und anschließender Drive vor DEN–OKC Q1 10:35 visuell geprüft,
 Seeking zum Kontakt und ATL–CHA Q3 3:47 mit Ballannahme außerhalb des Dreierbogens geprüft.
+
+## Spielzeit als Choreografie-Budget (25.10.2026)
+
+Die Engine verwendet die Differenz zwischen vorheriger und aktueller Ereignisuhr als `scene.liveSeconds`.
+Perioden beginnen weiterhin bei 12 bzw. 5 Minuten; negative Differenzen erzeugen kein Zeitbudget.
+Das ist der Abstand zwischen Ereignissen, nicht automatisch die Dauer eines vollständigen Ballbesitzes.
+Bei Feldwürfen und Ballaktionen vor Fouls/Turnovern steuert dieser Abstand die vorhandene Vorbereitung:
+
+- Ballvortrag wird bei kurzen Abständen bis auf 65 Prozent seiner bisherigen Dauer verdichtet.
+  Bei höchstens fünf vergangenen Spielsekunden entfällt die separate Zwischenstation an der Mittellinie.
+- Längere Abstände erhalten zusätzliche Vorbereitung mit Dribbling und den bereits geplanten
+  Positionskorrekturen. Das Zielbudget beträgt die halbe vergangene Spielzeit, maximal zwölf
+  Replay-Sekunden, abzüglich des bisherigen Aufbaus und einer Abschlussreserve (2,5 Sekunden
+  für Feldwürfe, 2 für Wurffouls, sonst 0,8). Es ist ein schematischer Richtwert; die bestehenden
+  Abschlussphasen haben Vorrang und dürfen das Budget überschreiten.
+- Ballflüge, Abschlüsse, Rebounds und Kontakte behalten ihre bisherigen Dauern. Heaves, Tip-ins,
+  Putbacks und Freiwürfe erhalten keine zusätzliche Wartephase. Es werden keine weiteren Pässe,
+  Kontakte oder konkreten Spielzüge aus dem Zeitabstand abgeleitet.
+- Einwurfaufbau und Rückkehr vom Spielfeldrand beanspruchen Replay-Zeit bei stehender Spieluhr.
+  `scene.liveAt` markiert anschließend den Beginn der Uhrinterpolation bis `scene.eventAt`.
+  Ereignisse mit gleicher Spieluhr behalten ihre Animationszeit ohne zusätzliches Live-Zeitbudget.
+
+Alle Phasen bleiben vorkompilierte Keyframes. Pause, Geschwindigkeit und Seeking verwenden weiterhin
+dieselbe Replay-Zeitbasis. Score und Marker bleiben an den jeweiligen Ereigniszeitpunkt gebunden.
+Die Referenz-Replays dauern jetzt 1992,445 / 2007,033 / 1993,778 Sekunden (DEN–OKC / NYK–BOS /
+ATL–CHA). Die längere Gesamtdauer und schematische Dribblingphasen sind bewusste Folgen dieser Planung;
+weitere Laufwege und eine Rekonstruktion konkreter Spielzüge gehören nicht zu dieser Änderung.
+
+Alle 19 Regressionstests und der Audit der drei Referenzspiele mit 19.527 Keyframes bestehen.
+Die neuen Tests vergleichen dieselbe Aktion nach 4, 12 und 22 Spielsekunden, unveränderte Wurf-Flugzeit,
+Marker-/Score-Zuordnung sowie stehende Uhren bei Einwürfen, Rückkehr und zeitgleichen Ereignissen.
+Format-, Typ-, Lint-Prüfung der JavaScript-Dateien und `git diff --check` bestehen.
+Chrome MCP am bestehenden lokalen Server auf Port 5500: lange Vorbereitung visuell geprüft,
+kurze und lange Abschlüsse, Halbzeit, Spielende und wiederholtes Seeking geprüft; Wiedergabe mit
+2× und anschließende Pause geprüft.
+
+### Shot-Clock-Verstöße als Planungshinweis (25.10.2026)
+
+Ein Turnover mit `subType: "shot clock"` kennzeichnet rückblickend den vorausgehenden Angriff
+mit `shotClockPressure`. Dessen Vorbereitung nutzt 85 statt 50 Prozent des jeweiligen belegten
+Spieluhrabstands, begrenzt auf 24 statt 12 Replay-Sekunden. Abschlussreserve und Mindestdauer der
+vorhandenen Bewegungen bleiben erhalten. So bekommt ein ausgespielter Angriff vor dem Verstoß
+sichtbar mehr Zeit mit schematischem Dribbling.
+
+Der Rückblick erfasst eigene Fehlwürfe über eigene Offensivrebounds hinweg. Ein Verstoß kann im
+Feed bereits 1–3 Sekunden nach einem solchen Fehlwurf auftreten; dann wird vor allem die Vorbereitung
+vor dem Wurf verlängert, ohne nach dem Rebound einen neuen langen Angriff zu erfinden. Der Rückblick
+endet an Besitzwechseln, Treffern, Fouls, Freiwürfen, anderen Verstößen, Sprungbällen und Periodengrenzen.
+Timeouts, Wechsel und Annotationen allein beenden ihn nicht. Das rekonstruiert keine exakte Rest-Shot-Clock
+und unterstellt keinen Reset; maßgeblich bleiben die aufgezeichneten Ereignisse und Spieluhrabstände.
+Zeitgleiche Ereignisse erzeugen weiterhin keine zusätzliche Wartezeit. Es gibt keine neue Shot-Clock-Anzeige.
+
+Alle 21 Tests bestehen, darunter die sechs echten Shot-Clock-Verstöße aus NYK–BOS und ATL–CHA,
+Grenzen des Rückblicks, unveränderte Wurfflugzeit, Besitzwechsel und Marker-Zuordnung. Der Audit
+besteht mit 19.529 Keyframes; die Replay-Dauern betragen jetzt 1992,445 / 2036,483 / 2009,613 Sekunden.
+Typ-, Lint-, Formatprüfung der JavaScript-Dateien und `git diff --check` bestehen.
+Chrome MCP auf Port 5500 mit den lokalen Rohfeed-Fixtures für ATL–CHA: verlängerte Vorbereitung
+visuell geprüft, Play/Pause, Seeking zum Verstoß, zum Endstand 128:81 und zurück geprüft.
+
+### Zusätzliches Referenzspiel BKN–CLE (25.10.2026)
+
+`0022600105` wurde mit dem bestehenden Importer als `data/replay-0022600105.json` gespeichert,
+zusammen mit beiden unveränderten Rohfeeds unter `data/raw/`. Der Snapshot datiert das Spiel auf
+2026-10-24 23:30 UTC: BKN bei CLE, Endstand 121:125, 641 Aktionen, 504 Szenen und 2158,599 Sekunden
+Replay-Dauer mit der aktuellen Zeitplanung.
+
+Das Spiel ergänzt die Shot-Clock-Regression: Aktion 8, Q1 11:34, Team-Turnover nach 26 vergangenen
+Spielsekunden. Die Vorbereitung bis zum Verstoß dauert rund 22,3 Replay-Sekunden. Der bestehende
+Shot-Clock-Test berücksichtigt jetzt alle sieben Verstöße aus drei Referenzspielen; der automatische
+Snapshot-Audit entdeckt das vierte Spiel ohne Konfigurationsänderung. Der Default bleibt DEN–OKC;
+`?game=0022600105` lädt wie bisher die Backend-Feeds, nicht den gespeicherten Snapshot.
+
+### Bewegung während langer Vorbereitung (25.10.2026)
+
+Die zusätzliche Vorbereitungszeit wird nicht mehr überwiegend als stationäres Dribbling abgespielt.
+Der bestehende Ballvortrag darf bei langen Spieluhrabständen bis zum Faktor 1,8 seiner ursprünglichen
+Dauer beanspruchen; die Verdichtung kurzer Angriffe bleibt erhalten. Die Vorbereitung rechnet diesen
+Zeitverbrauch weiterhin auf ihr vorhandenes Budget an.
+
+Bei mindestens drei verbleibenden Replay-Sekunden erhält der aktuelle Ballführer bis zu drei kurze
+seitliche bzw. rückwärtige Bewegungen mit jeweils 0,4 Sekunden Ruhe am Zwischenpunkt. Die Wege
+bleiben nahe am Ausgangspunkt und führen nach Erreichen des Angriffshalbfelds nicht zurück ins
+Rückfeld. Der bestehende Mannverteidiger folgt. Die Planung prüft kurze Wegsegmente gegen andere
+aktive Spieler, geplante Positionsziele und einen Abschlussanker eines anderen Spielers. Gibt es
+keinen passenden Weg, bleibt der Spieler während dieses Teilabschnitts an seinem Platz. Das ist
+keine allgemeine Kollisionssimulation; Überschneidungen aus bestehenden Formationen und gleichzeitig
+laufenden Bewegungen bleiben möglich. Es werden weder weitere Pässe noch konkrete Spielzüge ergänzt.
+
+Bei Feldwürfen verteilen sich bereits geplante Positionskorrekturen zeitversetzt über die Vorbereitung.
+Neue Laufwege enden vor dem bestehenden Wurf-/Foulanlauf. Ballbesitz, Ballflüge, Kontakte und Ereignisse
+folgen weiterhin der bisherigen Logik; alle neuen Bewegungen sind vorkompilierte Keyframes.
+`preparationAt`, `dribbleRoute` sowie die Zeitdaten in `spacingMoves` machen die Vorbereitung prüfbar.
+
+Alle 22 Tests und die vier Spiel-Audits mit 26.990 Keyframes bestehen. Der zusätzliche Test prüft
+Bewegung, Ballbindung, folgenden Verteidiger, Court-/Halbfeldgrenzen, verteilte Positionskorrekturen
+und reproduzierbares Seeking für lange Vorbereitungen über alle vier Spiele. Der Vergleich mit dem
+Stand vor dieser Änderung bestätigt identische Ereignisreihenfolge und Wurfflugzeiten. Die Dauern
+betragen jetzt 1993,304 / 2037,708 / 2011,068 / 2159,742 Sekunden (DEN–OKC / NYK–BOS / ATL–CHA /
+BKN–CLE). Typ-, Lint-, Formatprüfung der JavaScript-Dateien und `git diff --check` bestehen.
+Chrome MCP am bestehenden Server auf Port 5500 mit lokalen Rohfeed-Fixtures: Bewegung vor dem
+Shot-Clock-Verstoß Q1 11:34 in BKN–CLE visuell geprüft; Übergang zum Driving Layup (Aktion 73),
+Play/Pause, Seeking zum Verstoß, Endstand 121:125 und zurück geprüft.
+
+### Schematische Ballzirkulation (25.10.2026)
+
+Zusätzliche Verbindungspässe sind jetzt ausdrücklich Teil der schematischen Vorbereitung. Sie
+ersetzen bei geeigneten Passwegen einen Teil der bisherigen Dribbelphasen; die vorhandene Erklärung
+schematisch ergänzter Bewegungen bleibt bestehen. Das stellt keine belegte Passfolge oder einen
+bestimmten Spielzug dar und erzeugt weder PbP-Ereignisse noch Statistikwerte oder Assist-Zuschreibungen.
+
+Ab sechs verbleibenden Replay-Sekunden plant `circulateBall()` zwei Pässe, ab zehn Sekunden drei,
+über mindestens drei aktive Angreifer. Nahe Empfänger werden bevorzugt. Empfangende Spieler mit
+laufender Positionskorrektur werden ausgelassen; Wege zwischen 6 und 32 Court-Fuß werden gegen
+Verteidiger im Passkorridor geprüft. Die Prüfung verwendet die schematischen Positionen bei der
+Planung, keine vollständige Kollisions- oder Interceptionssimulation. Ohne vollständige passende
+Folge bleibt die bisherige Dribbelvorbereitung erhalten.
+
+Bei Feldwürfen endet die Folge beim belegten Assistgeber, sonst beim Schützen, bevor die bestehende
+Abschlussanimation übernimmt. Bei individuellen Turnovern endet sie beim beteiligten Spieler;
+Team-Turnover erlauben einen anderen letzten Ballhalter. Bei Fouls kehrt die Folge zum bisherigen
+Ballhalter zurück, damit der vorhandene Pass-/Drive-Ablauf zum Gefoulten unverändert übernehmen kann.
+Sichtbare Ballflüge und Fänge verwenden die bestehenden Keyframes und `flyBall()`. Halte-/Dribbelzeiten
+zwischen Pässen füllen das übrige Budget. Die Engine hält die schematischen Verbindungen separat
+unter `scene.preparationPasses` mit Absender, Empfänger, Release- und Catch-Zeit fest.
+
+Alle 23 Tests und die vier Spiel-Audits mit 27.418 Keyframes bestehen. Der neue Test prüft freie
+Ballflüge, Fänge am Empfänger, aktive Aufstellungen, mindestens drei Beteiligte, den Übergang zum
+belegten Assistgeber/Schützen, unveränderte Quelldaten und Scores sowie reproduzierbares Seeking.
+Die Replay-Dauern bleiben gegenüber der vorherigen Bewegungsplanung unverändert.
+Typ-, Lint-, Formatprüfung der JavaScript-Dateien und `git diff --check` bestehen.
+Chrome MCP auf Port 5500 mit den lokalen BKN–CLE-Rohfeeds: Passflug vor Q1 11:34 visuell geprüft,
+Wiedergabe über Pass und Fang mit anschließender Pause sowie Seeking zum Verstoß, zum Endstand
+121:125 und zurück geprüft.

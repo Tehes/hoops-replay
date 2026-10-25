@@ -648,3 +648,276 @@ Deno.test("shooting foul formations reserve the finish and complete passes and d
 	}
 	assert(planned > 0 && passes > 0 && drives > 0, "fixtures did not exercise formations, passes and drives");
 });
+
+Deno.test("game-clock gaps pace existing buildup without stretching shots or adding actions", async () => {
+	const source = await readData("replay-0022600007.json");
+	const ordered = source.actions.slice().sort((a, b) => a.orderNumber - b.orderNumber);
+	const shotIndex = ordered.findIndex((action) => action.isFieldGoal);
+	const variants = [];
+	for (const seconds of [4, 12, 22]) {
+		const data = structuredClone(source);
+		data.actions = ordered.slice(0, shotIndex + 1).map((action, index) => ({
+			...action,
+			clock: `PT${index === shotIndex ? 720 - seconds : 720}S`,
+		}));
+		const replay = compileReplay(data);
+		const shot = replay.scenes.at(-1);
+		variants.push({ replay, shot });
+		assert(shot.liveSeconds === seconds, "wrong elapsed game time");
+		assert(replay.scenes.length === variants[0].replay.scenes.length, "pacing invented an event");
+		assert(
+			Math.abs(getReplayFrame(replay, shot.start + shot.eventAt).clock - (720 - seconds)) < 0.02,
+			"game clock did not reach the recorded time at the event",
+		);
+		const marker = replay.markers.find((item) => ["made", "miss"].includes(item.kind));
+		assert(Math.abs(marker.time - shot.start - shot.eventAt) < 0.00001, "shot marker detached from event");
+	}
+	const [short, medium, long] = variants.map((item) => item.shot);
+	assert(short.eventAt < medium.eventAt && medium.eventAt < long.eventAt, "attack rhythms did not differ");
+	assert(short.preparationWait === 0 && long.preparationWait > 0, "preparation ignored available time");
+	assert(long.eventAt < long.liveSeconds, "long buildup was not compressed");
+	for (const { shot } of variants) {
+		assert(
+			Math.abs((shot.eventAt - shot.releaseAt) - (short.eventAt - short.releaseAt)) < 0.00001,
+			"pacing stretched the shot flight",
+		);
+		assert(
+			JSON.stringify(shot.frames.at(-1).score) === JSON.stringify(short.frames.at(-1).score),
+			"pacing changed the score",
+		);
+	}
+});
+
+Deno.test("stopped clocks and court returns retain animation time without consuming live time", async () => {
+	const data = await readData("replay-0022600007.json");
+	const replay = compileReplay(data);
+	let inbounds = 0;
+	let returns = 0;
+	let stopped = 0;
+	for (const scene of replay.scenes) {
+		if (scene.liveAt > 0) {
+			const frame = getReplayFrame(replay, scene.start + scene.liveAt * 0.5);
+			assert(frame.clock === scene.clockFrom, "clock ran during return or inbound setup");
+			if (scene.returnAt) {
+				returns++;
+			} else {
+				inbounds++;
+			}
+		}
+		if (scene.clockFrom === scene.clockTo) {
+			assert(scene.liveSeconds === 0 && !scene.preparationWait, "stopped clock created a buildup budget");
+			assert(scene.end > scene.start, "same-clock event lost its animation");
+			const frame = getReplayFrame(replay, scene.start + (scene.end - scene.start) * 0.5);
+			assert(frame.clock === scene.clockTo, "same-clock event advanced the clock");
+			stopped++;
+		}
+	}
+	assert(inbounds > 0 && returns > 0 && stopped > 0, "missing stopped-clock coverage");
+});
+
+Deno.test("shot-clock violations prolong the buildup, including a late miss before an offensive rebound", async () => {
+	let longAttacks = 0;
+	let lateMisses = 0;
+	for (const id of ["0022600008", "0022600094", "0022600105"]) {
+		const data = await readData(`replay-${id}.json`);
+		const replay = compileReplay(data);
+		const ordinary = structuredClone(data);
+		for (const action of ordinary.actions) {
+			if (action.actionType === "turnover" && action.subType === "shot clock") {
+				action.subType = "lost ball";
+			}
+		}
+		const baseline = compileReplay(ordinary);
+		for (const [index, scene] of replay.scenes.entries()) {
+			if (scene.kind !== "turnover" || scene.action.subType !== "shot clock") {
+				continue;
+			}
+			assert(scene.shotClockPressure, "shot-clock violation did not constrain planning");
+			assert(scene.preparationWait >= baseline.scenes[index].preparationWait, "buildup was shortened");
+			const marker = replay.markers.find((item) => item.kind === "shot-clock" && item.time >= scene.start);
+			assert(Math.abs(marker.time - scene.start - scene.eventAt) < 0.00001, "violation marker moved");
+			const after = scene.frames.at(-1);
+			assert(after.ball.owner === null, "ball remained owned after expiration");
+			assert(after.possession !== scene.action.teamId, "violation did not change possession");
+			if (scene.liveSeconds >= 24) {
+				assert(scene.preparationWait > baseline.scenes[index].preparationWait, "buildup was not prolonged");
+				assert(scene.eventAt - (scene.liveAt ?? 0) >= 20, "full-clock attack was rushed");
+				longAttacks++;
+			} else if (scene.liveSeconds <= 3) {
+				const rebound = replay.scenes[index - 1];
+				const shot = replay.scenes[rebound.reboundShotIndex];
+				assert(rebound.action.subType === "offensive" && shot.shotClockPressure, "late miss was ignored");
+				assert(
+					shot.preparationWait > baseline.scenes[rebound.reboundShotIndex].preparationWait,
+					"time before the missed shot was not prolonged",
+				);
+				assert(scene.eventAt - (scene.liveAt ?? 0) < 6, "invented a fresh long attack after the miss");
+				assert(
+					Math.abs(
+						(shot.eventAt - shot.releaseAt) -
+							(baseline.scenes[rebound.reboundShotIndex].eventAt -
+								baseline.scenes[rebound.reboundShotIndex].releaseAt),
+					) < 0.00001,
+					"shot-clock planning stretched the missed shot's flight",
+				);
+				lateMisses++;
+			}
+		}
+		assert(checkReplay(data, replay).errors.length === 0, "shot-clock pacing failed validation");
+	}
+	assert(longAttacks === 4 && lateMisses === 3, "missing shot-clock scenarios");
+});
+
+Deno.test("shot-clock lookahead stops at possession changes and does not invent time at a stopped clock", async () => {
+	const data = await readData("replay-0022600008.json");
+	const original = compileReplay(data);
+	const index = original.scenes.findIndex((scene) => scene.action.subType === "shot clock");
+	const violation = original.scenes[index];
+	const previous = original.scenes[index - 1];
+	assert(previous.action.subType === "defensive", "fixture needs a new possession");
+	assert(!original.scenes[index - 2].shotClockPressure, "lookahead crossed a possession change");
+	const changed = data.actions.find((action) => action.actionNumber === violation.action.actionNumber);
+	changed.clock = previous.action.clock;
+	const replay = compileReplay(data);
+	const sameClock = replay.scenes[index];
+	assert(sameClock.preparationWait === 0, "violation invented elapsed time at a stopped clock");
+	assert(
+		getReplayFrame(replay, sameClock.start + sameClock.eventAt).clock === sameClock.clockTo,
+		"violation changed the recorded clock",
+	);
+});
+
+Deno.test("long preparations move the ball carrier with their defender and preserve seeking and possession", async () => {
+	let routes = 0;
+	let spacing = 0;
+	for (const id of ["0022600007", "0022600008", "0022600094", "0022600105"]) {
+		const data = await readData(`replay-${id}.json`);
+		const replay = compileReplay(data);
+		for (const scene of replay.scenes) {
+			const route = scene.dribbleRoute;
+			if (!route) {
+				continue;
+			}
+			const start = getReplayFrame(replay, scene.start + route.start);
+			const carrier = start.players.find((player) => player.id === route.owner);
+			const direction = attackDirection(data, scene.attackTeam, scene.action.period);
+			const defender = Number(Object.keys(scene.matchups).find((key) => scene.matchups[key] === route.owner));
+			let distance = 0;
+			let previous = carrier;
+			for (let i = 1; i <= 12; i++) {
+				const time = scene.start + route.start + (route.end - route.start) * i / 12;
+				const frame = getReplayFrame(replay, time);
+				const player = frame.players.find((item) => item.id === route.owner);
+				const opponent = frame.players.find((item) => item.id === defender);
+				assert(frame.ball.owner === route.owner && frame.ball.dribble, "preparation lost dribbling possession");
+				assert(
+					Math.hypot(frame.ball.x - player.x - 1, frame.ball.y - player.y - 0.8) < 0.00001,
+					"ball detached from moving carrier",
+				);
+				assert(player.x >= 2 && player.x <= 92 && player.y >= 3 && player.y <= 47, "dribble left the court");
+				if ((carrier.x - 47) * direction >= 0) {
+					assert((player.x - 47) * direction >= 0, "preparation returned to the backcourt");
+				}
+				assert(Math.hypot(opponent.x - player.x, opponent.y - player.y) < 4.5, "defender stopped following");
+				distance += Math.hypot(player.x - previous.x, player.y - previous.y);
+				previous = player;
+				assert(
+					Math.hypot(player.x - carrier.x, player.y - carrier.y) <= 8,
+					"preparation invented a long dribble route",
+				);
+			}
+			assert(distance >= 1, "long preparation remained stationary");
+			const middle = scene.start + (route.start + route.end) / 2;
+			const firstSeek = getReplayFrame(replay, middle);
+			getReplayFrame(replay, replay.duration);
+			assert(
+				JSON.stringify(getReplayFrame(replay, middle)) === JSON.stringify(firstSeek),
+				"seeking changed preparation movement",
+			);
+			for (const move of scene.spacingMoves ?? []) {
+				if (!move.duration) {
+					continue;
+				}
+				const halfway = getReplayFrame(replay, scene.start + move.startAt + move.duration / 2);
+				const player = halfway.players.find((item) => item.id === move.id);
+				assert(
+					Math.hypot(player.x - move.from.x, player.y - move.from.y) > 0.1 &&
+						Math.hypot(player.x - move.x, player.y - move.y) > 0.1,
+					"off-ball adjustment was not distributed over preparation",
+				);
+				spacing++;
+			}
+			routes++;
+		}
+	}
+	assert(routes > 200 && spacing > 0, "missing preparation movement coverage");
+});
+
+Deno.test("schematic circulation has free pass flights, visible catches and the recorded finish recipient", async () => {
+	let sequences = 0;
+	let assists = 0;
+	let shotClocks = 0;
+	for (const id of ["0022600007", "0022600008", "0022600094", "0022600105"]) {
+		const data = await readData(`replay-${id}.json`);
+		const actions = JSON.stringify(data.actions);
+		const replay = compileReplay(data);
+		assert(JSON.stringify(data.actions) === actions, "circulation changed source events or statistics");
+		for (const scene of replay.scenes) {
+			const passes = scene.preparationPasses;
+			if (!passes) {
+				continue;
+			}
+			assert(!scene.dribbleRoute, "circulation added time on top of the dribble route");
+			assert(passes.length >= 2 && passes.length <= 3, "unbounded circulation");
+			assert(new Set(passes.flatMap((pass) => [pass.from, pass.to])).size >= 3, "mechanical two-player pingpong");
+			const start = getReplayFrame(replay, scene.start + scene.preparationAt + 0.02);
+			for (const pass of passes) {
+				assert(
+					scene.lineups[scene.attackTeam].includes(pass.from) &&
+						scene.lineups[scene.attackTeam].includes(pass.to),
+					"pass involved an inactive player or opponent",
+				);
+				const middle = scene.start + (pass.releaseAt + pass.catchAt) / 2;
+				const flight = getReplayFrame(replay, middle);
+				assert(flight.ball.owner === null && flight.ball.z > 0.5, "pass did not travel through the air");
+				assert(
+					JSON.stringify(flight.score) === JSON.stringify(start.score),
+					"connection pass changed the score",
+				);
+				const caught = getReplayFrame(replay, scene.start + pass.catchAt);
+				const receiver = caught.players.find((player) => player.id === pass.to);
+				assert(caught.ball.owner === pass.to, "pass was not caught by its recipient");
+				assert(
+					Math.hypot(caught.ball.x - receiver.x - 1, caught.ball.y - receiver.y - 0.8) < 0.00001,
+					"pass arrived away from the recipient",
+				);
+				assert(
+					pass.catchAt <= scene.preparationAt + scene.preparationWait + 0.00001,
+					"pass exceeded time budget",
+				);
+				getReplayFrame(replay, replay.duration);
+				assert(
+					JSON.stringify(getReplayFrame(replay, middle)) === JSON.stringify(flight),
+					"pass seeking changed",
+				);
+			}
+			if (["2pt", "3pt"].includes(scene.kind)) {
+				const finish = scene.action.assistPersonId || scene.action.personId;
+				assert(passes.at(-1).to === finish, "circulation did not reach the recorded finish recipient");
+				assert(
+					getReplayFrame(replay, scene.start + scene.approachAt).ball.owner === finish,
+					"finish began without the expected ball owner",
+				);
+				if (scene.action.assistPersonId) {
+					assists++;
+				}
+			}
+			if (scene.action.subType === "shot clock") {
+				shotClocks++;
+			}
+			sequences++;
+		}
+		assert(checkReplay(data, replay).errors.length === 0, "circulation failed replay validation");
+	}
+	assert(sequences > 10 && assists > 0 && shotClocks === 4, "missing circulation scenarios");
+});
