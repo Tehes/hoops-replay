@@ -47,6 +47,27 @@ function normalizeTeam(team, home) {
 	};
 }
 
+function normalizeShotCoordinates(action) {
+	if (
+		!action.isFieldGoal || !["left", "right"].includes(action.side) ||
+		!Number.isFinite(action.x) || !Number.isFinite(action.y) || !Number.isFinite(action.shotDistance)
+	) {
+		return action;
+	}
+	const hoopX = action.side === "left" ? 5.25 : 88.75;
+	const distance = Math.hypot(action.x * 0.94 - hoopX, action.y * 0.5 - 25);
+	// Allow rounding in the feed's distance, but reject contradictory geometry.
+	if (Math.abs(distance - action.shotDistance) <= 1) {
+		return action;
+	}
+	const mirroredDistance = Math.hypot((100 - action.x) * 0.94 - hoopX, action.y * 0.5 - 25);
+	// Correct only a mirrored longitudinal coordinate corroborated by the recorded distance and basket.
+	if (Math.abs(mirroredDistance - action.shotDistance) <= 1) {
+		return { ...action, x: 100 - action.x, sourceX: action.x, coordinateCorrection: "mirrored-x" };
+	}
+	throw new Error(`Shot coordinates contradict the recorded distance: ${action.actionNumber}`);
+}
+
 export function normalizeGame(gameId, boxscore, playByPlay) {
 	const game = boxscore.game;
 	if (game?.gameId !== gameId || playByPlay.game?.gameId !== gameId) {
@@ -74,7 +95,7 @@ export function normalizeGame(gameId, boxscore, playByPlay) {
 			captured: new Date().toISOString(),
 		},
 		teams: [normalizeTeam(game.awayTeam, false), normalizeTeam(game.homeTeam, true)],
-		actions: playByPlay.game.actions,
+		actions: playByPlay.game.actions.map(normalizeShotCoordinates),
 	};
 }
 

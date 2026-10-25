@@ -45,6 +45,43 @@ Deno.test("default uses the local example; an explicit ID always loads both back
 	}
 });
 
+Deno.test("shot geometry is checked consistently across positions and basket sides", async () => {
+	const boxscore = await readData("raw/boxscore-0022600094.json");
+	const playByPlay = await readData("raw/playbyplay-0022600094.json");
+	const shot = playByPlay.game.actions.find((action) => action.isFieldGoal);
+	for (const side of ["left", "right"]) {
+		for (const [x, y] of [[8, 5], [20, 50], [30, 90], [75, 40]]) {
+			const validX = side === "left" ? x : 100 - x;
+			const hoopX = side === "left" ? 5.25 : 88.75;
+			const distance = Math.hypot(validX * 0.94 - hoopX, y * 0.5 - 25);
+			for (const mirrored of [false, true]) {
+				Object.assign(shot, { x: mirrored ? 100 - validX : validX, y, side, shotDistance: distance });
+				const original = JSON.stringify(playByPlay);
+				const data = normalizeGame(boxscore.game.gameId, boxscore, playByPlay);
+				const normalized = data.actions.find((action) => action.actionNumber === shot.actionNumber);
+				assert(Math.abs(normalized.x - validX) < 0.00001 && normalized.y === y, "wrong geometry");
+				assert(Boolean(normalized.coordinateCorrection) === mirrored, "consistent shot was changed");
+				assert(!mirrored || normalized.sourceX === shot.x, "missing original coordinate");
+				assert(JSON.stringify(playByPlay) === original, "raw feed was mutated");
+			}
+		}
+	}
+	shot.shotDistance = 40;
+	let rejected = false;
+	try {
+		normalizeGame(boxscore.game.gameId, boxscore, playByPlay);
+	} catch (error) {
+		rejected = error.message.includes("coordinates contradict");
+	}
+	assert(rejected, "contradictory geometry was accepted");
+	shot.shotDistance = null;
+	const data = normalizeGame(boxscore.game.gameId, boxscore, playByPlay);
+	assert(
+		data.actions.find((action) => action.actionNumber === shot.actionNumber).x === shot.x,
+		"missing distance caused a guessed correction",
+	);
+});
+
 Deno.test("normalization rejects unfinished games and mismatched feed IDs", async () => {
 	const boxscore = await readData("raw/boxscore-0022600094.json");
 	const playByPlay = await readData("raw/playbyplay-0022600094.json");

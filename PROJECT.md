@@ -245,6 +245,15 @@ Daraus werden die entgegengesetzte Richtung des anderen Teams und der Seitenwech
 abgeleitet; Verlängerungen behalten die Richtung der zweiten Halbzeit. Ohne solchen Beleg bleibt
 die bisherige Schema-Annahme (Heimteam vor der Halbzeit nach rechts) als Fallback bestehen.
 Die aufgezeichneten x/y-Wurfkoordinaten werden dabei nicht gespiegelt oder geändert.
+Die Feed-Normalisierung prüft für jeden Feldwurf mit endlichen x/y, `shotDistance` und
+belegter Korbseite, ob Position und Distanz zusammenpassen. Ein Fuß Toleranz berücksichtigt
+Rundungen. Eine passende Position bleibt erhalten, auch bei echten Würfen aus dem Rückfeld.
+Bei einem Widerspruch wird geprüft, ob das Spiegeln der Längskoordinate (`100 - x`) die
+angegebene Distanz zum angegebenen Korb bestätigt. Nur dann wird x korrigiert;
+`sourceX` und `coordinateCorrection: "mirrored-x"` halten den Eingriff fest.
+Passen beide Positionen nicht, wird das Spiel mit einer Datenfehlermeldung abgelehnt.
+Fehlen Distanz oder Korbseite, wird keine Korrektur geraten. Rohfeeds und y bleiben unverändert.
+Die Regeln gelten unabhängig von Spiel, Team, Spieler und Ereignis-ID.
 
 Szenen verbinden unter anderem zugehörige Blocks mit Würfen, Steals mit Turnovern sowie
 Offensivfouls mit Turnovern, damit dieselbe Aktion nicht doppelt abgespielt wird.
