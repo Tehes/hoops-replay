@@ -65,7 +65,8 @@ festgelegt. Der Nutzer findet den Prototyp interessant, möchte aber weiter erku
   Arenaname oben rechts, jeweils außerhalb des mittigen Stützenbereichs. Ring- und
   Brettpositionen im Spielfeld bleiben maßstäblich unverändert. Die Ringe sind orange mit dunkler
   Kontur, damit sie sowohl auf dunklen als auch auf hellen Teamfarben sichtbar bleiben.
-- Spieler als Trikots mit Rückennummern: Heimteam in Weiß mit teamfarbenen Rändern und Nummern,
+- Spieler als ärmellose Basketball-Jerseys mit schmalen Schulterträgern, gerundetem Halsausschnitt,
+  seitlichen Armausschnitten und Rückennummern: Heimteam in Weiß mit teamfarbenen Rändern und Nummern,
   Auswärtsteam in seiner bisherigen Teamfarbe, ohne Ausnahmen für Gelb oder Silber.
   Das ist eine bewusste Replay-Konvention, keine Behauptung der echten Uniformwahl des jeweiligen
   Spiels. Logo und Paint behalten ihre Heimteamfarben.
