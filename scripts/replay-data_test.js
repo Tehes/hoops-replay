@@ -125,6 +125,59 @@ Deno.test("known inconsistent HOU-SAS feeds still fail replay validation", async
 	assert(report.errors.length > 0, "inconsistent feeds were silently accepted");
 });
 
+Deno.test("unlisted people in technical fouls remain team events without changing court state", async () => {
+	const data = await readData("replay-0022600007.json");
+	const previous = data.actions.find((action) => action.actionType === "rebound" && action.personId);
+	const action = {
+		actionNumber: 10000,
+		orderNumber: previous.orderNumber + 0.1,
+		period: previous.period,
+		clock: previous.clock,
+		scoreAway: previous.scoreAway,
+		scoreHome: previous.scoreHome,
+		actionType: "foul",
+		subType: "technical",
+		teamId: data.teams[0].id,
+		personId: 204005,
+		description: "S. Kerr technical technical FOUL (1 Tech)",
+	};
+	data.actions.push(action);
+	const original = JSON.stringify(data);
+	const replay = compileReplay(data);
+	const scene = replay.scenes.find((scene) => scene.action.actionNumber === action.actionNumber);
+	const before = replay.scenes[replay.scenes.indexOf(scene) - 1].frames.at(-1);
+	assert(!replay.players.some((player) => player.id === action.personId), "invented a court player");
+	assert(scene.action.description === action.description && scene.action.teamId === action.teamId, "lost team event");
+	for (const frame of scene.frames) {
+		assert(JSON.stringify(frame.players) === JSON.stringify(before.players), "team foul moved players");
+		assert(JSON.stringify(frame.ball) === JSON.stringify(before.ball), "team foul changed the ball");
+		assert(frame.possession === before.possession, "team foul changed possession");
+	}
+	const time = scene.start + scene.eventAt;
+	const first = getReplayFrame(replay, time);
+	getReplayFrame(replay, replay.duration);
+	assert(JSON.stringify(getReplayFrame(replay, time)) === JSON.stringify(first), "team foul seeking changed");
+	assert(JSON.stringify(data) === original, "source action was mutated");
+	assert(checkReplay(data, replay).errors.length === 0, "team foul failed replay validation");
+	for (const variant of ["personal", "shot", "substitution", "unknown team"]) {
+		Object.assign(action, { actionType: "foul", subType: "technical", teamId: data.teams[0].id });
+		if (variant === "personal") {
+			action.subType = "personal";
+		} else if (variant === "unknown team") {
+			action.teamId = -1;
+		} else {
+			action.actionType = variant === "shot" ? "2pt" : "substitution";
+		}
+		let rejected = false;
+		try {
+			compileReplay(data);
+		} catch (error) {
+			rejected = error.message === "Unknown replay player: 204005";
+		}
+		assert(rejected, `${variant} incorrectly used the team fallback`);
+	}
+});
+
 Deno.test("synthetic overtime boundaries use five-minute clocks and OT labels, including multiple OT", async () => {
 	const data = await readData("replay-0022600007.json");
 	const end = data.actions.find((action) => action.actionType === "game");

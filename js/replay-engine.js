@@ -1317,6 +1317,10 @@ function compileScene(replay, scene, index, state, data) {
 			state.positions = previousPositions;
 		}
 		record(0.65);
+	} else if (scene.kind === "foul" && action.subType === "technical" && !state.positions[action.personId]) {
+		// Unlisted people can receive technical fouls; keep the action without inventing a court player.
+		scene.eventAt = time;
+		record(0.7);
 	} else if (scene.kind === "foul" || scene.kind === "turnover" || scene.kind === "steal") {
 		const offensive = scene.kind === "foul" && action.subType === "offensive";
 		const onBall = scene.kind === "turnover" || offensive ||
@@ -1565,7 +1569,11 @@ export function compileReplay(data) {
 	const playerIds = new Set(players.map((player) => player.id));
 	for (const action of data.actions) {
 		if (action.personId && !playerIds.has(action.personId)) {
-			throw new Error(`Unknown replay player: ${action.personId}`);
+			const teamTechnical = action.actionType === "foul" && action.subType === "technical" &&
+				data.teams.some((team) => team.id === action.teamId);
+			if (!teamTechnical) {
+				throw new Error(`Unknown replay player: ${action.personId}`);
+			}
 		}
 		if (action.isFieldGoal && (!Number.isFinite(action.x) || !Number.isFinite(action.y))) {
 			throw new Error(`Missing shot coordinates: ${action.actionNumber}`);

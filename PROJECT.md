@@ -295,6 +295,12 @@ Viertel- und Spielende, Auszeiten und weitere Regelverstöße. Beispiele für So
 - Bankshots über das Brett; Step-back/Fadeaway/Turnaround mit eigener Bewegung oder Pose.
 - Shooting Foul, Charge, Loose-ball, technisches Foul, Traveling, Shot-clock, Out-of-bounds,
   Lost-ball, offensives Goaltending, Kicked-ball und Challenge haben spezifische Behandlung.
+- Technische Fouls (`foul / technical`) mit einer Personen-ID außerhalb des Spieleraufgebots
+  werden bei bekannter Team-ID als Teamereignisse gezeigt: Teamlogo und originaler PbP-Text,
+  ohne erfundenen Spieler oder Foulanimation auf dem Court. Personen-ID und Quelldaten bleiben
+  erhalten; eine Trainerrolle wird nicht aus der ID abgeleitet. Ball und Ballbesitz bleiben erhalten.
+  Für andere Aktionen oder eine unbekannte Team-ID bleibt eine unbekannte Personen-ID ein Fehler.
+  Reproduktionsfall: GSW–PHX `?game=0022600111&action=724`, technisches Foul gegen S. Kerr.
 
 Viele Ereignisse teilen sich trotzdem schematische Zweige oder generische Symbole. Es gibt keine
 Garantie, dass alle NBA-actionTypes, Descriptors und Kombinationen bereits fachlich vollständig
