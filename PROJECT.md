@@ -640,3 +640,40 @@ einschließlich Bankwechseln, Rückkehr, Endständen und bisherigen Wurf-/Reboun
 Format-, Typ-, Lint-Prüfung und `git diff --check` bestehen. Chrome MCP auf Port 5500 wurde für
 Timeout, Halbzeit, Rückkehr in Q3 und Seeking zum Spielende verwendet; die Darstellung der beiden
 Gruppen außerhalb des Courts wurde visuell geprüft.
+
+## Wurfzone und Choreografie bei Wurffouls (25.10.2026)
+
+Wurffouls verwenden die Feed-Qualifiers `2freethrow` / `3freethrow`, um den Gefoulten beim
+Kontakt innerhalb bzw. außerhalb der Dreipunktlinie des angegriffenen Korbs zu positionieren.
+Fehlt der Qualifier, wird die folgende reguläre Freiwurfsequenz desselben Spielers bei identischer
+Perioden-/Spielzeit bis zum nächsten Foul ausgewertet. Die Geometrie berücksichtigt den Bogen
+und die geraden Ecklinien sowie den Seitenwechsel.
+
+Die Formationssuche endet jetzt auch am nächsten Wurffoul eines aktiven Angreifers. Der Gefoulte
+und sein Anlauf erhalten denselben Vorrang wie ein Feldwurfschütze; die übrigen Spieler halten
+Abstand zum Anlaufkorridor, eine Innenposition bleibt erhalten. `kind: "foul-spacing"`,
+`foulActionNumber` und `foulPlan` kennzeichnen diesen schematischen Abschluss getrennt von
+belegten Feldwurfkoordinaten. Die bestehenden Grenzen durch offensive Auswechslungen bleiben bestehen.
+Ein späterer Feldwurf nach den Freiwürfen bestimmt nicht mehr die Vorbereitung dieses Fouls.
+
+Ist ein anderer Spieler am Ball, läuft der Gefoulte zunächst zur Empfangsposition und erhält einen
+sichtbaren Pass mit freiem Ballflug und Fang. Bei zwei Freiwürfen folgt ein schematischer kurzer
+Drive zum geplanten Kontaktpunkt; beim Dreier wird die Empfangsposition außerhalb der Linie
+reserviert. Hat der Gefoulte den Ball bereits, führt er ihn selbst zum Ziel. Zugeordnete Verteidiger
+folgen weiterhin ihren Angreifern. Ankommen und Aufnehmen des Balls liegen vor der Wurfpose und
+dem Foulkontakt; der Kontakt selbst versetzt den Gefoulten nicht mehr. Die Phasen liegen vollständig
+in den Replay-Keyframes und bleiben bei Pause und Seeking konsistent.
+
+Bei einem And-one (`1freethrow`) dient der vorangegangene Treffer desselben Spielers zur selben
+Perioden-/Spielzeit als Positionsanker; dessen Anlauf wird nicht erneut animiert. Ohne belegte
+Zuordnung bleibt die bisherige Position erhalten. Normale persönliche Fouls mit Bonusfreiwürfen
+erhalten keine Wurfzonen-Korrektur. Orte, zusätzliche Pässe und Drives bleiben schematische Ergänzungen,
+keine Behauptung eines gemessenen Spielzugs oder Tracking-Daten.
+
+Alle 17 Regressionstests und der Audit der drei Referenzspiele mit 18.606 Keyframes bestehen,
+einschließlich beider Korbrichtungen, Ecklinien, And-ones, Formationsankern, Passflug/-fang,
+Ballbesitz beim Dribbling und Positionskontinuität vor dem Kontakt. Format-, Typ-, Lint-Prüfung und
+`git diff --check` bestehen. Die zusätzliche Vorbereitung verlängert die Replay-Dauern auf
+1426,308 / 1403,933 / 1476,176 Sekunden (DEN–OKC / NYK–BOS / ATL–CHA).
+Chrome MCP auf Port 5500: Passflug und anschließender Drive vor DEN–OKC Q1 10:35 visuell geprüft,
+Seeking zum Kontakt und ATL–CHA Q3 3:47 mit Ballannahme außerhalb des Dreierbogens geprüft.

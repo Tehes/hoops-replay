@@ -1,5 +1,5 @@
 import { loadReplayData, normalizeGame } from "../js/replay-data.js";
-import { clockSeconds, compileReplay, getReplayFrame } from "../js/replay-engine.js";
+import { attackDirection, clockSeconds, compileReplay, getReplayFrame } from "../js/replay-engine.js";
 import { checkReplay } from "../js/replay-validation.js";
 
 const DATA = new URL("../data/", import.meta.url);
@@ -457,4 +457,194 @@ Deno.test("timeouts and period breaks clear the court, preserve bench substituti
 		assert(returns > 4 && benchSwaps > 0, "fixture did not cover timeouts, quarters, halftime and bench swaps");
 		assert(checkReplay(data, replay).errors.length === 0, "break choreography failed replay validation");
 	}
+});
+
+Deno.test("shooting fouls respect two-point and three-point territory in both directions", async () => {
+	for (const file of ["replay-0022600007.json", "replay-0022600008.json", "replay-0022600094.json"]) {
+		const data = await readData(file);
+		for (const reverse of [false, true]) {
+			const changed = structuredClone(data);
+			if (reverse) {
+				for (const action of changed.actions) {
+					if (action.isFieldGoal) {
+						action.x = 100 - action.x;
+						action.side = action.side === "left" ? "right" : "left";
+					}
+				}
+			}
+			const replay = compileReplay(changed);
+			for (const scene of replay.scenes.filter((item) => item.action.descriptor === "shooting")) {
+				const action = scene.action;
+				const frame = getReplayFrame(replay, scene.start + scene.eventAt);
+				const victim = frame.players.find((player) => player.id === action.foulDrawnPersonId);
+				const offense = changed.teams.find((team) => team.id !== action.teamId).id;
+				const direction = attackDirection(changed, offense, action.period);
+				const hoopX = direction === 1 ? 88.75 : 5.25;
+				const outside = Math.abs(victim.y - 25) > 22 || Math.hypot(victim.x - hoopX, victim.y - 25) > 23.75;
+				if (action.qualifiers.includes("2freethrow") || action.qualifiers.includes("3freethrow")) {
+					assert(
+						outside === action.qualifiers.includes("3freethrow"),
+						`${file} foul ${action.actionNumber} wrong territory`,
+					);
+					assert(
+						(hoopX - victim.x) * direction > 0 && (victim.x - 47) * direction > 0,
+						"foul outside attacking half",
+					);
+				} else if (action.qualifiers.includes("1freethrow")) {
+					const shot = replay.scenes.slice(0, replay.scenes.indexOf(scene)).findLast((item) =>
+						item.action.period === action.period && item.action.clock === action.clock &&
+						item.action.personId === action.foulDrawnPersonId && item.action.shotResult === "Made" &&
+						["2pt", "3pt"].includes(item.kind)
+					);
+					assert(
+						shot && Math.hypot(victim.x - shot.shotPoint.x, victim.y - shot.shotPoint.y) < 0.001,
+						"and-one lost recorded shot location",
+					);
+				}
+				assert(
+					frame.ball.owner === action.foulDrawnPersonId && victim.jump > 0,
+					"shooting foul lost shooter or ball",
+				);
+			}
+		}
+	}
+});
+
+Deno.test("shooting foul territory can use the following free-throw sequence without qualifiers", async () => {
+	const data = await readData("replay-0022600094.json");
+	for (const action of data.actions) {
+		if (action.actionType === "foul" && action.descriptor === "shooting") {
+			delete action.qualifiers;
+		}
+	}
+	const replay = compileReplay(data);
+	const foul = replay.scenes.find((scene) => scene.action.actionNumber === 495);
+	const victim = getReplayFrame(replay, foul.start + foul.eventAt).players.find((player) =>
+		player.id === foul.action.foulDrawnPersonId
+	);
+	const hoopX = attackDirection(data, data.teams[0].id, foul.action.period) === 1 ? 88.75 : 5.25;
+	assert(
+		Math.abs(victim.y - 25) > 22 || Math.hypot(victim.x - hoopX, victim.y - 25) > 23.75,
+		"three-shot foul stayed inside arc",
+	);
+});
+
+Deno.test("shooting foul positioning respects the straight corner three-point line", async () => {
+	for (const direction of [-1, 1]) {
+		for (const freeThrows of [2, 3]) {
+			const data = await readData("replay-0022600007.json");
+			const [away, home] = data.teams;
+			const shooter = home.players.find((player) => player.starter);
+			const defender = away.players.find((player) => player.starter);
+			const tip = data.actions.find((action) => action.actionType === "jumpball");
+			const hoopX = direction === 1 ? 88.75 : 5.25;
+			data.actions = [
+				{ ...tip, teamId: home.id, jumpBallRecoverdPersonId: shooter.id },
+				{
+					actionType: "3pt",
+					subType: "Jump Shot",
+					personId: shooter.id,
+					teamId: home.id,
+					isFieldGoal: 1,
+					shotResult: "Made",
+					x: (hoopX - direction * 6) / 0.94,
+					y: 4,
+					side: direction === 1 ? "right" : "left",
+				},
+				{
+					actionType: "foul",
+					subType: "personal",
+					descriptor: "shooting",
+					personId: defender.id,
+					teamId: away.id,
+					possession: home.id,
+					foulDrawnPersonId: shooter.id,
+					qualifiers: [`${freeThrows}freethrow`],
+				},
+			].map((action, index) => ({
+				...action,
+				period: 1,
+				clock: "PT10M00.00S",
+				scoreAway: "0",
+				scoreHome: "3",
+				actionNumber: index + 1,
+				orderNumber: index + 1,
+			}));
+			const replay = compileReplay(data);
+			const foul = replay.scenes.at(-1);
+			const victim = getReplayFrame(replay, foul.start + foul.eventAt).players.find((player) =>
+				player.id === shooter.id
+			);
+			assert(
+				(Math.abs(victim.y - 25) > 22) === (freeThrows === 3),
+				"corner foul is on the wrong side of the straight line",
+			);
+		}
+	}
+});
+
+Deno.test("shooting foul formations reserve the finish and complete passes and drives before contact", async () => {
+	let passes = 0;
+	let drives = 0;
+	let planned = 0;
+	for (const file of ["replay-0022600007.json", "replay-0022600008.json", "replay-0022600094.json"]) {
+		const data = await readData(file);
+		const replay = compileReplay(data);
+		for (const scene of replay.scenes.filter((item) => item.action.descriptor === "shooting")) {
+			const shooterId = scene.action.foulDrawnPersonId;
+			if (scene.action.qualifiers.includes("1freethrow")) {
+				assert(
+					scene.foulPassAt === undefined && scene.foulDriveAt === undefined,
+					"and-one repeated its approach",
+				);
+				continue;
+			}
+			const at = (time) => getReplayFrame(replay, scene.start + time);
+			const playerAt = (time) => at(time).players.find((player) => player.id === shooterId);
+			if (scene.formation.foulActionNumber === scene.action.actionNumber) {
+				planned++;
+				assert(
+					scene.formation.shooterId === shooterId && scene.formation.evidenceActionNumber === null,
+					"foul used a later field goal as its anchor",
+				);
+				assert(
+					JSON.stringify(scene.foulPoint) === JSON.stringify(scene.formation.foulPlan.point),
+					"foul changed its planned finish",
+				);
+				const slot = scene.lineups[scene.attackTeam].indexOf(shooterId);
+				const [x, y] = scene.formation.slots[slot];
+				const direction = attackDirection(data, scene.attackTeam, scene.action.period);
+				assert(
+					Math.abs(y - scene.foulPoint.y) < 0.001 &&
+						Math.abs((direction === 1 ? x : 94 - x) - scene.foulPoint.x) <= 7.001,
+					"formation did not reserve the approach",
+				);
+			}
+			if (scene.foulPassAt !== undefined) {
+				passes++;
+				const midPass = at((scene.foulPassAt + scene.foulCatchAt) / 2);
+				assert(midPass.ball.owner === null && midPass.ball.z > 0.5, "pass did not travel as a free ball");
+				assert(at(scene.foulCatchAt).ball.owner === shooterId, "pass was not caught before the drive");
+			}
+			const start = playerAt(scene.foulDriveAt);
+			const gather = playerAt(scene.foulGatherAt);
+			const contact = playerAt(scene.eventAt);
+			const distance = Math.hypot(gather.x - start.x, gather.y - start.y);
+			assert(distance <= (scene.foulGatherAt - scene.foulDriveAt) * 8 + 0.001, "foul approach moved too fast");
+			if (distance > 1) {
+				drives++;
+				const middle = at((scene.foulDriveAt + scene.foulGatherAt) / 2);
+				assert(
+					middle.ball.owner === shooterId && middle.ball.dribble,
+					"approach did not keep the dribbling shooter",
+				);
+			}
+			assert(gather.jump === 0 && contact.jump > 0, "shooting pose started before the gather");
+			assert(
+				Math.hypot(contact.x - gather.x, contact.y - gather.y) < 0.001,
+				"contact still relocated the shooter",
+			);
+		}
+	}
+	assert(planned > 0 && passes > 0 && drives > 0, "fixtures did not exercise formations, passes and drives");
 });
