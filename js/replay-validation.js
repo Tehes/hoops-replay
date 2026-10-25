@@ -294,6 +294,15 @@ export function checkReplay(data, replay = compileReplay(data)) {
 				`${id} off-ball rotation before shot ${scene.action.actionNumber}`,
 			);
 		}
+		if (scene.reboundShotIndex !== undefined) {
+			const shot = replay.scenes[scene.reboundShotIndex];
+			check(
+				scene.reboundShotIndex < index && shot.reboundSceneIndex === index &&
+					(scene.action.shotActionNumber === undefined || scene.action.shotActionNumber === null ||
+						shot.action.actionNumber === scene.action.shotActionNumber),
+				`${id} explicit rebound shot ${scene.action.actionNumber}`,
+			);
+		}
 		if (scene.reboundApproach) {
 			const approach = scene.reboundApproach;
 			const previous = replay.scenes[approach.sceneIndex];
@@ -304,6 +313,16 @@ export function checkReplay(data, replay = compileReplay(data)) {
 					Math.hypot(first.x - arrived.x, first.y - arrived.y) < 0.00001,
 				`${id} rebound arrival ${scene.action.actionNumber}`,
 			);
+			for (const between of replay.scenes.slice(approach.sceneIndex + 1, index)) {
+				check(
+					between.frames.every((frame) => {
+						const player = frame.players.find((player) => player.id === approach.playerId);
+						return !frame.ball.owner && player.opacity === 1 &&
+							Math.hypot(player.x - approach.target.x, player.y - approach.target.y) < 0.00001;
+					}),
+					`${id} rebound continuity across annotation ${between.action.actionNumber}`,
+				);
+			}
 			const catchFrame = scene.frames.find((frame) => Math.abs(frame.time - scene.catchAt) < 0.00001);
 			check(
 				catchFrame && catchFrame.ball.owner === approach.playerId &&

@@ -1,5 +1,5 @@
 import { loadReplayData, normalizeGame } from "../js/replay-data.js";
-import { compileReplay, getReplayFrame } from "../js/replay-engine.js";
+import { clockSeconds, compileReplay, getReplayFrame } from "../js/replay-engine.js";
 import { checkReplay } from "../js/replay-validation.js";
 
 const DATA = new URL("../data/", import.meta.url);
@@ -262,4 +262,148 @@ Deno.test("recorded shot sides determine baskets for both teams before and after
 		assert(shooter.x === (shootsLeft ? 19 : 75), "free throw uses the wrong side");
 	}
 	assert(checkReplay(data, replay).errors.length === 0, "reversed basket replay failed validation");
+});
+
+Deno.test("explicit rebound links and missing-field fallback preserve all reference choreography", async () => {
+	for (const id of ["0022600007", "0022600008", "0022600094"]) {
+		const data = await readData(`replay-${id}.json`);
+		const explicit = compileReplay(structuredClone(data));
+		for (const action of data.actions) {
+			delete action.shotActionNumber;
+		}
+		const fallback = compileReplay(data);
+		explicit.scenes.forEach((scene, index) => {
+			assert(
+				JSON.stringify(scene.frames) === JSON.stringify(fallback.scenes[index].frames),
+				"choreography changed",
+			);
+			if (scene.kind === "rebound") {
+				assert(
+					explicit.scenes[scene.reboundShotIndex]?.action.actionNumber === scene.action.shotActionNumber,
+					"rebound did not resolve its explicit shot ID",
+				);
+			}
+		});
+		assert(explicit.duration === fallback.duration, "reference timing changed");
+	}
+});
+
+Deno.test("an intervening standalone block retains the approach, free ball and continuous seeking", async () => {
+	const data = await readData("replay-0022600007.json");
+	const baseline = compileReplay(data);
+	const original = baseline.scenes.find((scene) =>
+		scene.reboundApproach &&
+		baseline.scenes[scene.reboundApproach.sceneIndex].action.blockPersonId
+	);
+	const shot = baseline.scenes[original.reboundApproach.sceneIndex];
+	const block = data.actions.find((action) =>
+		action.actionType === "block" && action.personId === shot.action.blockPersonId &&
+		action.clock === shot.action.clock && action.period === shot.action.period
+	);
+	// A separate clock prevents buildScenes from merging this block annotation into the shot.
+	const shotAction = data.actions.find((action) => action.actionNumber === shot.action.actionNumber);
+	shotAction.clock = `PT${clockSeconds(block.clock) + 0.01}S`;
+	const replay = compileReplay(data);
+	const rebound = replay.scenes.find((scene) => scene.action.actionNumber === original.action.actionNumber);
+	assert(rebound.reboundApproach, "explicit link lost the early rebound approach");
+	const linkedShot = replay.scenes[rebound.reboundShotIndex];
+	assert(linkedShot.action.actionNumber === shot.action.actionNumber, "wrong linked shot");
+	const between = replay.scenes.slice(rebound.reboundShotIndex + 1, replay.scenes.indexOf(rebound));
+	assert(between.length === 1 && between[0].kind === "block", "fixture block was merged");
+	const id = rebound.action.personId;
+	const target = rebound.reboundApproach.target;
+	for (const scene of [...between, rebound]) {
+		const frame = getReplayFrame(replay, scene.start);
+		const player = frame.players.find((player) => player.id === id);
+		assert(Math.hypot(player.x - target.x, player.y - target.y) < 0.00001, "rebounder jumps at scene boundary");
+		assert(frame.ball.owner === null, "ball acquired before the catch");
+	}
+	assert(checkReplay(data, replay).errors.length === 0, "standalone block failed replay validation");
+});
+
+Deno.test("interruptions retain the shot link without rewriting timeout, foul or substitution choreography", async () => {
+	for (const kind of ["timeout", "foul", "substitution"]) {
+		const data = await readData("replay-0022600007.json");
+		const baseline = compileReplay(data);
+		const original = baseline.scenes.find((scene) => scene.reboundApproach);
+		const shot = baseline.scenes[original.reboundShotIndex];
+		data.actions = data.actions.filter((action) => action.orderNumber <= original.action.orderNumber);
+		const reboundAction = data.actions.find((action) => action.actionNumber === original.action.actionNumber);
+		const team = data.teams.find((team) => team.id === reboundAction.teamId);
+		const common = {
+			period: reboundAction.period,
+			clock: reboundAction.clock,
+			scoreAway: reboundAction.scoreAway,
+			scoreHome: reboundAction.scoreHome,
+			teamId: team.id,
+		};
+		const order = Math.max(...data.actions.filter((action) => action !== reboundAction).map((a) => a.orderNumber));
+		const actionNumber = Math.max(...data.actions.map((action) => action.actionNumber)) + 1;
+		if (kind === "substitution") {
+			const incoming = team.players.find((player) => !player.starter);
+			data.actions.push(
+				{
+					...common,
+					actionType: kind,
+					subType: "out",
+					personId: reboundAction.personId,
+					actionNumber,
+					orderNumber: order + 0.1,
+				},
+				{
+					...common,
+					actionType: kind,
+					subType: "in",
+					personId: incoming.id,
+					actionNumber: actionNumber + 1,
+					orderNumber: order + 0.2,
+				},
+			);
+			reboundAction.personId = incoming.id;
+		} else {
+			data.actions.push({
+				...common,
+				actionType: kind,
+				subType: kind === "foul" ? "personal" : "full",
+				descriptor: "loose ball",
+				personId: reboundAction.personId,
+				actionNumber,
+				orderNumber: order + 0.1,
+			});
+		}
+		data.teams.forEach((team, index) => team.score = Number(index ? common.scoreHome : common.scoreAway));
+		const replay = compileReplay(data);
+		const rebound = replay.scenes.at(-1);
+		assert(
+			replay.scenes[rebound.reboundShotIndex].action.actionNumber === shot.action.actionNumber,
+			"lost shot link",
+		);
+		assert(!rebound.reboundApproach, `${kind} was overwritten by an early approach`);
+		assert(!replay.scenes[rebound.reboundShotIndex].reboundContinuous, "interrupted ball flight planned");
+		assert(checkReplay(data, replay).errors.length === 0, `${kind} scenario failed replay validation`);
+		const frame = getReplayFrame(replay, rebound.start + rebound.catchAt);
+		assert(frame.ball.owner === reboundAction.personId, "wrong catcher after interruption");
+	}
+});
+
+Deno.test("invalid explicit references never fall back to an unrelated adjacent shot", async () => {
+	for (const reference of ["unknown", "future", "made", "earlier miss"]) {
+		const data = await readData("replay-0022600007.json");
+		const baseline = compileReplay(data);
+		const original = baseline.scenes.find((scene, index) => scene.reboundApproach && index > 30);
+		const action = data.actions.find((action) => action.actionNumber === original.action.actionNumber);
+		const shotIndex = original.reboundShotIndex;
+		const target = reference === "future"
+			? baseline.scenes.slice(shotIndex + 2).find((scene) => scene.action.isFieldGoal)
+			: baseline.scenes.slice(0, shotIndex).find((scene) =>
+				scene.action.isFieldGoal &&
+				(reference === "made" ? scene.action.shotResult === "Made" : scene.action.shotResult === "Missed")
+			);
+		action.shotActionNumber = reference === "unknown" ? 999999 : target.action.actionNumber;
+		const replay = compileReplay(data);
+		const rebound = replay.scenes.find((scene) => scene.action.actionNumber === action.actionNumber);
+		assert(rebound.reboundShotIndex === undefined && !rebound.reboundApproach, `${reference} link accepted`);
+		assert(!replay.scenes[shotIndex].reboundContinuous, "adjacent shot incorrectly used the rejected rebound");
+		assert(checkReplay(data, replay).errors.length === 0, "rejected link damaged normal rebound handling");
+	}
 });

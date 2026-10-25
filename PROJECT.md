@@ -184,7 +184,8 @@ oder der tatsächlichen Dauer der Übertragung.
 - Pro Spieler: `id`, `name`, `number`, `position`, `starter`, `minutes`.
 - `actions`: übernommene Ereignisfelder einschließlich `actionNumber`, `orderNumber`, `period`,
   ISO-Dauer `clock`, `actionType`, `subType`, optional `descriptor`/`qualifiers`, `teamId`, beteiligte
-  Personen-IDs, `x`/`y`, `isFieldGoal`, `shotResult`, `scoreAway`/`scoreHome` und `possession`.
+  Personen-IDs, optional `shotActionNumber` als Verweis eines Rebounds auf die Wurf-ID, `x`/`y`,
+  `isFieldGoal`, `shotResult`, `scoreAway`/`scoreHome` und `possession`.
   Nicht jedes Ereignis enthält alle diese Felder; nicht jeder Wert ist belegt.
 
 Die Dateien sind für den Replay aufbereitete Snapshots, keine vollständigen unbearbeiteten
@@ -275,7 +276,8 @@ Viertel- und Spielende, Auszeiten und weitere Regelverstöße. Beispiele für So
   Abprallort; beim eigenen Fehlwurf beginnt der Weg nach dem Abschluss. Der Ball prallt sichtbar
   ab und wird in der Rebound-Szene im Sprung gefangen. Das gilt auch nach einem letzten verfehlten
   regulären Freiwurf. Team-Rebounds bleiben ohne erfundenen individuellen Fänger. Bei dazwischen
-  liegenden anderen Szenen greift weiterhin der einfache Rebound-Weg statt dieser Vorabplanung.
+  liegenden eigenständigen Block-Szenen bleibt die Vorabplanung jetzt über `shotActionNumber` erhalten;
+  Unterbrechungen verwenden weiterhin den einfachen Rebound-Weg.
 - Alley-oop mit freiem Lob und Abschluss am Korb; Tip/Putback mit direktem Folgeabschluss ohne
   zwischengeschalteten normalen Aufbau oder Assistpass.
 - Bankshots über das Brett; Step-back/Fadeaway/Turnaround mit eigener Bewegung oder Pose.
@@ -393,7 +395,8 @@ des Backends oder aller NBA-Daten. Den vorhandenen Spielplan zur Auswahl abgesch
 ## Ergänzung: Rebound-Choreografie
 
 `prepareRebound()` passt beim Kompilieren eines persönlichen Rebounds die Bewegungs-Keyframes
-seines unmittelbar vorausgehenden Fehlwurfs an. Die Endposition wird vor dem ersten Rebound-Frame
+des über `shotActionNumber` zugeordneten Fehlwurfs an, sofern keine Unterbrechung dazwischenliegt.
+Die Endposition wird vor dem ersten Rebound-Frame
 auch in den Compilerzustand übernommen, damit Seeking und Szenenübergänge konsistent bleiben.
 Das ist eine bewusste Nutzung des bekannten Spielverlaufs, keine Rekonstruktion gemessener Laufwege.
 Die Fangphase behält einen freien Ball bis zum Kontakt und markiert den Besitzwechsel mit catchAt.
@@ -583,3 +586,33 @@ Alle acht Tests und die drei lokalen Referenzspiele bestehen. Der frisch abgeruf
 besteht mit 513 Szenen, 6.595 Keyframes und FINAL 112:102 den vollständigen Audit.
 Chrome MCP auf Port 5500: Feed-Laden, Korbzuordnung in allen vier Vierteln und Seeking zum
 Alley-oop von Davis in Q3 geprüft. Kein neuer lokaler Spiel-Snapshot wurde angelegt.
+
+
+## Explizite Rebound-Zuordnung (25.10.2026)
+
+`linkRebounds()` verknüpft Wurf- und Rebound-Szenen vor der Bewegungsplanung über die Ereignis-ID
+`shotActionNumber`; die Reihenfolge bleibt ausschließlich durch `orderNumber` bestimmt. Nur wenn
+`shotActionNumber` fehlt oder null ist, wird der unmittelbar vorherige Wurf verwendet. Eine vorhandene,
+aber ungültige Referenz wird nicht durch einen anderen Wurf ersetzt. Vorwärtsverweise, Treffer,
+Periodenwechsel, dazwischenliegende weitere Würfe oder Rebounds und doppelte Zuordnungen werden
+nicht für diese Verknüpfung verwendet. Heaves ohne Ergebnisfeld bleiben wie bisher Fehlversuche.
+Team-Rebounds nach Zwischenfreiwürfen bleiben fachlich verknüpft, ohne eine Live-Fangphase auszulösen;
+auch technische Freiwürfe erhalten keine solche Vorabplanung.
+
+Direkte persönliche Rebounds behalten ihren bisherigen späten Anlauf, Abprall und Sprungfang.
+Bei eigenständigen Block-Annotationen dazwischen wird der Anlauf bereits im zugeordneten Wurf geplant
+und die erreichte Position durch die Annotationen gehalten. Innenposition und Wurf-Abprall verwenden
+dieselbe Verknüpfung. Fouls, Timeouts, Auswechslungen und andere Zwischenszenen unterbrechen diese
+Vorabplanung: Ihre Positionen, Aufstellungen und Ballzustände werden nicht rückwirkend überschrieben;
+der Rebound behält seinen bisherigen lokalen Anlauf und Fang. Die Zuordnung bleibt nachvollziehbar
+in `reboundShotIndex` / `reboundSceneIndex`, die Animationsfreigabe in `reboundContinuous`.
+
+Alle 338 Rebounds der drei Referenzspiele haben eine auflösbare explizite Wurf-ID. Ein Vergleich mit
+dem Stand vor der Änderung bestätigt identische Spieler-/Ball-Keyframes und Replay-Dauern für alle
+drei Spiele (18.226 Keyframes). Regressionstests prüfen außerdem fehlende Felder, ungültige Referenzen,
+einen eigenständigen Block sowie Timeout-, Foul- und Wechselunterbrechungen. Der gemeinsame Audit
+prüft die Zuordnung und die Positions-/Ballkontinuität durch Block-Annotationen zusätzlich zur Fangphase.
+
+Chrome MCP auf http://127.0.0.1:5500: Wurf-, Anlauf- und Fangphase per Timeline, Seeking bis
+FINAL 84:96 und zurück zum Rebound sowie Play/Pause geprüft; Fangdarstellung visuell kontrolliert.
+Format-, Typ- und Lint-Prüfungen sowie `git diff --check` bestehen.

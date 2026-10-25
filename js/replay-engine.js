@@ -91,6 +91,42 @@ function buildScenes(actions) {
 	return scenes;
 }
 
+function linkRebounds(scenes) {
+	const shotIndices = new Map(scenes.map((scene, index) => [scene.action.actionNumber, index]));
+	scenes.forEach((scene, index) => {
+		if (scene.kind !== "rebound") {
+			return;
+		}
+		const shotIndex = scene.action.shotActionNumber === undefined || scene.action.shotActionNumber === null
+			? index - 1
+			: shotIndices.get(scene.action.shotActionNumber);
+		const shot = scenes[shotIndex];
+		if (
+			!shot || shotIndex >= index || shot.action.period !== scene.action.period ||
+			!["2pt", "3pt", "heave", "freethrow"].includes(shot.kind) ||
+			shot.action.shotResult === "Made" || (shot.action.shotResult !== "Missed" && shot.kind !== "heave") ||
+			shot.reboundSceneIndex !== undefined
+		) {
+			return;
+		}
+		let liveFreeThrow = true;
+		if (shot.kind === "freethrow") {
+			const sequence = shot.action.subType.match(/(\d) of (\d)/);
+			liveFreeThrow = shot.action.descriptor !== "technical" && !shot.action.qualifiers?.includes("technical") &&
+				(!sequence || sequence[1] === sequence[2]);
+		}
+		const between = scenes.slice(shotIndex + 1, index);
+		if (between.some((item) => ["2pt", "3pt", "heave", "freethrow", "rebound", "period"].includes(item.kind))) {
+			return;
+		}
+		scene.reboundShotIndex = shotIndex;
+		shot.reboundSceneIndex = index;
+		// Only standalone block annotations may extend the live rebound choreography.
+		scene.reboundContinuous = liveFreeThrow && between.every((item) => item.kind === "block");
+		shot.reboundContinuous = scene.reboundContinuous;
+	});
+}
+
 // Future contacts constrain the formation before the corresponding action happens.
 function planMatchups(scenes, index, offense, state, data) {
 	const attack = state.lineups[offense];
@@ -267,10 +303,9 @@ function planFormation(replay, index, offense, direction, lineup, state) {
 				Math.max(5, Math.min(45, shot.y + (distance > 0.1 ? dy / distance : -side * 0.5) * length)),
 			];
 		}
-		const rebound = replay.scenes[evidenceIndex + 1];
-		const rebounderSlot = rebound?.kind === "rebound" && rebound.action.teamId === offense
-			? lineup.indexOf(rebound.action.personId)
-			: -1;
+		const shotScene = replay.scenes[evidenceIndex];
+		const rebound = shotScene.reboundContinuous ? replay.scenes[shotScene.reboundSceneIndex] : null;
+		const rebounderSlot = rebound?.action.teamId === offense ? lineup.indexOf(rebound.action.personId) : -1;
 		const available = lineup.map((_, slot) => slot).filter((slot) => slot !== shooterSlot && slot !== assistSlot);
 		interiorSlot = available.includes(rebounderSlot)
 			? rebounderSlot
@@ -541,12 +576,9 @@ function prepareReboundFormation(state, scene, rebounderId, hoop, record, data) 
 }
 
 function prepareRebound(replay, scene, index, state) {
-	const previous = replay.scenes[index - 1];
+	const previous = replay.scenes[scene.reboundShotIndex];
 	const id = scene.action.personId;
-	if (
-		!id || !previous || !["2pt", "3pt", "heave", "freethrow"].includes(previous.kind) ||
-		previous.action.shotResult === "Made" || previous.technical
-	) {
+	if (!id || !scene.reboundContinuous) {
 		return;
 	}
 	const reactionAt = previous.action.personId === id
@@ -568,8 +600,13 @@ function prepareRebound(replay, scene, index, state) {
 		player.x = origin.x + (target.x - origin.x) * smooth;
 		player.y = origin.y + (target.y - origin.y) * smooth;
 	}
+	for (const between of replay.scenes.slice(scene.reboundShotIndex + 1, index)) {
+		for (const frame of between.frames) {
+			Object.assign(frame.players.find((player) => player.id === id), target);
+		}
+	}
 	Object.assign(state.positions[id], target);
-	scene.reboundApproach = { sceneIndex: index - 1, start, end, playerId: id, target };
+	scene.reboundApproach = { sceneIndex: scene.reboundShotIndex, start, end, playerId: id, target };
 }
 
 function compileScene(replay, scene, index, state, data) {
@@ -578,8 +615,8 @@ function compileScene(replay, scene, index, state, data) {
 	const direction = attackDirection(data, offense, action.period);
 	const hoop = { x: direction === 1 ? 88.75 : 5.25, y: 25 };
 	const matchups = {};
-	const nextScene = replay.scenes[index + 1];
-	const namedRebound = nextScene?.kind === "rebound" && nextScene.action.personId;
+	const rebound = scene.reboundContinuous ? replay.scenes[scene.reboundSceneIndex] : null;
+	const namedRebound = rebound?.action.personId;
 	if (scene.kind === "rebound") {
 		prepareRebound(replay, scene, index, state);
 	}
@@ -1078,6 +1115,7 @@ export function compileReplay(data) {
 		players,
 		duration: 0,
 	};
+	linkRebounds(replay.scenes);
 	replay.scenes.forEach((scene, index) => {
 		const previous = replay.scenes[index - 1];
 		scene.start = replay.duration;
