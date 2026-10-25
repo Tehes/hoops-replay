@@ -843,3 +843,23 @@ Verifiziert: 25 Tests und vier Spiel-Audits mit 27.460 Keyframes ohne Fehler; De
 Lint, JavaScript-/HTML-/CSS-Formatprüfung und `git diff --check` bestehen. Chrome MCP am lokalen
 Server auf Port 5500: DEN–OKC, Rückfeld-Heaves in Q1 und Q3, Wiedergabe über den Q3-Wurf,
 Pause sowie Seeking zum Endstand und zurück geprüft.
+
+### Fehlpässe ins Aus (25.10.2026)
+
+Bei `turnover / out-of-bounds / bad pass` ohne Steal wählt die Engine einen anderen aktiven
+Angreifer als schematische Anspielstation aus der vorhandenen Aufstellung. Kurze Wege und ein
+nahes Aus werden bevorzugt; Verteidiger im Flugkorridor und ein Rückflug über die Mittellinie
+werden bei der Auswahl nachrangig behandelt. Der flache Pass verfehlt die Empfangsposition um
+knapp drei Court-Fuß seitlich und fliegt auf derselben Linie weiter über die erste Außenlinie.
+Der Empfänger bekommt keinen Ballbesitz; es entsteht kein zusätzliches PbP-Ereignis.
+Der Turnover wird nach dem Flug ins Aus angezeigt. `scene.missedPass` hält Empfänger-ID,
+Abwurf- und Aus-Zeit für Prüfungen und Seeking fest. Empfänger und Passweg sind schematisch
+gewählt, nicht aus dem Feed belegt; eine vollständige Kollisionssimulation findet nicht statt.
+Die distanzabhängige Flugdauer kann betroffene Replay-Szenen geringfügig verlängern.
+
+26 Tests und vier Spiel-Audits mit 27.549 Keyframes bestehen. Der neue Test prüft 19 echte
+Fehlpässe auf aktive Anspielstation, knappes Verfehlen vor dem Aus, durchgehende Flugrichtung,
+freien Ball, Turnover-Zeitpunkt, beide Spielrichtungen und reproduzierbares Seeking.
+Deno-Typprüfung, Lint, Formatprüfung und `git diff --check` bestehen. Chrome MCP auf Port 5500:
+Ajay Mitchells Fehlpass in DEN–OKC bei Q1 3:11 visuell geprüft, über den Pass abgespielt, pausiert
+und zum Endstand sowie zurück gesucht.

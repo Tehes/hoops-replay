@@ -1038,3 +1038,71 @@ Deno.test("backcourt finishes keep inbound, outlet, circulation and shot approac
 		}
 	}
 });
+
+Deno.test("bad passes out of bounds narrowly miss an active teammate before crossing the boundary", async () => {
+	let passes = 0;
+	const directions = new Set();
+	const sidelines = new Set();
+	for (const id of ["0022600007", "0022600008", "0022600094", "0022600105"]) {
+		const data = await readData(`replay-${id}.json`);
+		const original = JSON.stringify(data);
+		const replay = compileReplay(data);
+		for (const scene of replay.scenes) {
+			const expected = scene.kind === "turnover" && scene.action.subType === "out-of-bounds" &&
+				scene.action.descriptor === "bad pass" && !scene.action.stealPersonId;
+			assert(Boolean(scene.missedPass) === expected, "missed-pass choreography applied to the wrong event");
+			if (!expected) {
+				continue;
+			}
+			const plan = scene.missedPass;
+			const release = scene.frames.find((frame) => frame.time === plan.releaseAt);
+			const end = scene.frames.find((frame) => frame.time === plan.outAt);
+			assert(release.ball.owner === scene.action.personId, "recorded passer did not release the ball");
+			assert(
+				plan.receiverId !== scene.action.personId && scene.lineups[scene.attackTeam].includes(plan.receiverId),
+				"missing active receiving teammate",
+			);
+			const receiver = release.players.find((player) => player.id === plan.receiverId);
+			const dx = end.ball.x - release.ball.x;
+			const dy = end.ball.y - release.ball.y;
+			const fraction = ((receiver.x + 1 - release.ball.x) * dx + (receiver.y + 0.8 - release.ball.y) * dy) /
+				(dx * dx + dy * dy);
+			const miss = Math.hypot(
+				receiver.x + 1 - release.ball.x - dx * fraction,
+				receiver.y + 0.8 - release.ball.y - dy * fraction,
+			);
+			assert(fraction > 0 && fraction < 1, "ball went out before reaching the receiving station");
+			assert(miss >= 2 && miss <= 3, "ball did not narrowly miss the receiving hand");
+			assert(end.ball.x < 0 || end.ball.x > 94 || end.ball.y < 0 || end.ball.y > 50, "pass stayed in bounds");
+			assert(scene.eventAt === plan.outAt, "turnover was displayed before the pass went out");
+			const direction = attackDirection(data, scene.attackTeam, scene.action.period);
+			directions.add(direction);
+			sidelines.add(end.ball.y < 0 ? "top" : end.ball.y > 50 ? "bottom" : "baseline");
+			for (const frame of scene.frames.filter((item) => item.time > plan.releaseAt && item.time <= plan.outAt)) {
+				assert(frame.ball.owner === null, "receiver caught the bad pass");
+				const progress = ((frame.ball.x - release.ball.x) * dx + (frame.ball.y - release.ball.y) * dy) /
+					(dx * dx + dy * dy);
+				assert(
+					Math.hypot(
+						frame.ball.x - release.ball.x - dx * progress,
+						frame.ball.y - release.ball.y - dy * progress,
+					) < 0.00001,
+					"ball changed direction after missing",
+				);
+				if ((release.ball.x - 47) * direction >= 0) {
+					assert((frame.ball.x - 47) * direction >= 0, "bad pass returned to the backcourt");
+				}
+			}
+			const at = scene.start + plan.releaseAt + (plan.outAt - plan.releaseAt) * fraction;
+			const frame = getReplayFrame(replay, at);
+			getReplayFrame(replay, replay.duration);
+			assert(
+				JSON.stringify(getReplayFrame(replay, at)) === JSON.stringify(frame),
+				"seeking changed the missed pass",
+			);
+			passes++;
+		}
+		assert(JSON.stringify(data) === original, "missed-pass choreography mutated source events");
+	}
+	assert(passes >= 15 && directions.size === 2 && sidelines.size >= 2, "missing bad-pass coverage");
+});

@@ -705,6 +705,56 @@ function circulateBall(state, scene, duration, record) {
 	return true;
 }
 
+function animateOutOfBoundsPass(state, scene, direction, record) {
+	const passer = state.positions[state.ball.owner];
+	const origin = { x: passer.x + 1, y: passer.y + 0.8, z: 0.5 };
+	const candidates = [];
+	for (const id of state.lineups[scene.attackTeam]) {
+		if (id === state.ball.owner) {
+			continue;
+		}
+		const receiver = state.positions[id];
+		const dx = receiver.x + 1 - origin.x;
+		const dy = receiver.y + 0.8 - origin.y;
+		const distance = Math.hypot(dx, dy);
+		for (const side of [-1, 1]) {
+			// Miss the receiving hand laterally, then continue along the same pass line.
+			const near = {
+				x: receiver.x + 1 - dy / distance * side * 2.8,
+				y: receiver.y + 0.8 + dx / distance * side * 2.8,
+			};
+			const vx = near.x - origin.x;
+			const vy = near.y - origin.y;
+			const scale = Math.min(
+				vx > 0 ? (95 - origin.x) / vx : vx < 0 ? (-1 - origin.x) / vx : Infinity,
+				vy > 0 ? (51 - origin.y) / vy : vy < 0 ? (-1 - origin.y) / vy : Infinity,
+			);
+			const target = { x: origin.x + vx * scale, y: origin.y + vy * scale, z: 0 };
+			const length = Math.hypot(vx, vy) * scale;
+			let cost = distance + (length - distance) * 0.8 + Math.max(0, distance - 32) * 3;
+			if ((origin.x - 47) * direction >= 0 && (target.x - 47) * direction < 0) {
+				cost += 1000;
+			}
+			for (const defender of Object.keys(scene.matchups)) {
+				const position = state.positions[defender];
+				const fraction = ((position.x - origin.x) * vx + (position.y - origin.y) * vy) / (vx * vx + vy * vy);
+				if (
+					fraction > 0.1 && fraction < scale &&
+					Math.hypot(position.x - origin.x - vx * fraction, position.y - origin.y - vy * fraction) < 2.5
+				) {
+					cost += 30;
+				}
+			}
+			candidates.push({ receiverId: id, target, cost, duration: 0.35 + length / 60 });
+		}
+	}
+	const plan = candidates.sort((a, b) => a.cost - b.cost)[0];
+	scene.missedPass = { receiverId: plan.receiverId, releaseAt: scene.frames.at(-1).time };
+	state.ball.dribble = false;
+	flyBall(state, record, plan.target, 0.6, plan.duration);
+	scene.missedPass.outAt = scene.frames.at(-1).time;
+}
+
 function pacePreparation(state, scene, time, finishDuration, record, direction) {
 	// Compress live time while preserving the minimum time needed for the recorded finish.
 	const budget = scene.shotClockPressure
@@ -1282,6 +1332,12 @@ function compileScene(replay, scene, index, state, data) {
 			state.ball = { ...hoop, z: 3, owner: null };
 			record(0.4);
 		}
+		if (
+			scene.kind === "turnover" && action.subType === "out-of-bounds" && action.descriptor === "bad pass" &&
+			!action.stealPersonId
+		) {
+			animateOutOfBoundsPass(state, scene, direction, record);
+		}
 		scene.eventAt = time;
 		const markerKind = action.subType === "technical"
 			? "technical"
@@ -1320,7 +1376,7 @@ function compileScene(replay, scene, index, state, data) {
 			replay.attacks.push(scene.start + time);
 		} else if (scene.kind === "turnover" || offensive) {
 			releaseBall(state);
-			if (action.subType === "out-of-bounds") {
+			if (action.subType === "out-of-bounds" && !scene.missedPass) {
 				flyBall(
 					state,
 					record,
