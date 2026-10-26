@@ -25,6 +25,7 @@ Without a Game ID in the URL, the app opens the bundled DEN–OKC example.
 - **NBA and WNBA:** League detection from the Game ID, with league-specific team names, colors, logos,
   quarter lengths (NBA: 12 minutes; WNBA: 10 minutes), and three-point lines.
 - **Full-court replay:** Follow both teams as numbered jerseys on a court with the home team's logo and colors.
+- **Team colors and jerseys:** Automatic jersey selection balances team colors, clear separation, and readable numbers.
 - **Coordinated movement:** Players advance together during inbounds and possession changes. Shooters move into
   receiving positions during the buildup, with travel time based on route length and the available time budget.
 - **Play-by-play display:** See the score, game clock, player photos, and original event descriptions.
@@ -101,8 +102,10 @@ next shooter can move toward the receiving position during the preceding action.
   long routes can extend a scene when the condensed budget is too short. Shot flights keep their own timing.
 - **Completed games only:** There is no live replay mode. A game must have compatible, consistent
   play-by-play and boxscore feeds. Invalid or unsupported games show an error instead of a substitute game.
-- **Team colors:** Court colors and uniforms use fixed team palettes, not the game's actual court
-  design or uniform selection.
+- **Team colors:** Courts use fixed home-team palettes. Jerseys normally show home in white and away in primary.
+  Color conflicts can switch home to primary and away to white or black, with contrasting trim and numbers.
+  Team colors are preferred; neutral details are used when needed for readability. These are replay conventions,
+  not the game's actual court design or uniform selection.
 - **Network access:** Loading a game by ID and displaying NBA or WNBA player photos require a connection.
   There is no Service Worker or offline caching.
 - **Overtime:** Five-minute overtime periods and quarter controls are implemented and covered by
@@ -138,6 +141,7 @@ Include the relevant local action links when presenting a change so its behavior
 │   ├── replay-engine.js     # Scenes, lineups, possession, and movement planning
 │   ├── replay-shots.js      # Shot profiles and ball trajectories
 │   ├── replay-teams.js      # NBA/WNBA team names, color palettes, and logos
+│   ├── replay-colors.js     # Color similarity, contrast, and jersey selection
 │   ├── replay-leagues.js    # League detection, quarter lengths, and three-point geometry
 │   ├── replay-data.js       # Feed loading and normalization
 │   └── replay-validation.js # Shared replay checks
@@ -149,6 +153,29 @@ Include the relevant local action links when presenting a change so its behavior
 
 All runtime paths are relative, including under a GitHub Pages repository path.
 Umami page-view tracking is limited to `tehes.github.io`; localhost previews are excluded.
+
+### Jersey Color Rules
+
+All 30 NBA and 15 WNBA teams have local logos and primary colors adapted from
+[NBA-Spielplan](https://github.com/Tehes/nba-spielplan). Optional alternate colors follow the same palette,
+with cream for the Bucks and black available implicitly. The active values live in `js/replay-teams.js`;
+they are replay display colors and do not depend on a particular season's uniform rotation.
+
+- Normally, home wears white and away wears primary, provided contrast and readable team details allow it.
+- Similar primaries switch home to primary. Similarity follows the schedule's OKLab rule: less than 45° hue
+  separation for chromatic colors; less than 0.30 lightness separation when either color's chroma is below 0.04.
+  Contrast checks can also trigger a switch even when hues differ.
+- Away jerseys must reach at least **3:1** contrast against both the home jersey and the home paint color.
+  Trim and numbers must reach at least **4:1** against their own jersey.
+- On white or black jerseys, primary and alternate compete for trim and numbers. Among suitable neutral
+  away jerseys, the higher number contrast wins. Away can retain primary if that satisfies both limits
+  when neutral jerseys with team details cannot. Colored primary jerseys use white or black details.
+- If no team-color combination meets both limits, the neutral jersey receives contrasting neutral details.
+  This is a general rule for every matchup, with team identity still visible in the scoreboard and logos.
+
+Selection runs once when a game loads and stays consistent during playback, seeking, and side changes.
+Court colors and logos stay with the home team. Regression tests cover all **1,080** ordered matchups
+within the two leagues, including team-color preference and the neutral-detail rule.
 
 ### Import a Regression Fixture
 
@@ -187,6 +214,7 @@ deno fmt --check js/ scripts/ css/style.css index.html
 deno check js/*.js scripts/*.js
 deno lint js/ scripts/
 deno test --allow-read=data scripts/replay-data_test.js
+deno test scripts/replay-colors_test.js
 deno run --allow-read=data scripts/audit-replays.js
 git diff --check
 ```

@@ -29,6 +29,7 @@ let scale = 1;
 let courtBackground = null;
 let playerById = new Map();
 let teamById = new Map();
+let jerseyByTeamId = new Map();
 const homeLogo = new Image();
 
 /* --------------------------------------------------------------------------------------------------
@@ -213,7 +214,7 @@ function resizeCourt() {
 
 function drawPlayer(position) {
 	const player = playerById.get(position.id);
-	const colors = getJerseyColors(teamById.get(player.teamId));
+	const colors = jerseyByTeamId.get(player.teamId);
 	const size = Math.max(1, 7 / (scale / (globalThis.devicePixelRatio || 1) * 1.6));
 	ctx.save();
 	ctx.globalAlpha = position.opacity;
@@ -636,6 +637,9 @@ async function init() {
 		}
 		playerById = new Map(replay.players.map((player) => [player.id, player]));
 		teamById = new Map(game.teams.map((team) => [team.id, team]));
+		jerseyByTeamId = new Map(
+			game.teams.map((team, index) => [team.id, getJerseyColors(team, game.teams[1 - index])]),
+		);
 		for (const [index, element] of [awayTeamEl, homeTeamEl].entries()) {
 			const team = game.teams[index];
 			element.querySelector("span").textContent = team.code;

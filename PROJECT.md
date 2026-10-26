@@ -69,8 +69,12 @@ festgelegt. Der Nutzer findet den Prototyp interessant, möchte aber weiter erku
   Brettpositionen im Spielfeld bleiben maßstäblich unverändert. Die Ringe sind orange mit dunkler
   Kontur, damit sie sowohl auf dunklen als auch auf hellen Teamfarben sichtbar bleiben.
 - Spieler als ärmellose Basketball-Jerseys mit schmalen Schulterträgern, gerundetem Halsausschnitt,
-  seitlichen Armausschnitten und Rückennummern: Heimteam in Weiß mit teamfarbenen Rändern und Nummern,
-  Auswärtsteam in seiner bisherigen Teamfarbe, ohne Ausnahmen für Gelb oder Silber.
+  seitlichen Armausschnitten und Rückennummern: Normalerweise Heimteam in Weiß, Auswärtsteam
+  in Primary. Bei ähnlichen Primary-Farben trägt Home Primary und Away das kontrastreichere Weiß
+  oder Schwarz. Auf neutralen Jerseys bestimmt die kontrastreichere eigene Primary-/Alternate-Farbe
+  Rand und Nummer. Jersey-Kontrast muss 3:1, Nummernkontrast mindestens 4:1 erreichen.
+  Die eigene Primary oder Alternate bleibt nach Möglichkeit in Grundfarbe oder Details sichtbar. Auf farbigen Primary-Jerseys sind
+  Rand und Nummer das kontrastreichere Weiß oder Schwarz.
   Das ist eine bewusste Replay-Konvention, keine Behauptung der echten Uniformwahl des jeweiligen
   Spiels. Logo und Paint behalten ihre Heimteamfarben.
   Namen als kleine Badges oder Overlays;
@@ -983,3 +987,120 @@ Die Dauern betragen jetzt 2328,775 / 2350,292 / 2360,720 / 2512,693 Sekunden
 Deno-Typprüfung, Lint, Formatprüfung und `git diff --check` bestehen. Der Gesamtaudit umfasst
 26.016 Keyframes ohne Fehler. Chrome MCP: Aktionen 40 → 41 → 43 mit Wiedergabe und Pause
 visuell geprüft; Endstand FINAL 84:96 und Rücksprung geprüft, ohne Fehler/Warnungen in der Konsole.
+
+
+## Teamfarben und Jersey-Auswahl (26.10.2026)
+
+Alle 45 NBA-/WNBA-Basislogos und Primary-Farben stammen aus `Tehes/nba-spielplan`,
+Commit `610e3d627f88f891ace7335300d7b831268a433a`. Court-Paletten und Logoauswahl bleiben
+unabhängig von der Jersey-Auswahl. `shirt` ist die Primary-Farbe; `trim` und `ink` in den
+Teamdaten dienen weiterhin der bisherigen Darstellung außerhalb der Jerseys.
+
+Die aktuelle Auswahlregel unterscheidet Grafik- und Nummernkontrast:
+- Der Normalfall Home weiß / Away Primary bleibt erhalten, wenn die Farben nicht ähnlich sind,
+  Home eine lesbare eigene Teamfarbe in den Details hat und Away mindestens 3:1 gegen sowohl
+  Home-Jersey als auch Home-Paint erreicht.
+- Sonst trägt Home Primary. Away prüft Weiß und Schwarz gegen Home-Primary (zugleich Paint).
+  Mindestens 3:1 Grafik-Kontrast ist Pflicht; unter den Varianten mit mindestens 4:1 für die
+  Nummer gewinnt die mit dem höchsten Nummernkontrast. Gleichstand entscheidet der höhere
+  Grafik-Kontrast, danach Weiß durch stabile Reihenfolge.
+- Eigene Primary oder Alternate wird in Grundfarbe oder Rand/Nummer bevorzugt. Auf neutralen
+  Jerseys gewinnt die eigene Teamfarbe mit dem höheren Detailkontrast; bei Gleichstand Primary.
+  Wenn keine Teamfarbvariante beide Grenzen erreicht, werden neutrale Details gewählt.
+  Diese allgemeine Regel gilt dynamisch für jede Paarung, ohne feste Ausnahmeliste.
+- Wenn keine neutrale Variante beide Grenzen erfüllt, kann Away Primary mit neutralen Details
+  verwenden, sofern diese gegen Home/Paint mindestens 3:1 erreicht.
+- Ist auch das unmöglich, bleiben 3:1 Grafik-Kontrast und 4:1 Nummernkontrast erhalten;
+  das neutrale Away-Jersey erhält kontrastierende neutrale Ränder und Nummern. Die sichtbare
+  Teamfarbe am Jersey darf dann entfallen. Auf farbigen Primary-Jerseys sind Details das
+  kontrastreichere Weiß oder Schwarz.
+- Die Auswahl erfolgt einmal beim Laden und bleibt bei Pause, Seeking und Seitenwechsel stabil.
+
+`replay-colors.js` übernimmt die OKLab-Farbähnlichkeit aus dem Spielplan: 45° Farbton,
+0,30 Helligkeitsdifferenz bei Neutralfarben, Chroma-Grenze 0,04. Die bisherigen
+Verbesserungsschwellen für einen Alternate-Wechsel entfallen. Die Alternates folgen der Spielplan-Palette gemäß der unten dokumentierten
+pragmatischen Entscheidung. `alternate: null` bedeutet Primary, Weiß und Schwarz.
+Die aktuelle Alternate-Palette steht direkt in `js/replay-teams.js`. Bucks-Cream `#eee1c6`
+ist eingetragen; auch Celtics-Gold ist als Replay-Alternative verfügbar. Quellen: [Cream-Farbwert](https://sportcolorcodes.com/milwaukee-bucks-color-codes/)
+und [offizielle Cream City Edition](https://shop.bucks.com/pages/city-edition).
+Die Werte in `js/replay-teams.js` sind für NBA und WNBA die verbindliche Palette.
+
+Die Trikots bleiben eine Replay-Konvention, keine Behauptung der tatsächlichen Uniformwahl.
+Home kann dieselbe Grundfarbe wie die Paint haben; kontrastierende Ränder und Nummern sind
+bewusst die Unterscheidung. Holz- und Logo-Flächen werden nicht zusätzlich bewertet.
+
+Verifiziert: 38 Tests inklusive aller 1.080 liga-internen Paarungen und fünf vollständige
+Spiel-Audits mit 31.117 Keyframes ohne Fehler. JavaScript-/CSS-Formatcheck, Deno-Check,
+Lint und `git diff --check` bestehen. Chromium über Playwright auf Port 5500: NBA-Default
+und WNBA mit lokalen Rohfeed-Fixtures, Play/Pause, Seeking und Endstände geprüft. Zwei
+synthetische Farbzuordnungen auf dem unveränderten DEN–OKC-Ereignisverlauf prüfen Home-Grün
+mit Away-Weiß sowie Home-Orange mit Away-Schwarz; Desktop/Mobil visuell kontrolliert.
+Alle 45 Logos decodieren, keine JavaScript-Seitenfehler. Die bereits bekannte Formatabweichung
+der unveränderten `index.html` bleibt außerhalb dieser Änderung.
+
+
+### Pragmatische Alternate-Palette (26.10.2026)
+
+Der Nutzer hat die bisherigen Einschränkungen durch die Uniform-Recherche ausdrücklich ersetzt:
+Alle Alternativen aus dem Spielplan werden übernommen, auch Brooklyn-Grau, Celtics-Gold,
+Denver-Rot und Utah-Hellblau. Ob eine Farbe einer aktuellen Edition entspricht, ist keine
+Freigabebedingung mehr. Auffällige Partien werden im Replay bewertet und dann gezielt korrigiert.
+Keine saisonalen oder historischen Ausschlüsse anhand der Recherche erneut einführen.
+
+Bucks behalten echtes Cream `#eee1c6` statt des abgedunkelten Bronze-Werts. Schwarz bleibt
+implizit: explizit schwarze Alternates und die zuvor auf Schwarz normalisierten Near-Black-Werte
+von Magic/Liberty bleiben leer. Damit sind 35 zusätzliche Alternates gesetzt und zehn Einträge
+leer. Alle aktiven Werte stehen in `js/replay-teams.js`.
+
+Die Alternate-Freigabe ändert Court-Paletten und Logos nicht.
+Alternates konkurrieren mit Primary für Ränder und Nummern neutraler Jerseys. Die Werte sind
+bewusste Darstellungsfarben und keine Behauptung der Uniformwahl eines tatsächlichen Spiels.
+
+Verifiziert nach der Palette-Anpassung: fünf Farbtests inklusive aller 1.080 Paarungen und
+Brooklyn-Grau in der tatsächlichen Kontrastwahl, Deno-Check, Lint, JavaScript-/CSS-Formatcheck
+und `git diff --check` bestanden.
+
+
+### Getrennte Kontrastgrenzen und sichtbare Teamfarbe (26.10.2026)
+
+Die zuvor gemeinsame 4:1-Prüfung ist durch 3:1 für Jersey gegen Home-Jersey/Paint und ein
+4:1-Mindestkontrast für Nummern ersetzt. Bei mehreren geeigneten neutralen Away-Jerseys entscheidet
+der höhere Kontrast der teamfarbenen Nummer. Beispiele: ATL@CHI → CHI rot/weiß, ATL
+schwarz/rot; DEN@PHI → PHI blau/weiß, DEN weiß/dunkelblau. NYK@ORL wechselt nun ebenfalls:
+ORL blau/weiß, NYK weiß/blau, weil Orange gegen das bisher weiße Home-Jersey unter 3:1 liegt.
+
+Aktuell sieben von 1.080 Paarungen können mit der freigegebenen Palette sichtbare Teamfarbe, 3:1
+Grafik-Kontrast und 4:1 Nummernkontrast nicht gleichzeitig erreichen. Hier ist die sichtbare
+Teamfarbe eine Präferenz; beide Kontrastgrenzen bleiben verbindlich. CHI/DET/HOU/ORL/POR/TOR
+bei NYK erhalten schwarze Away-Jerseys mit weißen Rändern und Nummern. WNBA CHI@SEA erhält
+Weiß mit schwarzen Rändern und Nummern. Teamidentität bleibt über Scoreboard und Logos erkennbar.
+Die frühere Best-Effort-Auswahl mit Nummernkontrast unter 4:1 ist damit ausdrücklich ersetzt.
+Die genannten Paarungen sind Ergebnisse der allgemeinen Regel und Regression-Beispiele,
+keine Sonderfälle im Code. Nach Änderungen der Farben kann sich diese Menge ändern.
+
+Nach Umsetzung der allgemeinen Regel für neutrale Details: acht Farbtests inklusive aller 1.080 Paarungen
+bestanden. Alle Paarungen erfüllen 3:1 für Jerseys/Away-Paint und 4:1 für Nummern. Die sieben
+betroffenen Paarungen werden ausdrücklich geprüft; bei fehlender Teamfarbe wird eine passende Teamfarbvariante
+rechnerisch ausgeschlossen. Deno-Check, Lint, JavaScript-/CSS-Formatcheck und `git diff --check`
+bestanden. Chromium über Playwright: NBA/WNBA mit lokalen Fixtures, Play/Pause, Seeking und
+Endstände; ORL@NYK mit weißen Nummern auf Schwarz sowie ATL@CHI mit roten Details auf Schwarz
+als synthetische Farbzuordnungen auf Desktop/Mobil geprüft, ohne JavaScript-Seitenfehler.
+
+Verifiziert: 40 Tests bestanden. Der Farbtest prüft alle 1.080 Paarungen auf deterministische
+Auswahl, sichtbare Teamfarbe, mindestens 3:1 zwischen Jerseys und Away/Paint sowie 4:1 für
+Nummern. Fehlt eine sichtbare Teamfarbe, prüfen die Tests zusätzlich rechnerisch, dass keine
+Teamfarbvariante beide Grenzen erfüllt.
+Deno-Check, Lint, JavaScript-/CSS-Formatcheck und `git diff --check` bestehen. Chromium über
+Playwright: NBA-/WNBA-Replays mit lokalen Fixtures, Play/Pause, Seeking und Endstände geprüft;
+ATL@CHI und DEN@PHI als synthetische Farbzuordnungen visuell auf Desktop/Mobil kontrolliert.
+Keine JavaScript-Seitenfehler, alle 45 Logos laden. Keine neue Safari-Abnahme.
+
+
+### Projektbereinigung (26.10.2026)
+
+Die 45°-Hue-Regel aus dem Spielplan und die abgestimmte Trikot-/Kontrastlogik bleiben erhalten.
+Temporäre Recherche-, Erklärungs-, Export- und Prüfdateien dieser Arbeit wurden entfernt,
+einschließlich der separaten Alternate-Übersicht und der Matchup-HTML/CSV-Dateien.
+Die verbindliche Palette steht in `js/replay-teams.js`, die Produktentscheidungen in dieser Datei.
+Dauerhafte Regressionstests, Spieldaten-Fixtures, Importer und die bereits zum Projekt gehörenden
+Validierungs-/Audit-Skripte bleiben erhalten.
