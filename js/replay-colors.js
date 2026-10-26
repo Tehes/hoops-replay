@@ -1,11 +1,12 @@
 // Adapted from Tehes/nba-spielplan/js/game-colors.js at 610e3d6.
 // These are visually reviewed UI thresholds, not standardized perceptual limits.
-const MIN_JERSEY_CONTRAST = 2.5;
 const MIN_NUMBER_CONTRAST = 4;
 const SIMILARITY_DEFAULTS = {
 	hue: 45,
 	lightness: 0.30,
 	chroma: 0.04,
+	improvement: 0.04,
+	contrastImprovement: 0.5,
 };
 
 function hexToLinearRgb(hex) {
@@ -43,9 +44,10 @@ function compareAppearance(first, second, settings) {
 	const angle = Math.abs(angles[0] - angles[1]);
 	const hue = hueReliable ? Math.min(angle, 360 - angle) : null;
 	const lightness = Math.abs(first[0] - second[0]);
+	const distance = Math.hypot(...first.map((value, index) => value - second[index]));
 	// Different lightness must not hide similar hues; neutral colors have no reliable hue.
 	const similar = hue === null ? lightness < settings.lightness : hue < settings.hue;
-	return { chroma, hue, lightness, similar };
+	return { chroma, hue, lightness, distance, similar };
 }
 
 function getNeutralColor(background) {
@@ -61,36 +63,37 @@ function createJerseyColors(shirt, colors) {
 		);
 		if (getColorContrast(best, shirt) >= MIN_NUMBER_CONTRAST) {
 			detail = best;
-		} else if (!teamColors.includes(shirt)) {
-			// Preserve team identity even when no combination can meet both contrast limits.
-			detail = best;
 		}
 	}
 	return { shirt, trim: detail, ink: detail };
 }
 
 export function selectMatchupJerseys(home, away) {
-	const similar = compareAppearance(hexToOklab(home.shirt), hexToOklab(away.shirt), SIMILARITY_DEFAULTS).similar;
+	const homeLab = hexToOklab(home.shirt);
+	const primary = compareAppearance(homeLab, hexToOklab(away.shirt), SIMILARITY_DEFAULTS);
 	const normalHome = createJerseyColors("#ffffff", home);
 	const normalAway = createJerseyColors(away.shirt, away);
-	if (
-		!similar && getColorContrast(normalHome.ink, normalHome.shirt) >= MIN_NUMBER_CONTRAST &&
-		getColorContrast(normalAway.shirt, normalHome.shirt) >= MIN_JERSEY_CONTRAST &&
-		getColorContrast(normalAway.shirt, home.shirt) >= MIN_JERSEY_CONTRAST
-	) {
+	if (!primary.similar) {
 		return { home: normalHome, away: normalAway };
 	}
 
 	const homeJersey = createJerseyColors(home.shirt, home);
-	const candidates = ["#ffffff", "#000000"].map((shirt) => createJerseyColors(shirt, away))
-		.filter((jersey) => getColorContrast(jersey.shirt, home.shirt) >= MIN_JERSEY_CONTRAST);
-	const readable = candidates.filter((jersey) => getColorContrast(jersey.ink, jersey.shirt) >= MIN_NUMBER_CONTRAST);
-	// Away primary can satisfy both limits when neutral shirts cannot retain readable team details.
-	if (!readable.length && getColorContrast(normalAway.shirt, home.shirt) >= MIN_JERSEY_CONTRAST) {
-		return { home: homeJersey, away: normalAway };
-	}
-	// Prefer team details; neutral details are the last resort when both limits cannot otherwise be met.
-	const awayJersey = (readable.length ? readable : candidates).reduce((first, next) => {
+	const neutral = primary.hue === null;
+	const primaryContrast = getColorContrast(home.shirt, away.shirt);
+	const minimum = neutral ? SIMILARITY_DEFAULTS.contrastImprovement : SIMILARITY_DEFAULTS.improvement;
+	// Like the schedule, alternatives must improve separation enough. Primary conflicts with home paint.
+	const teamColors = [away.shirt, away.alternate].filter(Boolean);
+	const candidates = [...new Set([away.alternate, "#ffffff", "#000000"].filter(Boolean))].map((shirt) =>
+		createJerseyColors(shirt, away)
+	)
+		.filter((jersey) => {
+			const improvement = neutral
+				? getColorContrast(home.shirt, jersey.shirt) - primaryContrast
+				: compareAppearance(homeLab, hexToOklab(jersey.shirt), SIMILARITY_DEFAULTS).distance - primary.distance;
+			return improvement > 0 && improvement >= minimum;
+		});
+	const branded = candidates.filter((jersey) => teamColors.includes(jersey.shirt) || teamColors.includes(jersey.ink));
+	const awayJersey = (branded.length ? branded : candidates).reduce((first, next) => {
 		const firstContrast = getColorContrast(first.ink, first.shirt);
 		const nextContrast = getColorContrast(next.ink, next.shirt);
 		if (nextContrast !== firstContrast) {
@@ -98,9 +101,5 @@ export function selectMatchupJerseys(home, away) {
 		}
 		return getColorContrast(next.shirt, home.shirt) > getColorContrast(first.shirt, home.shirt) ? next : first;
 	});
-	if (getColorContrast(awayJersey.ink, awayJersey.shirt) < MIN_NUMBER_CONTRAST) {
-		const detail = getNeutralColor(awayJersey.shirt);
-		return { home: homeJersey, away: { shirt: awayJersey.shirt, trim: detail, ink: detail } };
-	}
 	return { home: homeJersey, away: awayJersey };
 }

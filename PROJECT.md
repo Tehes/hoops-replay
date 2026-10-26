@@ -70,9 +70,10 @@ festgelegt. Der Nutzer findet den Prototyp interessant, möchte aber weiter erku
   Kontur, damit sie sowohl auf dunklen als auch auf hellen Teamfarben sichtbar bleiben.
 - Spieler als ärmellose Basketball-Jerseys mit schmalen Schulterträgern, gerundetem Halsausschnitt,
   seitlichen Armausschnitten und Rückennummern: Normalerweise Heimteam in Weiß, Auswärtsteam
-  in Primary. Bei ähnlichen Primary-Farben trägt Home Primary und Away das kontrastreichere Weiß
-  oder Schwarz. Auf neutralen Jerseys bestimmt die kontrastreichere eigene Primary-/Alternate-Farbe
-  Rand und Nummer. Jersey-Kontrast muss 2,5:1, Nummernkontrast mindestens 4:1 erreichen.
+  in Primary. Bei ähnlichen Primary-Farben trägt Home Primary; Away wählt aus Alternate, Weiß und Schwarz.
+  Away-Primary ist bei diesem Farbkonflikt ausgeschlossen. Auf neutralen Jerseys bestimmt
+  die kontrastreichere lesbare eigene Primary-/Alternate-Farbe Rand und Nummer, sonst Weiß oder Schwarz.
+  Es gibt keinen festen Mindestkontrast zwischen Jerseys/Paint; Ränder und Nummern müssen 4:1 erreichen.
   Die eigene Primary oder Alternate bleibt nach Möglichkeit in Grundfarbe oder Details sichtbar. Auf farbigen Primary-Jerseys sind
   Rand und Nummer das kontrastreichere Weiß oder Schwarz.
   Das ist eine bewusste Replay-Konvention, keine Behauptung der echten Uniformwahl des jeweiligen
@@ -996,29 +997,31 @@ Commit `610e3d627f88f891ace7335300d7b831268a433a`. Court-Paletten und Logoauswah
 unabhängig von der Jersey-Auswahl. `shirt` ist die Primary-Farbe; `trim` und `ink` in den
 Teamdaten dienen weiterhin der bisherigen Darstellung außerhalb der Jerseys.
 
-Die aktuelle Auswahlregel unterscheidet Grafik- und Nummernkontrast:
-- Der Normalfall Home weiß / Away Primary bleibt erhalten, wenn die Farben nicht ähnlich sind,
-  Home eine lesbare eigene Teamfarbe in den Details hat und Away mindestens 2,5:1 gegen sowohl
-  Home-Jersey als auch Home-Paint erreicht.
-- Sonst trägt Home Primary. Away prüft Weiß und Schwarz gegen Home-Primary (zugleich Paint).
-  Mindestens 2,5:1 Grafik-Kontrast ist Pflicht; unter den Varianten mit mindestens 4:1 für die
-  Nummer gewinnt die mit dem höchsten Nummernkontrast. Gleichstand entscheidet der höhere
-  Grafik-Kontrast, danach Weiß durch stabile Reihenfolge.
+Die aktuelle Auswahlregel folgt der Farbähnlichkeit und den Verbesserungsschwellen des Spielplans:
+- Der Normalfall Home weiß / Away Primary bleibt erhalten, solange die Primaries nicht ähnlich sind.
+  Niedriger Helligkeitskontrast allein erzwingt keinen Wechsel. Ein Detailkonflikt auf dem weißen
+  Home-Jersey wird durch lesbare neutrale Details gelöst, nicht durch einen Wechsel der Grundfarbe.
+- Bei ähnlichen Primaries trägt Home Primary. Away prüft Alternate, Weiß und Schwarz gegen Home-Primary
+  (zugleich Paint). Away-Primary ist dann ausgeschlossen, auch als Rückfalloption.
+- Eine Ausweichfarbe muss die Trennung gegenüber dem Primary-Paar um mindestens 0,04 OKLab-Abstand
+  verbessern; bei neutralen Primary-Paaren gilt stattdessen eine Verbesserung des Kontrastverhältnisses
+  um mindestens 0,5. Es gibt keinen festen Mindestkontrast zwischen Jerseys/Paint.
+- Unter geeigneten Varianten mit sichtbarer Teamfarbe gewinnt die mit dem höchsten Nummernkontrast.
+  Gleichstand entscheidet der höhere Jersey-Kontrast gegen Home-Primary, danach die stabile Reihenfolge
+  Alternate, Weiß, Schwarz. Ränder/Nummern müssen mindestens 4:1 gegen das eigene Jersey erreichen.
 - Eigene Primary oder Alternate wird in Grundfarbe oder Rand/Nummer bevorzugt. Auf neutralen
   Jerseys gewinnt die eigene Teamfarbe mit dem höheren Detailkontrast; bei Gleichstand Primary.
-  Wenn keine Teamfarbvariante beide Grenzen erreicht, werden neutrale Details gewählt.
+  Wenn keine geeignete Teamfarbvariante lesbare Details erlaubt, werden neutrale Details gewählt.
   Diese allgemeine Regel gilt dynamisch für jede Paarung, ohne feste Ausnahmeliste.
-- Wenn keine neutrale Variante beide Grenzen erfüllt, kann Away Primary mit neutralen Details
-  verwenden, sofern diese gegen Home/Paint mindestens 2,5:1 erreicht.
-- Ist auch das unmöglich, bleiben 2,5:1 Grafik-Kontrast und 4:1 Nummernkontrast erhalten;
-  das neutrale Away-Jersey erhält kontrastierende neutrale Ränder und Nummern. Die sichtbare
-  Teamfarbe am Jersey darf dann entfallen. Auf farbigen Primary-Jerseys sind Details das
+- Ein neutrales Jersey kann kontrastierende neutrale Ränder und Nummern erhalten, wenn die
+  eigene Teamfarbe dort keine 4:1 erreicht. Die sichtbare Teamfarbe am Jersey darf dann entfallen.
+  Ein farbiges Alternate ist ausdrücklich auch als Jersey-Grundfarbe erlaubt. Auf farbigen Jerseys sind Details das
   kontrastreichere Weiß oder Schwarz.
 - Die Auswahl erfolgt einmal beim Laden und bleibt bei Pause, Seeking und Seitenwechsel stabil.
 
 `replay-colors.js` übernimmt die OKLab-Farbähnlichkeit aus dem Spielplan: 45° Farbton,
-0,30 Helligkeitsdifferenz bei Neutralfarben, Chroma-Grenze 0,04. Die bisherigen
-Verbesserungsschwellen für einen Alternate-Wechsel entfallen. Die Alternates folgen der Spielplan-Palette gemäß der unten dokumentierten
+0,30 Helligkeitsdifferenz bei Neutralfarben, Chroma-Grenze 0,04, Verbesserungsschwellen 0,04
+OKLab-Abstand beziehungsweise 0,5 Kontrastverhältnis. Die Alternates folgen der Spielplan-Palette gemäß der unten dokumentierten
 pragmatischen Entscheidung. `alternate: null` bedeutet Primary, Weiß und Schwarz.
 Die aktuelle Alternate-Palette steht direkt in `js/replay-teams.js`. Bucks-Cream `#eee1c6`
 ist eingetragen; auch Celtics-Gold ist als Replay-Alternative verfügbar. Quellen: [Cream-Farbwert](https://sportcolorcodes.com/milwaukee-bucks-color-codes/)
@@ -1111,6 +1114,8 @@ Validierungs-/Audit-Skripte bleiben erhalten.
 
 ### Häufiger Primary durch 2,5:1 Grafik-Kontrast (26.10.2026)
 
+Historischer Zwischenstand; die nachfolgende Umstellung ersetzt die feste Grafik-Kontrastgrenze.
+
 Der Mindestkontrast zwischen Jerseys sowie zwischen Away-Jersey und Home-Paint sinkt von 3:1
 auf 2,5:1. Die 4:1 für Ränder/Nummern und die 45°-OKLab-Ähnlichkeitsregel bleiben erhalten.
 Dadurch behält Away in 218 von 870 NBA-Paarungen Primary (zuvor 137); in der WNBA sind es
@@ -1126,3 +1131,28 @@ Paletten gültig und wird weiterhin mit einer synthetischen Farbkombination gepr
 Verifiziert: neun Farbtests bestanden, einschließlich aller 1.080 Paarungen mit mindestens 2,5:1
 für Jerseys/Away-Paint und 4:1 für Ränder/Nummern. Deno-Check, Lint, Formatcheck der geänderten
 JavaScript-Dateien und `git diff --check` bestehen. Keine neue Browser-Abnahme für diese Grenzwertänderung.
+
+
+### Spielplan-Logik statt fester Grafik-Kontrastgrenze (26.10.2026)
+
+Die feste 2,5:1-Grenze entfällt. Home bleibt weiß, außer die Spielplan-Regel erkennt ähnliche Primaries.
+Dann trägt Home Primary, Away wählt aus Alternate, Weiß und Schwarz unter den oben dokumentierten
+Verbesserungsschwellen. Away-Primary ist bei ähnlichen Primaries ausdrücklich ausgeschlossen.
+Alternate ist als tatsächliche Jersey-Grundfarbe zugelassen. 4:1 für Ränder/Nummern bleiben verbindlich.
+
+Beispiele: PHI@BOS und DAL@LAL behalten Home weiß / Away Primary trotz geringem Kontrast gegen die Paint.
+ORL@NYK und NYK@ORL bleiben ebenfalls weiß / Primary. PHX@NYK zeigt Home orange/schwarz,
+Away lila/weiß; ATL@CHI bleibt rot/weiß gegen schwarz/rot. MIA@NYK erhält Away schwarz/weiß,
+anstatt auf die zu ähnliche Primary zurückzuwechseln.
+
+Verifiziert: zehn Farbtests einschließlich aller 1.080 Paarungen bestanden; passende Grundfarben,
+kein Away-Primary bei Home-Primary, lesbare Details und stabile Auswahl geprüft. Deno-Check,
+Lint, Formatcheck der geänderten JavaScript-Dateien und `git diff --check` bestanden.
+Chromium über Playwright auf Port 5500: PHI@BOS, PHX@NYK, ATL@CLE und MIA@NYK als synthetische
+Paletten auf dem unveränderten DEN–OKC-Replay geprüft, einschließlich Play/Pause und Seeking.
+Getrennte Desktop-/Mobil-Läufe und die sichtbare Alternate-Grundfarbe geprüft, ohne Seitenfehler.
+
+Separater Bestandsfehler: Beim Wechsel des Viewports von Desktop auf Mobil im geladenen Replay
+tritt ein `drawImage`-Fehler wegen einer Canvas-Größe von 0 auf. Mit dem vorherigen Farbmodul aus
+Commit `5128f49` reproduziert; nicht durch die Jersey-Auswahl verursacht. Die Größenänderungslogik
+bleibt außerhalb dieser Farbänderung.

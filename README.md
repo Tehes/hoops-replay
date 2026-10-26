@@ -161,22 +161,22 @@ All 30 NBA and 15 WNBA teams have local logos and primary colors adapted from
 with cream for the Bucks and black available implicitly. The active values live in `js/replay-teams.js`;
 they are replay display colors and do not depend on a particular season's uniform rotation.
 
-- Normally, home wears white and away wears primary, provided contrast and readable team details allow it.
-- Similar primaries switch home to primary. Similarity follows the schedule's OKLab rule: less than 45° hue
-  separation for chromatic colors; less than 0.30 lightness separation when either color's chroma is below 0.04.
-  Contrast checks can also trigger a switch even when hues differ.
-- Away jerseys must reach at least **2.5:1** contrast against both the home jersey and the home paint color.
-  Trim and numbers must reach at least **4:1** against their own jersey.
-  The lower graphic threshold lets away retain primary in 218 of 870 NBA matchups (previously 137 at 3:1).
-- On white or black jerseys, primary and alternate compete for trim and numbers. Among suitable neutral
-  away jerseys, the higher number contrast wins. Away can retain primary if that satisfies both limits
-  when neutral jerseys with team details cannot. Colored primary jerseys use white or black details.
-- If no team-color combination meets both limits, the neutral jersey receives contrasting neutral details.
-  This is a general rule for every matchup, with team identity still visible in the scoreboard and logos.
+- Normally, home wears white and away wears primary. Only similar primaries switch home to primary.
+  Similarity follows the schedule's OKLab rule: less than 45° hue separation for chromatic colors;
+  less than 0.30 lightness separation when either color's chroma is below 0.04.
+- When home switches, away evaluates **alternate, white, and black**. Away primary is excluded because
+  it conflicts with home paint. Bases qualify if they improve separation from home primary by at least 0.04 OKLab
+  distance for chromatic primary pairs, or 0.5 contrast-ratio points for neutral pairs, as in the schedule.
+  There is **no fixed minimum contrast between jersey or paint colors**.
+- Trim and numbers must reach at least **4:1** against their own jersey. On white or black jerseys,
+  primary and alternate compete for details; neutral details keep numbers readable if neither qualifies.
+  Colored jerseys use white or black details. Variants retaining a team color in their base or details are preferred.
+- Among eligible away variants, the higher number contrast wins, then higher jersey contrast against
+  home primary. Final ties keep the order alternate, white, black.
 
 Selection runs once when a game loads and stays consistent during playback, seeking, and side changes.
 Court colors and logos stay with the home team. Regression tests cover all **1,080** ordered matchups
-within the two leagues, including team-color preference and the neutral-detail rule.
+within the two leagues, including alternate jerseys, exclusion of conflicting away primary, and readable details.
 
 ### Import a Regression Fixture
 
