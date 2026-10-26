@@ -47,6 +47,9 @@ function buildScenes(actions) {
 			return;
 		}
 		const scene = { kind: action.actionType, action, related: [], participants: [] };
+		if (scene.kind === "freethrow" && action.descriptor === "flagrant") {
+			scene.flagrantFreeThrow = true;
+		}
 		if (scene.kind === "substitution") {
 			for (let i = index; i < ordered.length; i++) {
 				const next = ordered[i];
@@ -113,7 +116,8 @@ function linkRebounds(scenes) {
 		let liveFreeThrow = true;
 		if (shot.kind === "freethrow") {
 			const sequence = shot.action.subType.match(/(\d) of (\d)/);
-			liveFreeThrow = shot.action.descriptor !== "technical" && !shot.action.qualifiers?.includes("technical") &&
+			liveFreeThrow = !shot.flagrantFreeThrow && shot.action.descriptor !== "technical" &&
+				!shot.action.qualifiers?.includes("technical") &&
 				(!sequence || sequence[1] === sequence[2]);
 		}
 		const between = scenes.slice(shotIndex + 1, index);
@@ -644,6 +648,8 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 	if (restart) {
 		const inboundPoint = restart === "baseline"
 			? { x: direction === 1 ? -1.5 : 95.5, y: 30 }
+			: restart === "flagrant"
+			? { x: direction === 1 ? 75 : 19, y: 51.5 }
 			: { x: state.formation.backcourt ? direction === 1 ? 34 : 60 : 47, y: 51.5 };
 		const inbounder = lineup.filter((id) => id !== pg).reduce((closest, id) =>
 			Math.hypot(origins[id].x - inboundPoint.x, origins[id].y - inboundPoint.y) <
@@ -1331,7 +1337,9 @@ function compileScene(replay, scene, index, state, data) {
 		} else {
 			// Team rebounds identify possession, not an individual ball winner.
 			state.ball.owner = null;
-			state.restart = "sideline";
+			if (state.restart !== "flagrant") {
+				state.restart = "sideline";
+			}
 			record(0.45);
 			addMarker(replay, scene, time, "rebound", state.ball);
 		}
@@ -1386,6 +1394,9 @@ function compileScene(replay, scene, index, state, data) {
 		if (technical) {
 			state.possession = retainedPossession;
 			state.restart = "sideline";
+		} else if (final && scene.flagrantFreeThrow) {
+			state.restart = "flagrant";
+			state.needsAdvance = true;
 		} else if (final && made) {
 			state.restart = "baseline";
 		} else if (!final) {
