@@ -165,8 +165,9 @@ they are replay display colors and do not depend on a particular season's unifor
 - Similar primaries switch home to primary. Similarity follows the schedule's OKLab rule: less than 45° hue
   separation for chromatic colors; less than 0.30 lightness separation when either color's chroma is below 0.04.
   Contrast checks can also trigger a switch even when hues differ.
-- Away jerseys must reach at least **3:1** contrast against both the home jersey and the home paint color.
+- Away jerseys must reach at least **2.5:1** contrast against both the home jersey and the home paint color.
   Trim and numbers must reach at least **4:1** against their own jersey.
+  The lower graphic threshold lets away retain primary in 218 of 870 NBA matchups (previously 137 at 3:1).
 - On white or black jerseys, primary and alternate compete for trim and numbers. Among suitable neutral
   away jerseys, the higher number contrast wins. Away can retain primary if that satisfies both limits
   when neutral jerseys with team details cannot. Colored primary jerseys use white or black details.

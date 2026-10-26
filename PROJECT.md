@@ -72,7 +72,7 @@ festgelegt. Der Nutzer findet den Prototyp interessant, möchte aber weiter erku
   seitlichen Armausschnitten und Rückennummern: Normalerweise Heimteam in Weiß, Auswärtsteam
   in Primary. Bei ähnlichen Primary-Farben trägt Home Primary und Away das kontrastreichere Weiß
   oder Schwarz. Auf neutralen Jerseys bestimmt die kontrastreichere eigene Primary-/Alternate-Farbe
-  Rand und Nummer. Jersey-Kontrast muss 3:1, Nummernkontrast mindestens 4:1 erreichen.
+  Rand und Nummer. Jersey-Kontrast muss 2,5:1, Nummernkontrast mindestens 4:1 erreichen.
   Die eigene Primary oder Alternate bleibt nach Möglichkeit in Grundfarbe oder Details sichtbar. Auf farbigen Primary-Jerseys sind
   Rand und Nummer das kontrastreichere Weiß oder Schwarz.
   Das ist eine bewusste Replay-Konvention, keine Behauptung der echten Uniformwahl des jeweiligen
@@ -998,10 +998,10 @@ Teamdaten dienen weiterhin der bisherigen Darstellung außerhalb der Jerseys.
 
 Die aktuelle Auswahlregel unterscheidet Grafik- und Nummernkontrast:
 - Der Normalfall Home weiß / Away Primary bleibt erhalten, wenn die Farben nicht ähnlich sind,
-  Home eine lesbare eigene Teamfarbe in den Details hat und Away mindestens 3:1 gegen sowohl
+  Home eine lesbare eigene Teamfarbe in den Details hat und Away mindestens 2,5:1 gegen sowohl
   Home-Jersey als auch Home-Paint erreicht.
 - Sonst trägt Home Primary. Away prüft Weiß und Schwarz gegen Home-Primary (zugleich Paint).
-  Mindestens 3:1 Grafik-Kontrast ist Pflicht; unter den Varianten mit mindestens 4:1 für die
+  Mindestens 2,5:1 Grafik-Kontrast ist Pflicht; unter den Varianten mit mindestens 4:1 für die
   Nummer gewinnt die mit dem höchsten Nummernkontrast. Gleichstand entscheidet der höhere
   Grafik-Kontrast, danach Weiß durch stabile Reihenfolge.
 - Eigene Primary oder Alternate wird in Grundfarbe oder Rand/Nummer bevorzugt. Auf neutralen
@@ -1009,8 +1009,8 @@ Die aktuelle Auswahlregel unterscheidet Grafik- und Nummernkontrast:
   Wenn keine Teamfarbvariante beide Grenzen erreicht, werden neutrale Details gewählt.
   Diese allgemeine Regel gilt dynamisch für jede Paarung, ohne feste Ausnahmeliste.
 - Wenn keine neutrale Variante beide Grenzen erfüllt, kann Away Primary mit neutralen Details
-  verwenden, sofern diese gegen Home/Paint mindestens 3:1 erreicht.
-- Ist auch das unmöglich, bleiben 3:1 Grafik-Kontrast und 4:1 Nummernkontrast erhalten;
+  verwenden, sofern diese gegen Home/Paint mindestens 2,5:1 erreicht.
+- Ist auch das unmöglich, bleiben 2,5:1 Grafik-Kontrast und 4:1 Nummernkontrast erhalten;
   das neutrale Away-Jersey erhält kontrastierende neutrale Ränder und Nummern. Die sichtbare
   Teamfarbe am Jersey darf dann entfallen. Auf farbigen Primary-Jerseys sind Details das
   kontrastreichere Weiß oder Schwarz.
@@ -1063,6 +1063,9 @@ und `git diff --check` bestanden.
 
 ### Getrennte Kontrastgrenzen und sichtbare Teamfarbe (26.10.2026)
 
+Historischer Stand mit 3:1; die unten dokumentierte Anpassung auf 2,5:1 ersetzt diese Grafik-Grenze
+und die daraus resultierenden Matchup-Beispiele.
+
 Die zuvor gemeinsame 4:1-Prüfung ist durch 3:1 für Jersey gegen Home-Jersey/Paint und ein
 4:1-Mindestkontrast für Nummern ersetzt. Bei mehreren geeigneten neutralen Away-Jerseys entscheidet
 der höhere Kontrast der teamfarbenen Nummer. Beispiele: ATL@CHI → CHI rot/weiß, ATL
@@ -1104,3 +1107,22 @@ einschließlich der separaten Alternate-Übersicht und der Matchup-HTML/CSV-Date
 Die verbindliche Palette steht in `js/replay-teams.js`, die Produktentscheidungen in dieser Datei.
 Dauerhafte Regressionstests, Spieldaten-Fixtures, Importer und die bereits zum Projekt gehörenden
 Validierungs-/Audit-Skripte bleiben erhalten.
+
+
+### Häufiger Primary durch 2,5:1 Grafik-Kontrast (26.10.2026)
+
+Der Mindestkontrast zwischen Jerseys sowie zwischen Away-Jersey und Home-Paint sinkt von 3:1
+auf 2,5:1. Die 4:1 für Ränder/Nummern und die 45°-OKLab-Ähnlichkeitsregel bleiben erhalten.
+Dadurch behält Away in 218 von 870 NBA-Paarungen Primary (zuvor 137); in der WNBA sind es
+67 von 210 (zuvor 59). Der geringere Helligkeitskontrast ist eine bewusste Darstellungsentscheidung.
+
+ORL@NYK und NYK@ORL zeigen Home weiß und Away Primary. ATL@CHI bleibt Home rot/weiß,
+Away schwarz/rot; DEN@PHI bleibt Home blau/weiß, Away weiß/dunkelblau.
+Die bisherigen sieben Paarungen ohne sichtbare Jersey-Teamfarbe benötigen diese Lösung aktuell
+nicht mehr: CHI/DET/HOU/POR/TOR bei NYK tragen Weiß mit Teamdetails, ORL@NYK und WNBA
+CHI@SEA behalten Away-Primary. Die allgemeine Regel für neutrale Details bleibt für andere
+Paletten gültig und wird weiterhin mit einer synthetischen Farbkombination geprüft.
+
+Verifiziert: neun Farbtests bestanden, einschließlich aller 1.080 Paarungen mit mindestens 2,5:1
+für Jerseys/Away-Paint und 4:1 für Ränder/Nummern. Deno-Check, Lint, Formatcheck der geänderten
+JavaScript-Dateien und `git diff --check` bestehen. Keine neue Browser-Abnahme für diese Grenzwertänderung.

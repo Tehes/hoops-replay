@@ -1,6 +1,6 @@
 // Adapted from Tehes/nba-spielplan/js/game-colors.js at 610e3d6.
 // These are visually reviewed UI thresholds, not standardized perceptual limits.
-const MIN_JERSEY_CONTRAST = 3;
+const MIN_JERSEY_CONTRAST = 2.5;
 const MIN_NUMBER_CONTRAST = 4;
 const SIMILARITY_DEFAULTS = {
 	hue: 45,
