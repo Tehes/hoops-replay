@@ -106,6 +106,30 @@ festgelegt. Der Nutzer findet den Prototyp interessant, möchte aber weiter erku
 
 ## Fachliche Rekonstruktionsregeln
 
+### Einwurf nach Flagrant-Freiwürfen (26.10.2026)
+
+Freiwürfe mit dem Feed-Descriptor `flagrant` führen nach Abschluss der Serie unabhängig von
+Treffer oder Fehlwurf zu einem Seiteneinwurf des gefoulten Teams auf Höhe der verlängerten
+Freiwurflinie (Court-x 75 bzw. 19, je nach Angriffsrichtung). Das gilt auch für Serien mit
+`subType: "other"`, wie sie im Referenzspiel BKN–CLE vorkommen. Die vorhandene Einwurfanimation
+läuft vor dem erneuten Start der Spieluhr; Team-Rebound-Annotationen überschreiben diesen
+Einwurfort nicht. Ein verknüpfter Fehlwurf löst keine kontinuierliche Live-Rebound-Choreografie aus.
+Die Zahl der Freiwürfe und ihre Ergebnisse stammen weiterhin unverändert aus dem Feed.
+
+Synthetische Tests prüfen beide Spielrichtungen, Treffer/Fehlwurf, Timeout zwischen den Würfen,
+Ballbesitz, Seeking und die Abgrenzung zu regulären Freiwürfen. Die Flagrant-Serien aus
+`0022600105` dienen als zusätzlicher echter Regressionstest.
+
+Das gemeldete Spiel `0022600114` wurde zusätzlich mit echten Backend-Feeds geprüft: Anunobys
+Flagrant Foul (Aktion 52), Carter Jr.s Freiwürfe (55/56) und der folgende Aufbau (57).
+Chromium über Playwright, lokale Vorschau auf Port 5050: ORL wirft bei Q1 7:17 und 2:12
+an der Seitenlinie bei Court-x 19 ein; die Spieluhr steht bis zur Ballannahme. Wiedergabe,
+Pause, wiederholtes Seeking, Endstand 111:102 und Desktop-/Mobilansicht wurden geprüft,
+ohne JavaScript-Laufzeitfehler. Der zusätzliche Replay-Audit besteht.
+Das Backend akzeptiert die Herkunft `http://127.0.0.1:5500`, lehnt aber `localhost:5050` ab.
+Die echten Feeds wurden mit der akzeptierten Herkunft abgerufen und für den Browsertest
+über Playwright zugespielt; die Anwendung selbst wurde dafür nicht verändert.
+
 | Situation | Vereinbarte schematische Darstellung |
 | --- | --- |
 | Feldwurf mit Koordinaten | Aufgezeichnete Wurfposition als Anker, passende Bewegung und Ballflug ergänzen. |

@@ -5,6 +5,120 @@ import { getTeamColors, getTeamLogo, getTeamName } from "../js/replay-teams.js";
 
 const DATA = new URL("../data/", import.meta.url);
 
+Deno.test("recorded BKN-CLE flagrant penalties lead to a free-throw-line sideline inbound", async () => {
+	const data = await readData("replay-0022600105.json");
+	const replay = compileReplay(data);
+	const penalties = replay.scenes.filter((scene) =>
+		scene.kind === "freethrow" && scene.action.descriptor === "flagrant"
+	);
+	assert(penalties.length > 0, "fixture has no flagrant free throws");
+	for (const penalty of penalties) {
+		assert(penalty.flagrantFreeThrow, "recorded penalty was not recognized");
+		const index = replay.scenes.indexOf(penalty);
+		const next = replay.scenes.slice(index + 1).find((scene) =>
+			["freethrow", "2pt", "3pt", "heave", "turnover", "foul"].includes(scene.kind)
+		);
+		if (next.kind === "freethrow") {
+			continue;
+		}
+		const direction = attackDirection(data, penalty.action.teamId, penalty.action.period);
+		assert(
+			next.frames.some((frame) => {
+				const owner = frame.players.find((player) => player.id === frame.ball.owner);
+				return owner?.x === (direction === 1 ? 75 : 19) && owner.y === 51.5 && frame.time < next.liveAt;
+			}),
+			"recorded penalty skipped the required inbound",
+		);
+	}
+	assert(checkReplay(data, replay).errors.length === 0, "recorded flagrant replay failed validation");
+});
+
+Deno.test("Flagrant 1 free throws retain possession and restart at the free-throw line extended", async () => {
+	for (const period of [1, 3]) {
+		for (const made of [true, false]) {
+			for (const flagrant of [true, false]) {
+				const data = await readData("replay-0022600007.json");
+				const [away, home] = data.teams;
+				const shooter = home.players.find((player) => player.starter);
+				const defender = away.players.find((player) => player.starter);
+				const tip = data.actions.find((action) => action.actionType === "jumpball");
+				const common = { period, clock: "PT08M44.00S", scoreAway: "0", scoreHome: "0" };
+				data.actions = [
+					{ ...tip, teamId: home.id, jumpBallRecoverdPersonId: shooter.id },
+					{
+						actionType: "foul",
+						subType: "personal",
+						descriptor: flagrant ? "flagrant-type-1" : "shooting",
+						teamId: away.id,
+						personId: defender.id,
+						foulDrawnPersonId: shooter.id,
+						possession: home.id,
+						qualifiers: ["2freethrow"],
+					},
+					{
+						actionType: "freethrow",
+						subType: "1 of 2",
+						descriptor: flagrant ? "flagrant" : "",
+						teamId: home.id,
+						personId: shooter.id,
+						shotResult: "Made",
+					},
+					{ actionType: "timeout", subType: "full", teamId: home.id },
+					{
+						actionType: "freethrow",
+						subType: "2 of 2",
+						descriptor: flagrant ? "flagrant" : "",
+						teamId: home.id,
+						personId: shooter.id,
+						shotResult: made ? "Made" : "Missed",
+					},
+					...(!made ? [{ actionType: "rebound", subType: "offensive", teamId: home.id }] : []),
+					{
+						actionType: "2pt",
+						subType: "Jump Shot",
+						teamId: home.id,
+						personId: shooter.id,
+						isFieldGoal: 1,
+						x: 75,
+						y: 40,
+						shotResult: "Made",
+						clock: "PT08M30.00S",
+					},
+				].map((action, index) => ({
+					...common,
+					...action,
+					period,
+					actionNumber: index + 1,
+					orderNumber: index + 1,
+				}));
+				const original = JSON.stringify(data);
+				const replay = compileReplay(data);
+				const throws = replay.scenes.filter((scene) => scene.kind === "freethrow");
+				assert(throws.every((scene) => !!scene.flagrantFreeThrow === flagrant), "incorrect penalty linkage");
+				const shot = replay.scenes.at(-1);
+				const direction = attackDirection(data, home.id, period);
+				const inbound = shot.frames.find((frame) => {
+					const owner = frame.players.find((player) => player.id === frame.ball.owner);
+					return owner?.x === (direction === 1 ? 75 : 19) && owner.y === 51.5;
+				});
+				assert(!!inbound === flagrant, "missing or spurious free-throw-line sideline inbound");
+				if (flagrant) {
+					assert(shot.lineups[home.id].includes(inbound.ball.owner), "wrong team inbounding");
+					assert(inbound.time < shot.liveAt, "inbound must precede the live clock");
+					const at = shot.start + inbound.time;
+					const frame = getReplayFrame(replay, at);
+					getReplayFrame(replay, replay.duration);
+					assert(
+						JSON.stringify(getReplayFrame(replay, at)) === JSON.stringify(frame),
+						"seeking changed inbound",
+					);
+				}
+				assert(JSON.stringify(data) === original, "source data changed");
+			}
+		}
+	}
+});
+
 function assert(value, message) {
 	if (!value) {
 		throw new Error(message);
