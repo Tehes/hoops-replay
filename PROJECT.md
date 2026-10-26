@@ -118,8 +118,17 @@ Die Zahl der Freiwürfe und ihre Ergebnisse stammen weiterhin unverändert aus d
 
 Synthetische Tests prüfen beide Spielrichtungen, Treffer/Fehlwurf, Timeout zwischen den Würfen,
 Ballbesitz, Seeking und die Abgrenzung zu regulären Freiwürfen. Die Flagrant-Serien aus
-`0022600105` dienen als zusätzlicher echter Regressionstest. Das gemeldete Spiel `0022600114`
-ist ein manueller Prüffall; dessen Backend-Daten waren in der Arbeitsumgebung nicht abrufbar.
+`0022600105` dienen als zusätzlicher echter Regressionstest.
+
+Das gemeldete Spiel `0022600114` wurde zusätzlich mit echten Backend-Feeds geprüft: Anunobys
+Flagrant Foul (Aktion 52), Carter Jr.s Freiwürfe (55/56) und der folgende Aufbau (57).
+Chromium über Playwright, lokale Vorschau auf Port 5050: ORL wirft bei Q1 7:17 und 2:12
+an der Seitenlinie bei Court-x 19 ein; die Spieluhr steht bis zur Ballannahme. Wiedergabe,
+Pause, wiederholtes Seeking, Endstand 111:102 und Desktop-/Mobilansicht wurden geprüft,
+ohne JavaScript-Laufzeitfehler. Der zusätzliche Replay-Audit besteht.
+Das Backend akzeptiert die Herkunft `http://127.0.0.1:5500`, lehnt aber `localhost:5050` ab.
+Die echten Feeds wurden mit der akzeptierten Herkunft abgerufen und für den Browsertest
+über Playwright zugespielt; die Anwendung selbst wurde dafür nicht verändert.
 
 | Situation | Vereinbarte schematische Darstellung |
 | --- | --- |
