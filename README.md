@@ -2,7 +2,7 @@
 
 ![Hoops Replay demo](img/demo.png)
 
-Watch completed NBA games play out as little jerseys move around a basketball court. Hoops Replay
+Watch completed NBA and WNBA games play out as little jerseys move around a basketball court. Hoops Replay
 uses real play-by-play events and available shot coordinates to create a schematic replay of the game.
 
 **This is a very early prototype.** Expect bugs, odd movements, and games that cannot be loaded yet.
@@ -13,7 +13,8 @@ The player movements are schematic estimates, not a reconstruction from tracking
 ## Try It Out
 
 Open [TOR at WAS in Hoops Replay](https://tehes.github.io/hoops-replay/?game=0022600097)
-to try a completed game directly in your browser.
+to try a completed NBA game directly in your browser.
+For a WNBA example, open [Golden State at Atlanta](https://tehes.github.io/hoops-replay/?game=1042600304).
 
 Without a Game ID in the URL, the app opens the bundled DEN–OKC example.
 
@@ -21,6 +22,8 @@ Without a Game ID in the URL, the app opens the bundled DEN–OKC example.
 
 ## Features
 
+- **NBA and WNBA:** League detection from the Game ID, with league-specific team names, colors, logos,
+  quarter lengths (NBA: 12 minutes; WNBA: 10 minutes), and three-point lines.
 - **Full-court replay:** Follow both teams as numbered jerseys on a court with the home team's logo and colors.
 - **Coordinated movement:** Players advance together during inbounds and possession changes. Shooters move into
   receiving positions during the buildup, with travel time based on route length and the available time budget.
@@ -28,7 +31,7 @@ Without a Game ID in the URL, the app opens the bundled DEN–OKC example.
 - **Different shot animations:** Dunks, layups, jump shots, and other finishes have different movements and ball flights.
 - **Shot markers:** Made shots appear as green dots; misses appear as red crosses. Markers fade with replay time.
 - **Playback controls:** Pause, change speed, scrub the timeline, or jump between quarters and possessions.
-- **Load other games:** Use a completed NBA game's ID in the URL to request its replay.
+- **Load other games:** Use a completed NBA or WNBA game's ID in the URL to request its replay.
 
 ---
 
@@ -44,7 +47,8 @@ Pressing Play at the end restarts the replay.
 
 ### Load Another Game
 
-1. Open a completed game's match page on [NBA.com](https://www.nba.com/games).
+1. Open a completed game's match page on [NBA.com](https://www.nba.com/games)
+   or [WNBA.com](https://www.wnba.com/schedule).
 2. Find the ten-digit number in the match URL. For example:
 
    ```text
@@ -57,7 +61,9 @@ Pressing Play at the end restarts the replay.
 4. In the Hoops Replay link, replace the number after `?game=` with that Game ID:
    [https://tehes.github.io/hoops-replay/?game=0022600002](https://tehes.github.io/hoops-replay/?game=0022600002)
 
-The replay loads the game directly. No download or command-line import is needed.
+The replay detects the league from the Game ID: IDs starting with `10` use WNBA feeds;
+other IDs use NBA feeds. For example, `?game=1042600304` loads the WNBA game above.
+No additional league parameter, download, or command-line import is needed.
 If your link already contains a `game` value, replace it rather than adding a second one.
 
 ### Jump to an Action
@@ -67,7 +73,7 @@ Add `&action=ACTION_NUMBER` to a game link to open the replay paused at that eve
 Press **Play** to continue from there.
 The link starts at the event itself. Scrub back a few seconds before pressing Play to watch its buildup.
 
-The number is the event's `actionNumber` from the NBA play-by-play data (also stored in local
+The number is the event's `actionNumber` from the NBA or WNBA play-by-play data (also stored in local
 `data/replay-<gameId>.json` snapshots). It is an event ID, not its position in the event list,
 a quarter, or a replay timestamp. Include `game` when sharing links to identify the correct game.
 For the bundled default game, `?action=17` works without a `game` parameter.
@@ -97,7 +103,7 @@ next shooter can move toward the receiving position during the preceding action.
   play-by-play and boxscore feeds. Invalid or unsupported games show an error instead of a substitute game.
 - **Team colors:** Court colors and uniforms use fixed team palettes, not the game's actual court
   design or uniform selection.
-- **Network access:** Loading a game by ID and displaying NBA player photos require a connection.
+- **Network access:** Loading a game by ID and displaying NBA or WNBA player photos require a connection.
   There is no Service Worker or offline caching.
 - **Overtime:** Five-minute overtime periods and quarter controls are implemented and covered by
   synthetic tests; a real overtime game has not yet been verified.
@@ -131,7 +137,8 @@ Include the relevant local action links when presenting a change so its behavior
 │   ├── app.js               # Application entry point, rendering, and playback
 │   ├── replay-engine.js     # Scenes, lineups, possession, and movement planning
 │   ├── replay-shots.js      # Shot profiles and ball trajectories
-│   ├── replay-teams.js      # Team names and color palettes
+│   ├── replay-teams.js      # NBA/WNBA team names, color palettes, and logos
+│   ├── replay-leagues.js    # League detection, quarter lengths, and three-point geometry
 │   ├── replay-data.js       # Feed loading and normalization
 │   └── replay-validation.js # Shared replay checks
 ├── data/                    # Reference snapshots and archived raw feeds
@@ -146,7 +153,7 @@ Umami page-view tracking is limited to `tehes.github.io`; localhost previews are
 ### Import a Regression Fixture
 
 The optional importer archives a completed game for repeatable local checks. Replace `GAME_ID`
-with its ten-digit ID:
+with its ten-digit NBA or WNBA ID; the importer detects the league automatically:
 
 ```sh
 deno run --allow-net=nba-spielplan.tehes.deno.net --allow-read --allow-write=data scripts/import-game.js GAME_ID
@@ -159,14 +166,15 @@ Raw feeds are saved before validation, so a failed import can leave raw archives
 
 ### Reference Games
 
-Four playable snapshots are included for repeatable regression checks:
+Five playable snapshots are included for repeatable regression checks:
 
-| Game ID | Matchup | Final score (away–home) |
-| --- | --- | --- |
-| `0022600007` | DEN at OKC | 84–96 |
-| `0022600008` | NYK at BOS | 103–107 |
-| `0022600094` | ATL at CHA | 128–81 |
-| `0022600105` | BKN at CLE | 121–125 |
+| Game ID | League | Matchup | Final score (away–home) |
+| --- | --- | --- | --- |
+| `0022600007` | NBA | DEN at OKC | 84–96 |
+| `0022600008` | NBA | NYK at BOS | 103–107 |
+| `0022600094` | NBA | ATL at CHA | 128–81 |
+| `0022600105` | NBA | BKN at CLE | 121–125 |
+| `1042600304` | WNBA | GSV at ATL | 67–62 |
 
 Only DEN–OKC is selected locally by default. Explicit `?game=` links request the backend.
 Files under `data/raw/` also include unsupported or inconsistent cases; their presence does not mean
@@ -186,7 +194,8 @@ git diff --check
 The audit discovers all local replay snapshots and checks scores, lineups, ball ownership, coordinates,
 interpolation, and shot behavior. Raw archives are excluded.
 The regression tests also cover simultaneous buildup, travel speed, early shooter positioning,
-passes, rebounds, substitutions and synthetic overtime cases.
+passes, rebounds, substitutions, synthetic overtime cases, and WNBA feed routing, team metadata,
+ten-minute quarters, and three-point geometry.
 
 For a browser check, load a game, play and pause, scrub across halftime, and seek to the final score.
 Check the controls and court on both mobile and desktop widths.
@@ -198,5 +207,6 @@ Check the controls and court on both mobile and desktop widths.
 The code is source-available under the MIT License with the Commons Clause condition.
 See [LICENSE.txt](LICENSE.txt) for the terms.
 
-NBA game data, team names, logos, and player photos belong to their respective owners. Player photos
-load from the NBA CDN; team logos are stored locally. Hoops Replay is an independent, unofficial project.
+NBA and WNBA game data, team names, logos, and player photos belong to their respective owners.
+Player photos load from the respective league's CDN; team logos are stored locally.
+Hoops Replay is an independent, unofficial project.
