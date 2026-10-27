@@ -596,6 +596,29 @@ Deno.test("formation lookahead stops before an offensive substitution introduces
 	assert(checkReplay(data, replay).errors.length === 0, "substitution scenario failed replay validation");
 });
 
+Deno.test("recorded MIN-CLE same-clock steal stays before Dosunmu's substitution", async () => {
+	const data = await readData("replay-0022600120.json");
+	const raw = await readData("raw/playbyplay-0022600120.json");
+	const original = JSON.stringify(data);
+	const sourceSubstitution = raw.game.actions.find((action) => action.actionNumber === 254);
+	const sourceTurnover = raw.game.actions.find((action) => action.actionNumber === 385);
+	assert(sourceSubstitution.orderNumber < sourceTurnover.orderNumber, "fixture lost the original ordering conflict");
+	assert(sourceSubstitution.personId === sourceTurnover.stealPersonId &&
+		sourceSubstitution.period === sourceTurnover.period && sourceSubstitution.clock === sourceTurnover.clock,
+		"fixture no longer records the outgoing stealer at the same clock");
+	const replay = compileReplay(data);
+	const turnover = replay.scenes.find((scene) => scene.action.actionNumber === 385);
+	const substitution = replay.scenes.find((scene) => scene.related.some((action) => action.actionNumber === 254));
+	assert(turnover.start < substitution.start, "recorded steal still follows the substitution");
+	assert(turnover.related.some((action) => action.actionNumber === 386), "recorded steal annotation was lost");
+	assert(turnover.lineups[sourceSubstitution.teamId].includes(sourceSubstitution.personId), "stealer is inactive");
+	assert(!substitution.lineups[sourceSubstitution.teamId].includes(sourceSubstitution.personId), "player never left");
+	assert(replay.quarters.some((quarter) => quarter.period === 5), "recorded overtime was lost");
+	assert(JSON.stringify(replay.finalScore) === JSON.stringify([125, 127]), "recorded overtime score changed");
+	assert(checkReplay(data, replay).errors.length === 0, "recorded MIN-CLE replay failed validation");
+	assert(JSON.stringify(data) === original, "source events were rewritten");
+});
+
 Deno.test("same-clock steals precede an outgoing player's substitution and retain linked events", async () => {
 	const data = await readData("replay-0022600007.json");
 	const [away, home] = data.teams;

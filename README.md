@@ -116,7 +116,8 @@ next shooter can move toward the receiving position during the preceding action.
 - **Network access:** Loading a game by ID and displaying NBA or WNBA player photos require a connection.
   There is no Service Worker or offline caching.
 - **Overtime:** Five-minute overtime periods and quarter controls are implemented and covered by
-  synthetic tests; a real overtime game has not yet been verified.
+  synthetic tests. The archived MIN–CLE overtime game also passes data and replay validation;
+  its overtime playback has not yet been visually verified.
 
 ---
 
@@ -178,7 +179,7 @@ Raw feeds are saved before validation, so a failed import can leave raw archives
 
 ### Reference Games
 
-Five playable snapshots are included for repeatable regression checks:
+Six playable snapshots are included for repeatable regression checks:
 
 | Game ID | League | Matchup | Final score (away–home) |
 | --- | --- | --- | --- |
@@ -186,9 +187,12 @@ Five playable snapshots are included for repeatable regression checks:
 | `0022600008` | NBA | NYK at BOS | 103–107 |
 | `0022600094` | NBA | ATL at CHA | 128–81 |
 | `0022600105` | NBA | BKN at CLE | 121–125 |
+| `0022600120` | NBA | MIN at CLE (OT) | 125–127 |
 | `1042600304` | WNBA | GSV at ATL | 67–62 |
 
 Only DEN–OKC is selected locally by default. Explicit `?game=` links request the backend.
+MIN–CLE preserves the original Q2 6:11 feed conflict: Dosunmu's substitution precedes his
+recorded steal in the raw data. A dedicated regression checks the corrected replay order.
 Files under `data/raw/` also include unsupported or inconsistent cases; their presence does not mean
 that a game passed validation.
 

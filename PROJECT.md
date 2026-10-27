@@ -1581,3 +1581,19 @@ neue Prüfungen für eingehende und ausgehende Spieler, Uhr-/Periodengrenzen, wi
 Belege, verknüpfte Ereignisse, unveränderte Quellen und deterministisches Seeking.
 Deno ist hier nicht installiert. Die lokale Browserprüfung über Chrome/Cloud Browser
 scheiterte an `ERR_CONNECTION_REFUSED` für `http://127.0.0.1:5500`; keine visuelle Abnahme.
+
+### MIN–CLE als archivierter Regressionfall (28.10.2026)
+
+`0022600120` liegt jetzt wie die übrigen Referenzspiele unter `data/replay-0022600120.json`.
+Die bei der Fehleranalyse geladenen unveränderten Rohfeeds sind unter
+`data/raw/boxscore-0022600120.json` und `data/raw/playbyplay-0022600120.json` archiviert;
+der Snapshot verweist auf beide Quellen. Insbesondere bleibt die widersprechende ursprüngliche
+`orderNumber`-Reihenfolge bei Q2 6:11 erhalten. Der spezifische Regressionstest prüft
+Dosunmus Steal 385/386 vor seiner Auswechslung 254/253, die jeweiligen aktiven Aufstellungen,
+die erhaltene Overtime, den Endstand 125:127 und die vollständige Replay-Validierung.
+Der vorhandene Audit entdeckt das sechste Referenzspiel automatisch.
+
+Verifiziert: 69 Tests unter Node mit Deno-Kompatibilitätsschicht bestanden; alle sechs
+Referenzspiele bestehen mit zusammen 43.409 Frames und null Fehlern. Syntaxprüfung und
+`git diff --check` bestehen. Keine zusätzliche Browserprüfung; nur Testdaten und Dokumentation
+wurden ergänzt, die Laufzeitlogik bleibt unverändert.
