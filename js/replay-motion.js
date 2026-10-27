@@ -31,6 +31,16 @@ export function movePlayers(scene, index, fraction, players) {
 	const to = frames[index + 1] ?? from;
 	const duration = to.time - from.time;
 	const local = from.time + fraction * duration;
+	const steal = scene.stealPlan;
+	if (steal && from.time >= steal.approachAt - 1e-8 && to.time <= steal.catchAt + 1e-8) {
+		return players.map((player, i) => player.id === steal.stealerId
+			? {
+				...player,
+				x: from.players[i].x + (to.players[i].x - from.players[i].x) * fraction,
+				y: from.players[i].y + (to.players[i].y - from.players[i].y) * fraction,
+			}
+			: player);
+	}
 	if (scene.driveAt !== undefined && from.time >= scene.driveAt - 1e-8 && to.time <= scene.gatherAt + 1e-8) {
 		// Drive samples already encode continuous travel; avoid stopping at every sampled frame.
 		return players.map((player, i) => ({

@@ -900,6 +900,96 @@ function circulateBall(state, scene, duration, record) {
 	return true;
 }
 
+function animateSteal(state, scene, stealerId, direction, record) {
+	const defender = state.positions[stealerId];
+	const passer = state.positions[state.ball.owner];
+	const origin = passer ? { x: passer.x + 1, y: passer.y + 0.8 } : { ...state.ball };
+	const intercepted = scene.action.subType === "bad pass" || scene.action.descriptor === "bad pass";
+	let receiverId = null;
+	let target = { x: origin.x + direction * 1.5, y: origin.y + 0.7 };
+	if (intercepted) {
+		const candidates = state.lineups[scene.attackTeam].filter((id) => id !== state.ball.owner).map((id) => {
+			const receiver = state.positions[id];
+			const dx = receiver.x + 1 - origin.x;
+			const dy = receiver.y + 0.8 - origin.y;
+			const length = Math.hypot(dx, dy);
+			const earliest = Math.min(0.6, Math.max(0.3, 7 / (length || 1)));
+			const fraction = Math.max(earliest, Math.min(0.8,
+				((defender.x + 1 - origin.x) * dx + (defender.y + 0.8 - origin.y) * dy) / (length ** 2 || 1)));
+			const point = { x: origin.x + dx * fraction - 1, y: origin.y + dy * fraction - 0.8 };
+			return {
+				id,
+				point,
+				length,
+				cost: Math.hypot(point.x - defender.x, point.y - defender.y) * 2 +
+					length * 0.1 + Math.max(0, 6 - length) * 3 + Math.max(0, length - 35),
+			};
+		});
+		const passingLanes = candidates.filter((candidate) => candidate.length >= 12);
+		const best = (passingLanes.length ? passingLanes : candidates).sort((a, b) => a.cost - b.cost)[0];
+		receiverId = best.id;
+		target = best.point;
+	}
+	target.x = Math.max(1, Math.min(93, target.x));
+	target.y = Math.max(1, Math.min(49, target.y));
+	const from = { x: defender.x, y: defender.y };
+	const distance = Math.hypot(target.x - from.x, target.y - from.y);
+	const remaining = Math.min(2.5, distance);
+	const fraction = distance > 0 ? (distance - remaining) / distance : 0;
+	const staging = { x: from.x + (target.x - from.x) * fraction, y: from.y + (target.y - from.y) * fraction };
+	const plan = {
+		kind: intercepted ? "interception" : "strip",
+		stealerId,
+		receiverId,
+		approachAt: scene.frames.at(-1).time,
+		origin,
+		target: { ...target },
+	};
+	scene.stealPlan = plan;
+	state.ball.dribble = !intercepted;
+	const dx = staging.x - from.x;
+	const dy = staging.y - from.y;
+	const travel = Math.hypot(dx, dy);
+	const passerX = origin.x - 1;
+	const passerY = origin.y - 0.8;
+	const nearest = Math.max(0, Math.min(1,
+		((passerX - from.x) * dx + (passerY - from.y) * dy) / (travel ** 2 || 1)));
+	const clearance = Math.hypot(from.x + dx * nearest - passerX, from.y + dy * nearest - passerY);
+	const side = Math.sign((passerX - from.x) * -dy + (passerY - from.y) * dx) || 1;
+	const normal = { x: side * dy / (travel || 1), y: -side * dx / (travel || 1) };
+	let bend = nearest > 0 && nearest < 1 && clearance < 3 ? 4 : 0;
+	for (const [axis, lower, upper] of [["x", 1, 93], ["y", 1, 49]]) {
+		if (normal[axis] !== 0) {
+			const room = normal[axis] > 0 ? upper - Math.max(from[axis], staging[axis])
+				: Math.min(from[axis], staging[axis]) - lower;
+			bend = Math.min(bend, Math.max(0, room / Math.abs(normal[axis])));
+		}
+	}
+	const duration = Math.max(0.2, (travel + Math.PI * bend) / 9);
+	const steps = Math.ceil(duration / 0.1);
+	for (let i = 1; i <= steps; i++) {
+		const progress = i / steps;
+		const offset = -side * Math.sin(progress * Math.PI) * bend;
+		defender.x = from.x + dx * progress - dy / (travel || 1) * offset;
+		defender.y = from.y + dy * progress + dx / (travel || 1) * offset;
+		record(duration / steps);
+	}
+	releaseBall(state);
+	record(0.01);
+	plan.releaseAt = scene.frames.at(-1).time;
+	const ballTarget = { x: target.x + 1, y: target.y + 0.8, z: 0.5 };
+	const flightTime = Math.max(0.25, Math.hypot(ballTarget.x - origin.x, ballTarget.y - origin.y) / 45, remaining / 9);
+	flyBall(state, record, ballTarget, intercepted ? 0.6 : 0.15, flightTime, 0, (progress) => {
+		defender.x = staging.x + (target.x - staging.x) * progress;
+		defender.y = staging.y + (target.y - staging.y) * progress;
+	});
+	state.ball.owner = stealerId;
+	state.possession = state.players.find((player) => player.id === stealerId).teamId;
+	state.ball.dribble = false;
+	record(0.01);
+	plan.catchAt = scene.frames.at(-1).time;
+}
+
 function animateOutOfBoundsPass(state, scene, direction, record) {
 	const passer = state.positions[state.ball.owner];
 	const origin = { x: passer.x + 1, y: passer.y + 0.8, z: 0.5 };
@@ -1614,6 +1704,11 @@ function compileScene(replay, scene, index, state, data) {
 		) {
 			animateOutOfBoundsPass(state, scene, direction, record);
 		}
+		if (action.stealPersonId || scene.kind === "steal") {
+			const stealer = action.stealPersonId || action.personId;
+			contacts.add(stealer);
+			animateSteal(state, scene, stealer, direction, record);
+		}
 		scene.eventAt = time;
 		const markerKind = action.subType === "technical"
 			? "technical"
@@ -1627,25 +1722,7 @@ function compileScene(replay, scene, index, state, data) {
 		addMarker(replay, scene, time, markerKind, victim || actor || state.ball);
 		if (action.stealPersonId || scene.kind === "steal") {
 			const stealer = action.stealPersonId || action.personId;
-			contacts.add(stealer);
-			const losing = state.positions[state.ball.owner];
-			if (losing) {
-				const receiver = state.positions[state.lineups[offense].find((id) => id !== state.ball.owner)];
-				Object.assign(state.positions[stealer], {
-					x: action.subType === "bad pass" ? (losing.x + receiver.x) / 2 : losing.x + direction * 2.5,
-					y: action.subType === "bad pass" ? (losing.y + receiver.y) / 2 : losing.y + 1.5,
-				});
-			}
-			const target = state.positions[stealer];
-			flyBall(
-				state,
-				record,
-				{ x: target.x + 1, y: target.y + 0.8, z: 0.5 },
-				action.subType === "bad pass" ? 1 : 0.2,
-				0.4,
-			);
-			state.ball.owner = stealer;
-			state.possession = otherTeam(data, offense);
+			state.possession = state.players.find((player) => player.id === stealer).teamId;
 			state.restart = null;
 			state.needsAdvance = true;
 			addMarker(replay, scene, time, "steal", state.positions[stealer]);

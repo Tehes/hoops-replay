@@ -1635,3 +1635,66 @@ Deno.test("guards prepare outside and enter the paint during the drive; centers 
 	}
 	assert(drives > 20 && centerThrees > 5 && directions.size === 2, "missing role and court direction coverage");
 });
+
+Deno.test("steals have a reachable approach, a visible loose ball and possession only at the catch", async () => {
+	let interceptions = 0;
+	let strips = 0;
+	const directions = new Set();
+	for (const game of ["0022600007", "0022600008", "0022600094", "0022600105", "1042600304"]) {
+		const data = await readData(`replay-${game}.json`);
+		const source = JSON.stringify(data);
+		const replay = compileReplay(data);
+		for (const scene of replay.scenes) {
+			const plan = scene.stealPlan;
+			if (!plan) {
+				continue;
+			}
+			const team = data.teams.find((t) => t.players.some((p) => p.id === plan.stealerId));
+			const start = scene.frames.find((f) => f.time === plan.approachAt);
+			const release = scene.frames.find((f) => f.time === plan.releaseAt);
+			const caught = getReplayFrame(replay, scene.start + plan.catchAt);
+			const defender = caught.players.find((p) => p.id === plan.stealerId);
+			assert(scene.eventAt === plan.catchAt, "turnover was announced before the interception");
+			assert(caught.ball.owner === plan.stealerId && caught.possession === team.id, "catch did not transfer possession");
+			assert(Math.hypot(caught.ball.x - defender.x - 1, caught.ball.y - defender.y - 0.8) < 0.00001,
+				"ball was caught away from the defender");
+			let previous = getReplayFrame(replay, scene.start + plan.approachAt);
+			for (let local = plan.approachAt + 1 / 60; local < plan.catchAt; local += 1 / 60) {
+				const frame = getReplayFrame(replay, scene.start + local);
+				const a = previous.players.find((p) => p.id === plan.stealerId);
+				const b = frame.players.find((p) => p.id === plan.stealerId);
+				assert(Math.hypot(b.x - a.x, b.y - a.y) <= 9 / 60 + 0.001, "defender jumped into the passing lane");
+				assert(b.x >= 0 && b.x <= 94 && b.y >= 0 && b.y <= 50, "interceptor left the court");
+				assert(frame.ball.owner !== plan.stealerId, "defender owned the ball before contact");
+				if (local > plan.releaseAt) {
+					assert(frame.ball.owner === null, "intercepted pass was never airborne");
+				}
+				previous = frame;
+			}
+			if (plan.kind === "interception") {
+				const receiver = start.players.find((p) => p.id === plan.receiverId);
+				assert(plan.receiverId !== scene.action.personId && scene.lineups[scene.attackTeam].includes(receiver.id),
+					"bad pass has no eligible intended teammate");
+				const dx = receiver.x + 1 - release.ball.x;
+				const dy = receiver.y + 0.8 - release.ball.y;
+				const cx = caught.ball.x - release.ball.x;
+				const cy = caught.ball.y - release.ball.y;
+				const fraction = (cx * dx + cy * dy) / (dx * dx + dy * dy);
+				assert(fraction >= 0.19 && fraction <= 0.81, "defender did not intercept between passer and receiver");
+				assert(Math.abs(cx * dy - cy * dx) < 0.001, "ball was thrown at a defender outside the passing lane");
+				directions.add(attackDirection(data, scene.attackTeam, scene.action.period));
+				interceptions++;
+			} else {
+				assert(!plan.receiverId, "lost-ball steal invented an intended receiver");
+				strips++;
+			}
+			const time = scene.start + (plan.releaseAt + plan.catchAt) / 2;
+			const frame = getReplayFrame(replay, time);
+			getReplayFrame(replay, replay.duration);
+			assert(JSON.stringify(getReplayFrame(replay, time)) === JSON.stringify(frame), "seeking changed the interception");
+		}
+		assert(JSON.stringify(data) === source, "steal planning changed recorded events");
+		assert(checkReplay(data, replay).errors.length === 0, "steal planning broke replay invariants");
+	}
+	assert(interceptions > 20 && strips > 5 && directions.size === 2, "missing steal variants or court directions");
+});

@@ -1349,3 +1349,42 @@ Chromium über Playwright: DEN–OKC Aktion 246 als Bildfolge von Vorbereitung �
 Wurf sowie laufende Wiedergabe ohne Seitenfehler geprüft. `git diff --check` bestanden.
 Zusätzlich Jokićs Dreier in DEN–OKC Aktion 81 als Court-Bildfolge und laufende Chromium-Wiedergabe
 geprüft: Vorbereitung und Abschluss bleiben außen, ohne Seitenfehler.
+
+### Fehlpässe mit Steal: sichtbarer Weg zum Abfangen (27.10.2026)
+
+Der bisherige Steal-Zweig setzte den Verteidiger unmittelbar vor dem ersten Ballflug-Sample an eine
+neue Position. Dadurch konnte er in etwa 0,1 Replay-Sekunden quer über das Feld springen und der
+Ballbesitzwechsel war vor dem sichtbaren Abfangen angekündigt.
+
+`animateSteal` plant bei einem abgefangenen Fehlpass jetzt einen plausiblen aktiven Mitspieler als
+Passziel. Aus dessen Passlinie wird ein Abfangpunkt zwischen Werfer und Empfänger gewählt, wobei
+nahe erreichbare Passwege bevorzugt werden. Wenn vorhanden werden Passstrecken ab zwölf Fuß
+verwendet; der Abfangpunkt liegt dann mindestens ungefähr sieben Fuß vom Abspiel entfernt.
+Der Empfänger und die genaue Passlinie sind schematische Ergänzungen, keine neuen Feed-Belege.
+
+Der ausgewiesene Stealer bewegt sich zunächst mit maximal neun Fuß pro Replay-Sekunde in die Nähe
+dieses Passwegs. Falls der direkte Zugang durch den Ballführer führen würde, bekommt der Zugang
+einen auf die Feldgrenzen begrenzten Bogen. Während des Passes tritt der Verteidiger die restliche
+Strecke in die Linie und fängt den frei fliegenden Ball. Ballbesitz, Possession, Turnover- und Steal-
+Zeitpunkt wechseln erst beim Fang. Während dieser Bewegung wird der Stealer nicht auf die Position
+relativ zu seinem ursprünglichen Gegenspieler zurückgesetzt. Die gesampelten Schritte werden bei
+Wiedergabe kontinuierlich interpoliert, ohne pro Sample neu anzuhalten.
+
+Lost-Ball-Steals erhalten eine Annäherung an den Ballführer und einen kurzen freien Ballweg statt
+eines erfundenen langen Passes. Fehlpässe ins Aus bleiben bei der vorhandenen Missed-Pass-Animation.
+Die aufgenommene Position geht in den anschließenden Gegenangriff ein; zusätzliche Wege können die
+Replay-Dauer verlängern, Ereignisreihenfolge, Beteiligte, Spieluhr-Anker und Ergebnis bleiben erhalten.
+
+Als gemeldeter Prüffall ist `0022600110` festgehalten. Seine Backend-Daten konnten hier nicht geladen
+werden: Der Netzwerkproxy verweigerte den CONNECT zum bestehenden Backend mit HTTP 403; die
+alternativ über das Web-Werkzeug angefragten offiziellen NBA-CDN-Feeds waren dort ebenfalls nicht
+verfügbar. Keine Behauptung einer direkten visuellen Prüfung dieses Spiels.
+
+Der neue Regressionstest nutzt stattdessen alle fünf lokalen NBA-/WNBA-Referenzspiele: Er prüft
+beide Angriffsrichtungen, beabsichtigten aktiven Empfänger, Fang auf dem Passweg vor dem Empfänger,
+maximale sichtbare Bewegungsgeschwindigkeit, Feldgrenzen, freien Ballflug, Eigentümerwechsel beim
+Fang, reproduzierbares Seeking und unveränderte Quelldaten. Chromium/Playwright: DEN–OKC Aktion 79
+und GSV–ATL Aktion 34 anhand zeitlicher Court-Bildfolgen und Wiedergabe geprüft, ohne Seitenfehler.
+Abschließend 55 Tests unter Node mit der bestehenden Deno-Test-/Dateilese-Kompatibilitätsschicht
+sowie alle fünf Referenzspiel-Audits bestanden; Deno selbst ist hier weiterhin nicht installiert.
+`git diff --check` bestanden.
