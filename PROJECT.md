@@ -32,18 +32,17 @@ festgelegt. Der Nutzer findet den Prototyp interessant, möchte aber weiter erku
 
 ## Northstar für die Choreografie (27.10.2026)
 
-Der englische Kopfkommentar in `js/replay-engine.js` hält die Leitlinie für die weitere
-Choreografieplanung fest: zusammenhängende, nachvollziehbare Ballbesitze mit zeitlich
-gestaffelter Abschlussvorbereitung, abgestimmten Pässen an bewegte Empfänger und einer
-auf Ball und Gefahr reagierenden Defense. Freie Positionen dürfen gehalten werden;
-Laufwege sollen einfach, zeitlich machbar und aus den bisherigen Positionen anschlussfähig sein.
+Der englische Kopfkommentar in `js/replay-engine.js` beschreibt das dauerhafte Zielbild:
+Aus belegten Ereignissen entstehen zusammenhängende, nachvollziehbare Ballbesitze.
+Ball, Angreifer und Verteidiger handeln räumlich und zeitlich abgestimmt; jede Bewegung
+hat einen erkennbaren Zweck. Freie Positionen dürfen gehalten werden. Laufwege sollen
+einfach, zeitlich machbar und aus den bisherigen Positionen anschlussfähig sein.
 
 Dies beschreibt das Entwicklungsziel, nicht zusätzliche bereits implementierte Funktionen.
 Belegte Ereignisse haben Vorrang; ergänzte Abläufe bleiben schematisch. Die bestehende
 Grenze für konkrete Screens und Pick-and-Roll-/Pick-and-Pop-Abläufe gilt unverändert.
 Planungsentscheidungen müssen deterministisch bleiben und Wiedergabe, Pause,
 Geschwindigkeit sowie Seeking auf derselben Replay-Zeitbasis erhalten.
-Dieser Schritt ergänzt ausschließlich Dokumentation und verändert keine Laufzeitlogik.
 
 ## Beschlossene Produktentscheidungen
 

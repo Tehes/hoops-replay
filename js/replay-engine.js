@@ -42,9 +42,8 @@
  * pause, speed changes and seeking agree. Game-clock gaps guide live-action
  * budgets; wall-clock timestamps must not turn stoppages into extra running time.
  *
- * First priorities: staged finish preparation, passes to moving receivers, and
- * ball-aware defensive reactions. Success means each movement has a readable
- * purpose, the next action follows naturally, and all recorded anchors survive.
+ * Success means each movement has a readable purpose, the next action follows
+ * naturally, and all recorded anchors survive.
  */
 
 import { animateShot, flyBall, getDriveStart, getShotEntry, getShotStyle, landPlayers } from "./replay-shots.js";
