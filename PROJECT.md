@@ -1221,3 +1221,96 @@ NBA- und 202 von 210 WNBA-Paarungen weiß; Home-Primary wird nur noch 79 beziehu
 Chromium über Playwright auf Port 5500: PHX@OKC, MEM@SAC, SAS@BKN, CHI@NYK und MIA@NYK als
 synthetische Paletten auf dem unveränderten DEN–OKC-Replay bei 1280 und 390 Pixeln geprüft,
 einschließlich Play/Pause und Seeking, ohne Seitenfehler. PHX@OKC auf Desktop/Mobil visuell geprüft.
+
+### Individuelle verbindende Laufwege (27.10.2026)
+
+`replay-motion.js` ergänzt die Darstellung der Aufbau- und Vorbereitungsintervalle. Monotone
+kubische Interpolation erhält Geschwindigkeit an durchlaufenen Zwischenpunkten und stoppt bei
+Haltepositionen/Richtungswechseln. Spieler starten und erreichen Haltepositionen zeitversetzt;
+Verteidiger reagieren verzögert auf die Bewegung ihres zugeordneten Angreifers. Lange Übergänge
+führen über breite Außenbahnen, kurze Off-ball-Wege am Perimeter biegen nach außen, Wege in
+Korbnähe halten die Mitte der Zone frei. Die bestehende Planung bestimmt weiterhin Aufbau,
+Anspielstationen, Innenposition, Pass-/Drive-Korridor und Wurfvorbereitung.
+
+Eine kurze Vorausschau ergänzt seitliches Ausweichen bei sich nähernden Laufwegen. Ereignisbeteiligte
+und Ballbesitzer behalten Vorrang; echte Ereignispunkte, Ballflüge, Abschlüsse, Rebounds und
+Einwurfpositionen werden nicht verschoben. Die Ausweichbewegung ist begrenzt und keine vollständige
+Kollisionsphysik: Bei dicht belegten Ereignisankern oder zwei priorisierten Beteiligten können weiterhin
+Überlagerungen auftreten. Die Berechnung ist zustandslos, sodass Pause und Seeking reproduzierbar bleiben.
+Der gehaltene Ball übernimmt die Positionskorrektur seines Besitzers.
+
+Keine neuen behaupteten Pick-&-Roll-, Screen- oder anderen Set-Play-Sequenzen. Die Laufwege bleiben
+basketballtypische Ergänzungen ohne Tracking-Beleg. Keine Änderung am Datenvertrag oder an Dependencies.
+
+Verifiziert: 47 bestehende Tests sowie drei Bewegungstests bestanden unter Node mit einer kleinen
+Kompatibilitätsschicht für `Deno.test`/`Deno.readTextFile`; Deno selbst ist hier nicht installiert.
+Alle fünf Referenzspiele bestehen den Replay-Audit. Chromium über Playwright, lokale Vorschau auf
+Port 5500: Aktionen 95/566, Wiedergabe/Pause, wiederholtes Seeking sowie Desktop (1280 px) und
+Mobil (390 px) ohne Seitenfehler geprüft. `git diff --check` bestanden. Die bisherige
+Midpoint-Prüfung erlaubt jetzt individuelle Start-/Reaktionszeiten statt nahezu gleichzeitigen Fortschritt.
+
+### Bogenwege am Perimeter geprüft und verstärkt (27.10.2026)
+
+Die visuelle Nachprüfung anhand zeitlich abgetasteter Court-Bilder und Laufspuren zeigte: Die
+bisherige radiale Ausbuchtung um 1,2 Fuß war noch kein Weg entlang des Perimeters. Für passende
+Verbindungen vor dem Abschluss wird jetzt Radius/Winkel um den angreifenden Korb interpoliert.
+Das hält Laufwege auf ihrem Bogen, statt die direkte Sehne durch den Innenraum abzulaufen.
+Bedingungen: beide Endpunkte im Feld und vor dem Korb, Radius 18–34 Fuß, Radiusänderung maximal
+acht Fuß, Winkeländerung etwa 7–80 Grad. Größere Übergänge, Einwurfpositionen außerhalb des Feldes
+und direkte Wege zum Korb behalten ihre passende bisherige Behandlung. Auch Empfänger,
+Ballführer und Verteidiger können Bogenwege verwenden. Ihre Ereignisanker bleiben unverändert.
+
+Geplante Richtungswechsel bremsen weiterhin vor der Umkehr ab; keine zufällig ergänzten
+Bewegungsschleifen. Neue Tests decken Perimeterwege in beiden Spielrichtungen einschließlich
+priorisierter Empfänger sowie eine Umkehr ab. Ein echter Regressionstest prüft Bagleys Bogenweg
+in DEN–OKC, Aktion 539, während des Aufbaus nach der Ballannahme. Die gehaltene Ballposition
+bleibt an den bewegten Besitzer gebunden.
+
+Visuell geprüft in Chromium über Playwright: Laufspuren unter anderem für Aktionen 95, 395, 539,
+564 und 566; für 539 eine Court-Bildfolge von 2,9 bis 5,9 Sekunden Szenenzeit und laufende Wiedergabe,
+ohne Seitenfehler. Die Darstellung ist weiter schematisch: Gruppierte Übergänge nach Einwürfen
+und belegte enge Kontaktpunkte sind keine vollständig aufgelöste Bewegungssimulation.
+
+Abschließende Prüfung: 53 Tests bestanden unter Node mit Deno-Test-/Dateilese-Kompatibilitätsschicht;
+alle fünf Referenzspiel-Audits fehlerfrei. Deno selbst ist weiterhin nicht verfügbar.
+`git diff --check` bestanden.
+
+### Gestaffelter Aufbau und situative Varianten (27.10.2026)
+
+Lange Wege in die neue Angriffsformation werden in `advanceFormation` über drei durchlaufene
+Positionsbilder geplant: vorauslaufende Außenbahnen, nachrückender Ballführer und späterer
+Trailer/Einwerfer. Flügel können ihren Platz vor den anderen erreichen. Verteidiger ziehen sich
+zuerst enger zum eigenen Korb zurück, schließen anschließend zu ihren Gegenspielern auf und
+übernehmen die bisherigen Endpositionen. Während dieses Übergangs entfällt das direkte
+interpolierte Nachziehen am Angreifer; im Halbfeld gelten wieder die Perimeter- und Matchup-Wege.
+
+Vier deterministisch aus dem Kontext gewählte Varianten:
+- `patient-inbound`: Grundlinieneinwurf mit mindestens zwölf verfügbaren Spielsekunden.
+- `quick-push`: höchstens acht Spielsekunden oder ein als laufender Abschluss eingeordneter Wurf;
+  früheres Nachrücken und bei passendem Ziel ein Flügel Richtung Korb.
+- `live-outlet`: Nachrücken bei `needsAdvance`, etwa nach Rebound oder Steal.
+- `spread-inbound`: sonstiger längerer Aufbau nach einem Einwurf.
+
+Aktuelle Positionen, Richtung, Aufstellung, Einwerfer und Zielpositionen bestimmen die konkreten
+Wege. Keine Zufallsauswahl und keine behaupteten belegten Set-Plays. Kurze Wege unter 24 Fuß
+sowie Backcourt-Heaves erhalten keinen zusätzlichen dreistufigen Aufbau. Bereits vor der
+Ballannahme rücken Flügel, große Spieler und Verteidiger unterschiedlich weit vor.
+
+Bei längeren Besitzphasen mit gestaffeltem Aufbau nutzt die Vorbereitung bis zu 65 Prozent der
+verfügbaren Spielsekunden (maximal 14 Replay-Sekunden), damit zwischen Aufbau und Abschluss Zeit
+für die bisherige Ballbewegung bleibt. Kurze Angriffe behalten das bisherige Zeitbudget;
+Shot-Clock-Druck bleibt bei der bisherigen 85-Prozent-Regel. Der Replay kann dadurch länger dauern.
+Spieluhr, Ereignisse, Endpositionen und Ballbesitz bleiben an die bisherigen Anker gebunden.
+Eine nötige Ballannahme wird vor dem ersten Laufabschnitt aufgezeichnet.
+
+Die frühere Bogenweg-Prüfung für DEN–OKC 539 wird durch einen Übergangstest ersetzt: Die Verteidigung
+soll hier zuerst die Zone schützen und erst danach ins Matchup gehen. Die vorhandenen isolierten
+Perimetertests prüfen Bogenwege weiterhin in beiden Richtungen. Der neue echte Übergangstest
+prüft alle vier Varianten, beide Richtungen, NBA und WNBA, Staffelung, anfänglich engere Verteidigung,
+abschließende Matchups, gehaltenen Ball, unveränderte Quelldaten und reproduzierbares Seeking.
+53 Tests unter Node mit der beschriebenen Deno-Kompatibilitätsschicht und alle fünf Referenzspiel-
+Audits bestanden. Deno selbst ist hier nicht installiert. `git diff --check` bestanden.
+Visuell zusätzlich in Chromium/Playwright geprüft: Aktionen 9 (`patient-inbound`), 17 (`quick-push`)
+und 539 (`spread-inbound`), jeweils eine zeitlich gestaffelte Court-Bildfolge über den gesamten
+Übergang und laufende Wiedergabe ohne Seitenfehler. Die Bildfolgen zeigen frühe Außenbahnen,
+nachkommenden Ballführer/Trailer und Rückzug vor der Matchup-Übernahme.

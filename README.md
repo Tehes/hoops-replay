@@ -25,7 +25,9 @@ Without a Game ID in the URL, the app opens the bundled DEN–OKC example.
 - **NBA and WNBA:** League detection from the Game ID, with league-specific team names, colors, logos,
   quarter lengths (NBA: 12 minutes; WNBA: 10 minutes), and three-point lines.
 - **Full-court replay:** Follow both teams as numbered jerseys on a court with the home team's logo and colors.
-- **Coordinated movement:** Players advance together during inbounds and possession changes. Shooters move into
+- **Coordinated movement:** Players use individual timing, continuous routes, delayed defensive reactions, and
+  anticipatory avoidance during buildup. Wings lead, the guard follows, and a big trails while defenders retreat
+  before matching up. The advance varies with the inbound, outlet, and available time. Shooters move into
   receiving positions during the buildup, with travel time based on route length and the available time budget.
 - **Play-by-play display:** See the score, game clock, player photos, and original event descriptions.
 - **Different shot animations:** Dunks, layups, jump shots, and other finishes have different movements and ball flights.
@@ -136,6 +138,7 @@ Include the relevant local action links when presenting a change so its behavior
 ├── js/
 │   ├── app.js               # Application entry point, rendering, and playback
 │   ├── replay-engine.js     # Scenes, lineups, possession, and movement planning
+│   ├── replay-motion.js     # Individual routes, defensive reactions, and anticipatory avoidance
 │   ├── replay-shots.js      # Shot profiles and ball trajectories
 │   ├── replay-teams.js      # NBA/WNBA team names, color palettes, and logos
 │   ├── replay-colors.js     # Color similarity, contrast, and jersey selection
@@ -189,6 +192,7 @@ deno check js/*.js scripts/*.js
 deno lint js/ scripts/
 deno test --allow-read=data scripts/replay-data_test.js
 deno test scripts/replay-colors_test.js
+deno test scripts/replay-motion_test.js
 deno run --allow-read=data scripts/audit-replays.js
 git diff --check
 ```

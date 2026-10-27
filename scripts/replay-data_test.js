@@ -1355,10 +1355,11 @@ Deno.test("buildup overlaps player travel, bounds speed and positions the shoote
 						moving++;
 						const middle = getReplayFrame(replay, scene.start + (move.start + move.end) / 2);
 						const traveler = middle.players.find((item) => item.id === player.id);
+						// Individual starts and reaction delays no longer imply equal midpoint progress.
 						assert(
-							Math.hypot(traveler.x - player.x, traveler.y - player.y) > 1 &&
-								Math.hypot(traveler.x - target.x, traveler.y - target.y) > 1,
-							"player did not travel throughout the shared interval",
+							Math.hypot(traveler.x - player.x, traveler.y - player.y) > 0.25 &&
+								Math.hypot(traveler.x - target.x, traveler.y - target.y) > 0.25,
+							"player did not travel during the shared interval",
 						);
 					}
 				}
@@ -1515,4 +1516,65 @@ Deno.test("receiver lookahead stops at interruptions, lineup changes and possess
 		const first = replay.scenes.find((scene) => scene.action.actionNumber === 40);
 		assert(!first.continuationMove && !first.formation.continuation, `lookahead crossed ${boundary}`);
 	}
+});
+
+Deno.test("transitions stagger wings, guard and trailer, then establish defensive matchups", async () => {
+	const variants = new Set();
+	const directions = new Set();
+	let staggered = 0;
+	let retreats = 0;
+	for (const game of ["0022600007", "1042600304"]) {
+		const data = await readData(`replay-${game}.json`);
+		const source = JSON.stringify(data);
+		const replay = compileReplay(data);
+		for (const scene of replay.scenes) {
+			for (const run of scene.transitionRuns ?? []) {
+				variants.add(run.variant);
+				directions.add(attackDirection(data, scene.attackTeam, scene.action.period));
+				const from = scene.frames.find((frame) => frame.time === run.start);
+				const first = scene.frames.find((frame) => frame.time === run.stages[0].end);
+				const end = scene.frames.find((frame) => frame.time === run.end);
+				const progress = (id) => {
+					const a = from.players.find((player) => player.id === id);
+					const b = end.players.find((player) => player.id === id);
+					const p = first.players.find((player) => player.id === id);
+					return Math.abs(b.x - a.x) > 6 ? (p.x - a.x) / (b.x - a.x) : null;
+				};
+				const guard = progress(run.ballHandler);
+				const trailer = progress(run.trailer);
+				for (const wing of run.wings) {
+					const lead = progress(wing);
+					if (lead !== null && guard !== null && trailer !== null) {
+						assert(lead > guard && guard > trailer, "transition still moves the lineup in parallel");
+						staggered++;
+					}
+				}
+				const defenders = Object.keys(scene.matchups).map(Number);
+				const spread = (frame) => {
+					const ys = defenders.map((id) => frame.players.find((player) => player.id === id).y);
+					return Math.max(...ys) - Math.min(...ys);
+				};
+				if (spread(first) + 3 < spread(end)) {
+					retreats++;
+				}
+				for (const [defender, attacker] of Object.entries(scene.matchups)) {
+					const d = end.players.find((player) => player.id === Number(defender));
+					const a = end.players.find((player) => player.id === attacker);
+					assert(Math.hypot(d.x - a.x, d.y - a.y) < 4.5, "defender never established the planned matchup");
+				}
+				for (const fraction of [0.2, 0.5, 0.8]) {
+					const time = scene.start + run.start + (run.end - run.start) * fraction;
+					const frame = getReplayFrame(replay, time);
+					const owner = frame.players.find((player) => player.id === frame.ball.owner);
+					assert(owner && Math.hypot(frame.ball.x - owner.x - 1, frame.ball.y - owner.y - 0.8) < 0.00001,
+						"held ball detached during the staggered transition");
+					getReplayFrame(replay, replay.duration);
+					assert(JSON.stringify(getReplayFrame(replay, time)) === JSON.stringify(frame), "seeking changed the transition");
+				}
+			}
+		}
+		assert(JSON.stringify(data) === source, "transition planning changed recorded events");
+	}
+	assert(staggered > 50 && retreats > 50, "insufficient staggered advance and retreat coverage");
+	assert(variants.size === 4 && directions.size === 2, "missing situational variants or a court direction");
 });

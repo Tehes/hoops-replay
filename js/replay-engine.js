@@ -1,4 +1,5 @@
 import { animateShot, flyBall, getShotEntry, getShotStyle, landPlayers } from "./replay-shots.js";
+import { movePlayers } from "./replay-motion.js";
 import { getLeague } from "./replay-leagues.js";
 
 const SLOT_ORDER = ["PG", "SG", "SF", "PF", "C"];
@@ -588,6 +589,86 @@ function releaseBall(state) {
 	}
 }
 
+function advanceFormation(state, scene, offense, direction, targets, record, duration, inbounder = null) {
+	const lineup = state.lineups[offense];
+	const origins = Object.fromEntries(Object.entries(state.positions).map(([id, point]) => [id, { ...point }]));
+	const longest = Math.max(...lineup.map((id) =>
+		Math.hypot(targets[id].x - origins[id].x, targets[id].y - origins[id].y)
+	));
+	if (longest < 24 || scene.formation.backcourt) {
+		for (const id of Object.values(state.lineups).flat()) {
+			Object.assign(state.positions[id], targets[id]);
+		}
+		record(duration);
+		return;
+	}
+	const trailer = lineup.indexOf(inbounder) >= 3 ? inbounder : lineup[4];
+	const wings = lineup.slice(1, 4).filter((id) => id !== inbounder && id !== trailer).slice(0, 2);
+	const quick = scene.liveSeconds <= 8 || scene.shotStyle?.running;
+	const variant = quick ? "quick-push" : state.restart === "baseline" && scene.liveSeconds >= 12
+		? "patient-inbound" : state.needsAdvance ? "live-outlet" : "spread-inbound";
+	const progressions = variant === "quick-push"
+		? { wing: [0.86, 1, 1], guard: [0.6, 0.94, 1], trailer: [0.3, 0.72, 1], inside: [0.7, 1, 1] }
+		: variant === "patient-inbound"
+		? { wing: [0.68, 1, 1], guard: [0.3, 0.76, 1], trailer: [0.13, 0.5, 1], inside: [0.5, 0.9, 1] }
+		: variant === "live-outlet"
+		? { wing: [0.8, 1, 1], guard: [0.5, 0.87, 1], trailer: [0.2, 0.62, 1], inside: [0.65, 0.97, 1] }
+		: { wing: [0.72, 1, 1], guard: [0.36, 0.8, 1], trailer: [0.16, 0.55, 1], inside: [0.55, 0.92, 1] };
+	const run = {
+		variant,
+		start: scene.frames.at(-1).time,
+		ballHandler: lineup[0],
+		trailer,
+		inbounder,
+		wings,
+		stages: [],
+	};
+	const total = Math.max(duration, longest / 12);
+	// Retreat to protect the basket before closing out to individual assignments.
+	const retreat = {};
+	for (const id of Object.values(state.lineups).flat().filter((id) => !lineup.includes(id))) {
+		const depth = direction === 1 ? origins[id].x : 94 - origins[id].x;
+		const targetDepth = direction === 1 ? targets[id].x : 94 - targets[id].x;
+		const x = Math.max(depth, Math.min(84, targetDepth + 6));
+		retreat[id] = { x: direction === 1 ? x : 94 - x, y: 25 + (targets[id].y - 25) * 0.4 };
+	}
+	for (let stage = 0; stage < 3; stage++) {
+		for (const id of Object.values(state.lineups).flat()) {
+			const from = origins[id];
+			const target = targets[id];
+			let point;
+			if (lineup.includes(id)) {
+				const progress = wings.includes(id) ? progressions.wing
+					: id === lineup[0] ? progressions.guard
+					: id === trailer || id === inbounder ? progressions.trailer : progressions.inside;
+				const fraction = progress[stage];
+				point = { x: from.x + (target.x - from.x) * fraction, y: from.y + (target.y - from.y) * fraction };
+				if (wings.includes(id) && stage === 0) {
+					const targetDepth = direction === 1 ? target.x : 94 - target.x;
+					const rimRun = quick && targetDepth > 78 && id === wings[0];
+					const lane = rimRun ? (target.y < 25 ? 20 : 30) : target.y < 25 ? 7 : 43;
+					point.y += (lane - point.y) * 0.65;
+				}
+			} else {
+				const inside = retreat[id];
+				const fraction = (quick ? [0.95, 1, 1] : [0.8, 1, 1])[stage];
+				const closeout = (quick ? [0.1, 0.6, 1] : [0, 0.45, 1])[stage];
+				point = {
+					x: from.x + (inside.x - from.x) * fraction + (target.x - inside.x) * closeout,
+					y: from.y + (inside.y - from.y) * fraction + (target.y - inside.y) * closeout,
+				};
+			}
+			Object.assign(state.positions[id], point);
+		}
+		const start = scene.frames.at(-1).time;
+		record(total * [0.45, 0.32, 0.23][stage]);
+		run.stages.push({ start, end: scene.frames.at(-1).time, phase: stage === 0 ? "retreat" : "matchup" });
+	}
+	run.end = scene.frames.at(-1).time;
+	scene.transitionRuns ??= [];
+	scene.transitionRuns.push(run);
+}
+
 function prepareAttack(state, scene, offense, direction, matchups, record, data, replay, index) {
 	const lineup = state.lineups[offense];
 	const pg = lineup[0];
@@ -659,8 +740,13 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 		);
 		// Teammates begin advancing while the nearest inbounder and the guard set up the restart.
 		for (const id of Object.values(state.lineups).flat()) {
-			state.positions[id].x = origins[id].x + (targets[id].x - origins[id].x) * 0.25;
-			state.positions[id].y = origins[id].y + (targets[id].y - origins[id].y) * 0.25;
+			const slot = lineup.indexOf(id);
+			const fraction = restart !== "baseline" ? 0.25 : slot === -1 ? 0.4 : slot === 4 ? 0.08 : 0.4;
+			state.positions[id].x = origins[id].x + (targets[id].x - origins[id].x) * fraction;
+			state.positions[id].y = origins[id].y + (targets[id].y - origins[id].y) * fraction;
+			if (restart === "baseline" && slot === -1) {
+				state.positions[id].y += (25 - state.positions[id].y) * 0.25;
+			}
 		}
 		Object.assign(state.positions[inbounder], inboundPoint);
 		Object.assign(
@@ -673,15 +759,14 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 		record(0.45);
 		// Inbound setup takes replay time without consuming the game clock.
 		scene.liveAt = scene.frames.at(-1).time;
-		for (const id of Object.values(state.lineups).flat()) {
-			Object.assign(state.positions[id], targets[id]);
-		}
-		record(1.2 * advanceScale);
+		advanceFormation(state, scene, offense, direction, targets, record, 1.2 * advanceScale, inbounder);
 	} else if (!changed && carrier && state.needsAdvance) {
 		// Keep the rebounder or stealer at the catch while teammates and the outlet advance together.
 		for (const id of Object.values(state.lineups).flat()) {
-			state.positions[id].x = origins[id].x + (targets[id].x - origins[id].x) * 0.2;
-			state.positions[id].y = origins[id].y + (targets[id].y - origins[id].y) * 0.2;
+			const slot = lineup.indexOf(id);
+			const fraction = slot === -1 ? 0.4 : slot === 4 ? 0.08 : 0.3;
+			state.positions[id].x = origins[id].x + (targets[id].x - origins[id].x) * fraction;
+			state.positions[id].y = origins[id].y + (targets[id].y - origins[id].y) * fraction;
 		}
 		Object.assign(state.positions[carrier], origin);
 		if (carrier !== pg) {
@@ -697,13 +782,17 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 			state.ball.owner = pg;
 			record(0.4);
 		}
-		for (const id of Object.values(state.lineups).flat()) {
-			Object.assign(state.positions[id], targets[id]);
-		}
-		record(1.1 * advanceScale);
+		advanceFormation(state, scene, offense, direction, targets, record, 1.1 * advanceScale);
 	} else {
 		state.ball.owner = pg;
-		record(0.85 * advanceScale);
+		for (const id of Object.values(state.lineups).flat()) {
+			Object.assign(state.positions[id], origins[id]);
+		}
+		if (scene.frames.at(-1).ball.owner !== pg) {
+			// Establish the catch before the guard begins the advance.
+			record(0.35);
+		}
+		advanceFormation(state, scene, offense, direction, targets, record, 0.85 * advanceScale);
 	}
 	state.restart = null;
 	state.needsAdvance = false;
@@ -839,6 +928,8 @@ function pacePreparation(state, scene, time, finishDuration, record, direction) 
 	// Compress live time while preserving the minimum time needed for the recorded finish.
 	const budget = scene.shotClockPressure
 		? Math.min(24, scene.liveSeconds * 0.85)
+		: scene.transitionRuns?.length && scene.liveSeconds >= 12
+		? Math.min(14, scene.liveSeconds * 0.65)
 		: Math.min(12, scene.liveSeconds * 0.5);
 	const elapsed = time - (scene.liveAt ?? 0);
 	scene.preparationWait = Math.max(0, budget - elapsed - finishDuration);
@@ -1784,7 +1875,7 @@ export function getReplayFrame(replay, time) {
 	const mix = (a, b) => a + (b - a) * smooth;
 	const ballFraction = to.ball.flight && !to.ball.owner ? fraction : smooth;
 	const mixBall = (a, b) => a + (b - a) * ballFraction;
-	const players = from.players.map((player, i) => ({
+	let players = from.players.map((player, i) => ({
 		id: player.id,
 		x: mix(player.x, to.players[i].x),
 		y: mix(player.y, to.players[i].y),
@@ -1792,13 +1883,24 @@ export function getReplayFrame(replay, time) {
 		angle: mix(player.angle, to.players[i].angle),
 		jump: mix(player.jump, to.players[i].jump),
 	}));
+	const originalPlayers = players;
+	players = movePlayers(scene, frameIndex, fraction, players);
+	const ownerIndex = from.ball.owner && from.ball.owner === to.ball.owner
+		? players.findIndex((player) => player.id === from.ball.owner)
+		: -1;
+	const carrierOffset = ownerIndex >= 0
+		? {
+			x: players[ownerIndex].x - originalPlayers[ownerIndex].x,
+			y: players[ownerIndex].y - originalPlayers[ownerIndex].y,
+		}
+		: { x: 0, y: 0 };
 	return {
 		scene,
 		time: bounded,
 		players,
 		ball: {
-			x: mixBall(from.ball.x, to.ball.x),
-			y: mixBall(from.ball.y, to.ball.y),
+			x: mixBall(from.ball.x, to.ball.x) + carrierOffset.x,
+			y: mixBall(from.ball.y, to.ball.y) + carrierOffset.y,
 			z: mixBall(from.ball.z, to.ball.z),
 			dribble: from.ball.dribble,
 			owner: fraction === 1 ? to.ball.owner : from.ball.owner,
