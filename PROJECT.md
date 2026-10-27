@@ -68,6 +68,9 @@ festgelegt. Der Nutzer findet den Prototyp interessant, möchte aber weiter erku
   Arenaname oben rechts, jeweils außerhalb des mittigen Stützenbereichs. Ring- und
   Brettpositionen im Spielfeld bleiben maßstäblich unverändert. Die Ringe sind orange mit dunkler
   Kontur, damit sie sowohl auf dunklen als auch auf hellen Teamfarben sichtbar bleiben.
+  Körbe einschließlich Brett, Träger und Stütze werden über den Spielern gezeichnet, damit
+  Bewegungen darunter die Korbanlage nicht verdecken. Wurfeffekte, Ball und Namensanzeigen
+  bleiben darüber sichtbar.
 - Spieler als ärmellose Basketball-Jerseys mit schmalen Schulterträgern, gerundetem Halsausschnitt,
   seitlichen Armausschnitten und Rückennummern: Normalerweise Heimteam in Weiß, Auswärtsteam
   in Primary. Sind die Primaries ähnlich und erreicht die eigene Away-Alternative die Spielplan-

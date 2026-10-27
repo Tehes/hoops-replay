@@ -149,40 +149,6 @@ function drawCourt() {
 		c.arc(5.25, 25, radius, -angle, angle);
 		c.lineTo(0, 47);
 		c.stroke();
-		c.strokeStyle = "#80909d";
-		c.lineWidth = 0.35;
-		c.beginPath();
-		c.moveTo(-2.4, 25);
-		c.lineTo(4, 23.7);
-		c.moveTo(-2.4, 25);
-		c.lineTo(4, 26.3);
-		c.stroke();
-		c.strokeStyle = "#b8c4ce";
-		c.lineWidth = 0.65;
-		c.beginPath();
-		c.moveTo(-2.4, 25);
-		c.lineTo(4, 25);
-		c.stroke();
-		c.fillStyle = colors.shirt;
-		roundedRect(c, -4.6, 22.9, 2.2, 4.2, 0.35);
-		c.fill();
-		c.strokeStyle = "#9aabb8";
-		c.lineWidth = 0.16;
-		c.stroke();
-		c.lineWidth = 0.3;
-		c.strokeStyle = "#f6f7f8";
-		c.beginPath();
-		c.moveTo(4, 22);
-		c.lineTo(4, 28);
-		c.stroke();
-		c.strokeStyle = "#18212b";
-		c.lineWidth = 0.42;
-		c.beginPath();
-		c.arc(5.25, 25, 0.75, 0, Math.PI * 2);
-		c.stroke();
-		c.strokeStyle = "#ff982e";
-		c.lineWidth = 0.22;
-		c.stroke();
 		c.restore();
 	}
 	for (
@@ -199,6 +165,53 @@ function drawCourt() {
 		c.rotate(label.angle);
 		c.fillText(label.text.toUpperCase(), 0, 0);
 		c.restore();
+	}
+}
+
+function drawBaskets() {
+	const home = game?.teams.find((team) => team.home);
+	const colors = home ? getTeamColors(home) : NEUTRAL_COURT;
+	for (const mirror of [false, true]) {
+		ctx.save();
+		if (mirror) {
+			ctx.translate(94, 0);
+			ctx.scale(-1, 1);
+		}
+		ctx.strokeStyle = "#80909d";
+		ctx.lineWidth = 0.35;
+		ctx.beginPath();
+		ctx.moveTo(-2.4, 25);
+		ctx.lineTo(4, 23.7);
+		ctx.moveTo(-2.4, 25);
+		ctx.lineTo(4, 26.3);
+		ctx.stroke();
+		ctx.strokeStyle = "#b8c4ce";
+		ctx.lineWidth = 0.65;
+		ctx.beginPath();
+		ctx.moveTo(-2.4, 25);
+		ctx.lineTo(4, 25);
+		ctx.stroke();
+		ctx.fillStyle = colors.shirt;
+		roundedRect(ctx, -4.6, 22.9, 2.2, 4.2, 0.35);
+		ctx.fill();
+		ctx.strokeStyle = "#9aabb8";
+		ctx.lineWidth = 0.16;
+		ctx.stroke();
+		ctx.lineWidth = 0.3;
+		ctx.strokeStyle = "#f6f7f8";
+		ctx.beginPath();
+		ctx.moveTo(4, 22);
+		ctx.lineTo(4, 28);
+		ctx.stroke();
+		ctx.strokeStyle = "#18212b";
+		ctx.lineWidth = 0.42;
+		ctx.beginPath();
+		ctx.arc(5.25, 25, 0.75, 0, Math.PI * 2);
+		ctx.stroke();
+		ctx.strokeStyle = "#ff982e";
+		ctx.lineWidth = 0.22;
+		ctx.stroke();
+		ctx.restore();
 	}
 }
 
@@ -488,19 +501,22 @@ function render() {
 	if (courtBackground) {
 		ctx.drawImage(courtBackground, 0, 0);
 	}
+	ctx.save();
+	ctx.scale(scale, scale);
+	ctx.translate(WORLD.left, WORLD.top);
 	if (!replay) {
+		drawBaskets();
+		ctx.restore();
 		return;
 	}
 	const frame = getReplayFrame(replay, currentTime);
 	currentFrame = frame;
-	ctx.save();
-	ctx.scale(scale, scale);
-	ctx.translate(WORLD.left, WORLD.top);
 	drawShotMarkers(frame);
-	drawShotEffects(frame);
 	for (const position of frame.players.filter((player) => player.opacity > 0.01).sort((a, b) => a.y - b.y)) {
 		drawPlayer(position);
 	}
+	drawBaskets();
+	drawShotEffects(frame);
 	drawScoreMarkers(frame);
 	drawBall(frame);
 	drawNames(frame);
