@@ -1557,3 +1557,27 @@ reproduzierbarem Seeking und negativer Link-Grenzen. Alle fünf gebündelten Spi
 bestehen mit 35.107 Frames. Das vollständige Spiel `1042600305` besteht zusätzlich mit
 5.432 Frames, Endstand 55:64 und null Fehlern. Syntaxprüfung und `git diff --check` bestehen.
 Der Fehler wurde im veröffentlichten Replay mit Chrome über Cloud Browser nachvollzogen.
+
+### Kausale Reihenfolge bei zeitgleichen Auswechslungen (27.10.2026)
+
+Innerhalb einer zusammenhängenden Gruppe mit exakt identischer Periode und identischem
+`clock`-Wert darf die Szenenreihenfolge eine widersprechende Auswechslung korrigieren:
+Eine Aktion eines ausgewechselten Spielers liegt vor seinem Ausscheiden, eine Aktion eines
+neu eingewechselten Spielers nach dessen Eintritt. Verknüpfte Turnover-/Steal-Ereignisse
+bleiben gemeinsam. Die Reihenfolge der übrigen Ereignisse untereinander und der
+Auswechslungsgruppen untereinander bleibt erhalten. Auswechslungsketten werden anhand
+der tatsächlichen Besetzung vor und nach der Gruppe bewertet; ein nur zwischenzeitlich
+gewechselter Spieler erzeugt keine künstliche Einschränkung. Widersprüchliche Abhängigkeiten
+lassen die ursprüngliche Gruppe unverändert und unterliegen weiter der Validierung.
+Es wird niemals über eine abweichende Spieluhrzeit oder Periodengrenze hinweg umgeordnet.
+Die Quelldaten einschließlich `orderNumber`, Ereignis-IDs und Uhrzeiten bleiben unverändert.
+
+Damit steht in MIN–CLE `0022600120` bei Q2 6:11 der Turnover/Steal 385/386 vor Dosunmus
+Auswechslung 254/253. Die zuvor vier `hidden owner`-Fehler in 385 und 262 entfallen.
+Das vollständige Spiel besteht mit 8.302 Frames und Endstand 125:127 die Validierung.
+Alle fünf bisherigen Referenzspiel-Audits bestehen ebenfalls ohne Fehler.
+68 Tests unter Node mit Deno-Test-/Dateilese-Kompatibilitätsschicht bestanden, darunter
+neue Prüfungen für eingehende und ausgehende Spieler, Uhr-/Periodengrenzen, widersprüchliche
+Belege, verknüpfte Ereignisse, unveränderte Quellen und deterministisches Seeking.
+Deno ist hier nicht installiert. Die lokale Browserprüfung über Chrome/Cloud Browser
+scheiterte an `ERR_CONNECTION_REFUSED` für `http://127.0.0.1:5500`; keine visuelle Abnahme.

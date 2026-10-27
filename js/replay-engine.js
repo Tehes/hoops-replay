@@ -144,6 +144,70 @@ function buildScenes(actions) {
 	return scenes;
 }
 
+function orderSameClockSubstitutions(scenes, data) {
+	const active = new Set(data.teams.flatMap((team) => team.players.filter((player) => player.starter)
+		.map((player) => player.id)));
+	for (let start = 0; start < scenes.length;) {
+		let end = start + 1;
+		while (end < scenes.length && scenes[end].action.period === scenes[start].action.period &&
+			scenes[end].action.clock === scenes[start].action.clock) {
+			end++;
+		}
+		const group = scenes.slice(start, end);
+		const dependencies = group.map(() => new Set());
+		let previousEvent = null;
+		let previousSubstitution = null;
+		for (const [index, scene] of group.entries()) {
+			if (scene.kind !== "substitution") {
+				if (previousEvent !== null) {
+					dependencies[index].add(previousEvent);
+				}
+				previousEvent = index;
+				continue;
+			}
+			if (previousSubstitution !== null) {
+				dependencies[index].add(previousSubstitution);
+			}
+			previousSubstitution = index;
+			const before = new Set(active);
+			for (const action of scene.related) {
+				if (action.subType === "out") {
+					active.delete(action.personId);
+				} else if (action.subType === "in") {
+					active.add(action.personId);
+				}
+			}
+			for (const [eventIndex, event] of group.entries()) {
+				if (event.kind === "substitution") {
+					continue;
+				}
+				if (event.participants.some((id) => before.has(id) && !active.has(id))) {
+					dependencies[index].add(eventIndex);
+				}
+				if (event.participants.some((id) => !before.has(id) && active.has(id))) {
+					dependencies[eventIndex].add(index);
+				}
+			}
+		}
+		const emitted = new Set();
+		const ordered = [];
+		while (ordered.length < group.length) {
+			const index = group.findIndex((_, i) => !emitted.has(i) &&
+				[...dependencies[i]].every((dependency) => emitted.has(dependency)));
+			if (index === -1) {
+				break;
+			}
+			emitted.add(index);
+			ordered.push(group[index]);
+		}
+		// Conflicting evidence must not manufacture a lineup or reorder recorded live events.
+		if (ordered.length === group.length) {
+			scenes.splice(start, group.length, ...ordered);
+		}
+		start = end;
+	}
+}
+
 function linkAndOneFouls(scenes) {
 	scenes.forEach((scene, index) => {
 		const action = scene.action;
@@ -2275,6 +2339,7 @@ export function compileReplay(data) {
 		players,
 		duration: 0,
 	};
+	orderSameClockSubstitutions(replay.scenes, data);
 	linkAndOneFouls(replay.scenes);
 	linkRebounds(replay.scenes);
 	planShotClockPressure(replay.scenes);

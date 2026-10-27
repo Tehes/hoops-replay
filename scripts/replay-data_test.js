@@ -596,6 +596,85 @@ Deno.test("formation lookahead stops before an offensive substitution introduces
 	assert(checkReplay(data, replay).errors.length === 0, "substitution scenario failed replay validation");
 });
 
+Deno.test("same-clock steals precede an outgoing player's substitution and retain linked events", async () => {
+	const data = await readData("replay-0022600007.json");
+	const [away, home] = data.teams;
+	const outgoing = away.players.find((player) => player.starter);
+	const incoming = away.players.find((player) => !player.starter);
+	const actor = home.players.find((player) => player.starter);
+	data.actions = data.actions.slice(0, 2);
+	const base = { period: 1, clock: "PT11M50.00S", scoreAway: "0", scoreHome: "0", qualifiers: [] };
+	data.actions.push(
+		{ ...base, actionNumber: 100, orderNumber: 7000000, actionType: "timeout", subType: "full", teamId: away.id },
+		{
+			...base, actionNumber: 101, orderNumber: 7000001, actionType: "substitution", subType: "out",
+			teamId: away.id, personId: outgoing.id,
+		},
+		{
+			...base, actionNumber: 102, orderNumber: 7000002, actionType: "substitution", subType: "in",
+			teamId: away.id, personId: incoming.id,
+		},
+		{
+			...base, actionNumber: 103, orderNumber: 7000003, actionType: "turnover", subType: "lost ball",
+			teamId: home.id, personId: actor.id, stealPersonId: outgoing.id,
+		},
+		{
+			...base, actionNumber: 104, orderNumber: 7000004, actionType: "steal", subType: "",
+			teamId: away.id, personId: outgoing.id,
+		},
+		{
+			...base, actionNumber: 105, orderNumber: 7000005, actionType: "foul", subType: "personal",
+			teamId: home.id, personId: actor.id, foulDrawnPersonId: incoming.id, possession: away.id,
+		},
+	);
+	const source = JSON.stringify(data);
+	const replay = compileReplay(data);
+	const steal = replay.scenes.find((scene) => scene.action.actionNumber === 103);
+	const substitution = replay.scenes.find((scene) => scene.kind === "substitution");
+	const incomingEvent = replay.scenes.at(-1);
+	assert(steal.start < substitution.start, "outgoing stealer was removed before the steal");
+	assert(substitution.start < incomingEvent.start, "incoming participant acted before entering");
+	assert(steal.related.some((action) => action.actionNumber === 104), "linked steal annotation was lost");
+	assert(steal.lineups[away.id].includes(outgoing.id), "stealer is absent from the action lineup");
+	assert(substitution.lineups[away.id].includes(incoming.id), "substitution did not update the lineup");
+	assert(replay.scenes.find((scene) => scene.kind === "timeout").start < steal.start, "unrelated event order changed");
+	for (const scene of replay.scenes) {
+		for (const frame of scene.frames) {
+			assert(
+				!frame.ball.owner || frame.players.some((player) => player.id === frame.ball.owner && player.opacity > 0),
+				"hidden ball owner",
+			);
+		}
+	}
+	const time = steal.start + steal.eventAt;
+	const frame = JSON.stringify(getReplayFrame(replay, time));
+	getReplayFrame(replay, replay.duration);
+	assert(JSON.stringify(getReplayFrame(replay, time)) === frame, "seeking changed the corrected scene");
+	assert(JSON.stringify(data) === source, "source events were rewritten");
+	assert(JSON.stringify(compileReplay(data).scenes) === JSON.stringify(replay.scenes), "ordering is not deterministic");
+	for (const [period, clock] of [[1, "PT11M49.00S"], [2, base.clock]]) {
+		const boundary = structuredClone(data);
+		for (const action of boundary.actions.filter((action) => [103, 104, 105].includes(action.actionNumber))) {
+			action.period = period;
+			action.clock = clock;
+		}
+		const unchanged = compileReplay(boundary);
+		assert(
+			unchanged.scenes.findIndex((scene) => scene.kind === "substitution") <
+				unchanged.scenes.findIndex((scene) => scene.action.actionNumber === 103),
+			"ordering crossed a clock or period boundary",
+		);
+	}
+	const conflict = structuredClone(data);
+	conflict.actions.find((action) => action.actionNumber === 103).assistPersonId = incoming.id;
+	const unresolved = compileReplay(conflict);
+	assert(
+		unresolved.scenes.findIndex((scene) => scene.kind === "substitution") <
+			unresolved.scenes.findIndex((scene) => scene.action.actionNumber === 103),
+		"conflicting lineup evidence was silently resolved",
+	);
+});
+
 Deno.test("same-clock substitution chains display only the final lineup while preserving all actions", async () => {
 	const data = await readData("replay-0022600007.json");
 	const [away, home] = data.teams;
