@@ -1519,7 +1519,7 @@ Deno.test("receiver lookahead stops at interruptions, lineup changes and possess
 	}
 });
 
-Deno.test("transitions stagger wings, guard and trailer, then establish defensive matchups", async () => {
+Deno.test("the PG advances while all off-ball players fill their spots, then defenders establish matchups", async () => {
 	const variants = new Set();
 	const directions = new Set();
 	let staggered = 0;
@@ -1542,13 +1542,17 @@ Deno.test("transitions stagger wings, guard and trailer, then establish defensiv
 					return Math.abs(b.x - a.x) > 6 ? (p.x - a.x) / (b.x - a.x) : null;
 				};
 				const guard = progress(run.ballHandler);
-				const trailer = progress(run.trailer);
-				for (const wing of run.wings) {
-					const lead = progress(wing);
-					if (lead !== null && guard !== null && trailer !== null) {
-						assert(lead > guard && guard > trailer, "transition still moves the lineup in parallel");
+				const settled = scene.frames.find((frame) => frame.time === run.stages[1].end);
+				for (const id of run.offBall) {
+					const lead = progress(id);
+					if (lead !== null && guard !== null) {
+						assert(lead > guard, "off-ball player was held behind the advancing PG");
 						staggered++;
 					}
+					const ready = settled.players.find((player) => player.id === id);
+					const target = end.players.find((player) => player.id === id);
+					assert(Math.hypot(ready.x - target.x, ready.y - target.y) < 0.00001,
+						"off-ball player needed a late catch-up sprint to their spot");
 				}
 				const defenders = Object.keys(scene.matchups).map(Number);
 				const spread = (frame) => {
@@ -1727,4 +1731,30 @@ Deno.test("preparations probe once then hold, with at most two purposeful spacin
 		assert(JSON.stringify(data) === source, "movement planning changed recorded data");
 	}
 	assert(probes > 50 && holds === probes, "reference fixtures did not exercise probe-and-hold behavior");
+});
+
+Deno.test("unanchored half-court possessions give an available center an interior spot", async () => {
+	let checked = 0;
+	for (const game of ["0022600007", "1042600304"]) {
+		const data = await readData(`replay-${game}.json`);
+		const replay = compileReplay(data);
+		for (const scene of replay.scenes) {
+			const formation = scene.formation;
+			if (!formation || formation.evidenceActionNumber || formation.foulActionNumber || formation.backcourt) {
+				continue;
+			}
+			const lineup = scene.lineups[scene.attackTeam];
+			const center = lineup.slice(1).find((id) =>
+				["C", "C-F", "F-C"].includes(replay.players.find((player) => player.id === id).position)
+			);
+			if (!center) {
+				continue;
+			}
+			assert(formation.interiorId === center, "free center inherited an outside spot without an event reason");
+			const [x, y] = formation.slots[lineup.indexOf(center)];
+			assert(Math.hypot(x - 88.75, y - 25) <= 12, "center's planned spot stayed outside");
+			checked++;
+		}
+	}
+	assert(checked > 10, "missing NBA/WNBA unanchored-possession coverage");
 });

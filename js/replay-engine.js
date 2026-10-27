@@ -471,6 +471,17 @@ function planFormation(replay, index, offense, direction, lineup, state) {
 			}
 		}
 	}
+	if (!shot && !backcourt) {
+		const bigs = lineup.map((id, slot) => ({ slot, position: state.players.find((player) => player.id === id).position }))
+			.filter(({ slot, position }) => slot !== 0 && ["C", "C-F", "F-C", "PF"].includes(position));
+		const interior = bigs.find(({ position }) => ["C", "C-F", "F-C"].includes(position)) ?? bigs[0];
+		if (interior) {
+			interiorSlot = interior.slot;
+			if (Math.hypot(slots[interiorSlot][0] - 88.75, slots[interiorSlot][1] - 25) > 12) {
+				slots[interiorSlot] = [82, slots[interiorSlot][1] < 25 ? 18 : 32];
+			}
+		}
+	}
 	if (backcourt) {
 		// Keep outlets spread behind half court until the recorded long-range release.
 		lineup.forEach((_, slot) => {
@@ -628,23 +639,23 @@ function advanceFormation(state, scene, offense, direction, targets, record, dur
 		record(duration);
 		return;
 	}
-	const trailer = lineup.indexOf(inbounder) >= 3 ? inbounder : lineup[4];
-	const wings = lineup.slice(1, 4).filter((id) => id !== inbounder && id !== trailer).slice(0, 2);
+	const offBall = lineup.slice(1);
+	const wings = lineup.slice(1, 4).filter((id) => id !== inbounder).slice(0, 2);
 	const quick = scene.liveSeconds <= 8 || scene.shotStyle?.running;
 	const variant = quick ? "quick-push" : state.restart === "baseline" && scene.liveSeconds >= 12
 		? "patient-inbound" : state.needsAdvance ? "live-outlet" : "spread-inbound";
 	const progressions = variant === "quick-push"
-		? { wing: [0.86, 1, 1], guard: [0.6, 0.94, 1], trailer: [0.3, 0.72, 1], inside: [0.7, 1, 1] }
+		? { wing: [0.86, 1, 1], guard: [0.6, 0.94, 1], inside: [0.8, 1, 1] }
 		: variant === "patient-inbound"
-		? { wing: [0.68, 1, 1], guard: [0.3, 0.76, 1], trailer: [0.13, 0.5, 1], inside: [0.5, 0.9, 1] }
+		? { wing: [0.72, 1, 1], guard: [0.4, 0.78, 1], inside: [0.7, 1, 1] }
 		: variant === "live-outlet"
-		? { wing: [0.8, 1, 1], guard: [0.5, 0.87, 1], trailer: [0.2, 0.62, 1], inside: [0.65, 0.97, 1] }
-		: { wing: [0.72, 1, 1], guard: [0.36, 0.8, 1], trailer: [0.16, 0.55, 1], inside: [0.55, 0.92, 1] };
+		? { wing: [0.8, 1, 1], guard: [0.5, 0.87, 1], inside: [0.76, 1, 1] }
+		: { wing: [0.76, 1, 1], guard: [0.44, 0.8, 1], inside: [0.72, 1, 1] };
 	const run = {
 		variant,
 		start: scene.frames.at(-1).time,
 		ballHandler: lineup[0],
-		trailer,
+		offBall,
 		inbounder,
 		wings,
 		stages: [],
@@ -666,7 +677,7 @@ function advanceFormation(state, scene, offense, direction, targets, record, dur
 			if (lineup.includes(id)) {
 				const progress = wings.includes(id) ? progressions.wing
 					: id === lineup[0] ? progressions.guard
-					: id === trailer || id === inbounder ? progressions.trailer : progressions.inside;
+					: progressions.inside;
 				const fraction = progress[stage];
 				point = { x: from.x + (target.x - from.x) * fraction, y: from.y + (target.y - from.y) * fraction };
 				if (wings.includes(id) && stage === 0) {
@@ -767,7 +778,7 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 		// Teammates begin advancing while the nearest inbounder and the guard set up the restart.
 		for (const id of Object.values(state.lineups).flat()) {
 			const slot = lineup.indexOf(id);
-			const fraction = restart !== "baseline" ? 0.25 : slot === -1 ? 0.4 : slot === 4 ? 0.08 : 0.4;
+			const fraction = restart !== "baseline" ? 0.25 : 0.4;
 			state.positions[id].x = origins[id].x + (targets[id].x - origins[id].x) * fraction;
 			state.positions[id].y = origins[id].y + (targets[id].y - origins[id].y) * fraction;
 			if (restart === "baseline" && slot === -1) {
@@ -790,7 +801,7 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 		// Keep the rebounder or stealer at the catch while teammates and the outlet advance together.
 		for (const id of Object.values(state.lineups).flat()) {
 			const slot = lineup.indexOf(id);
-			const fraction = slot === -1 ? 0.4 : slot === 4 ? 0.08 : 0.3;
+			const fraction = slot === -1 ? 0.4 : 0.3;
 			state.positions[id].x = origins[id].x + (targets[id].x - origins[id].x) * fraction;
 			state.positions[id].y = origins[id].y + (targets[id].y - origins[id].y) * fraction;
 		}

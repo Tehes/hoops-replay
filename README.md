@@ -29,7 +29,8 @@ Without a Game ID in the URL, the app opens the bundled DEN–OKC example.
   Open spots are held, with at most two congestion-clearing off-ball adjustments during preparation.
   Perimeter relocations follow the arc; deliberate cuts brake at their turns. Routes anticipate crossings
   with one planned detour or a delayed start instead of repeated sideways corrections. Defenders react later.
-  Wings lead the advance, the guard follows, and a big trails while defenders retreat before matching up.
+  The PG carries the ball forward while all four teammates fill their spots ahead of him,
+  including the interior player; defenders retreat before matching up.
   Ball handlers can probe one open lane and then hold while reading the defense.
 - **Play-by-play display:** See the score, game clock, player photos, and original event descriptions.
 - **Different shot animations:** Dunks, layups, jump shots, and other finishes have different movements and ball flights.

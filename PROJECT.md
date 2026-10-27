@@ -1434,3 +1434,28 @@ Deno ist ebenfalls nicht installiert, deshalb keine native Deno-Check-/Lint-/For
 Zur manuellen Abnahme in der lokalen Vorschau: `http://127.0.0.1:5500/?action=95`,
 `?action=246`, `?action=539` und `?action=566`; jeweils vor das Ereignis zurückspulen,
 Aufbau und Vorbereitung abspielen sowie Pause und wiederholtes Seeking prüfen.
+
+
+### PG-Aufbau ohne künstlichen Big-Man-Trailer (27.10.2026)
+
+Der PG trägt den Ball vor, während alle vier Mitspieler ihre Zielpositionen anlaufen.
+Die frühere feste Trailer-Rolle für Slot 4 beziehungsweise den Einwerfer entfällt vollständig,
+auch beim Vorrücken vor einem Einwurf oder Outlet. Nach der Ballannahme erhalten Innen- und
+Außenspieler einen früheren Laufbeginn beziehungsweise größeren Fortschritt als der PG und
+besetzen ihre Ziele spätestens am zweiten der drei Aufbauschritte. Der letzte Schritt gehört
+dem Ballvortrag des PG und der abschließenden Defensivzuordnung; kein künstliches spätes
+Aufholen des Centers. Ein Einwerfer oder Rebounder darf bis zur Ballabgabe natürlich zurückliegen.
+
+Auch Formationen ohne folgenden Wurf-/Shooting-Foul-Anker planen jetzt einen freien Center,
+ersatzweise PF, auf einer freien Innenposition statt seine alte Außenposition zu übernehmen.
+Belegte Center-Dreier, Assistpositionen und vorbereitete Folgeempfänger behalten ihre Priorität;
+die Positionsrolle erzwingt keine falsche Innenposition bei belegten Außenaktionen.
+Die situativen Aufbauvarianten, Außenbahnen, Defensivrückzug und echten Ereignisse bleiben erhalten.
+
+Verifiziert: 61 Tests unter Node mit Deno-Kompatibilitätsschicht bestanden. Der umgestellte
+Übergangstest prüft alle vier Off-ball-Spieler, frühes Besetzen aller Zielpositionen, beide
+Angriffsrichtungen, alle vier Aufbauvarianten sowie NBA/WNBA. Ein zusätzlicher Test prüft freie
+Center-Innenpositionen in Formationen ohne Wurfanker; belegte Center-Dreier bleiben durch den
+bestehenden Rollen-/Drive-Test geschützt. Alle fünf Spiel-Audits bestehen mit 34.507 Frames
+und null Fehlern. Syntaxcheck und `git diff --check` bestanden. Die oben beschriebene Grenze
+für Browser- und native Deno-Prüfungen gilt weiterhin; keine neue Browser-Abnahme.
