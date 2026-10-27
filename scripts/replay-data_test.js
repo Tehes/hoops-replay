@@ -129,6 +129,96 @@ async function readData(file) {
 	return JSON.parse(await Deno.readTextFile(new URL(file, DATA)));
 }
 
+Deno.test("a live off-ball foul after a basket follows an inbound and advances only as far as its clock gap allows", async () => {
+	const source = await readData("replay-0022600007.json");
+	for (const period of [1, 3]) {
+		for (const scoringIndex of [0, 1]) {
+			for (const includePossession of [false, true]) {
+				const depths = [];
+				for (const seconds of [0.5, 4, 20]) {
+					const data = structuredClone(source);
+					const scoring = data.teams[scoringIndex];
+					const receiving = data.teams[1 - scoringIndex];
+					const shooter = scoring.players.find((p) => p.starter && p.position === "PG");
+					const actor = scoring.players.find((p) => p.starter && p.id !== shooter.id);
+					const guard = receiving.players.find((p) => p.starter && p.position === "PG");
+					const victim = receiving.players.find((p) => p.starter && p.id !== guard.id);
+					const tip = source.actions.find((a) => a.actionType === "jumpball");
+					const common = { period, scoreAway: "0", scoreHome: "0" };
+					data.actions = [
+						{ ...tip, clock: "PT12M00S", jumpBallRecoverdPersonId: shooter.id },
+						{ actionType: "2pt", subType: "Jump Shot", teamId: scoring.id, personId: shooter.id,
+							clock: "PT08M00S", isFieldGoal: 1, shotResult: "Made", x: 80, y: 50, side: "right" },
+						{ actionType: "foul", subType: "personal", teamId: scoring.id, personId: actor.id,
+							foulDrawnPersonId: victim.id, clock: `PT07M${60 - seconds}S`,
+							...(includePossession ? { possession: receiving.id } : {}) },
+					].map((action, i) => ({ ...common, ...action, period, actionNumber: i + 1, orderNumber: i + 1 }));
+					const original = JSON.stringify(data);
+					const replay = compileReplay(data);
+					const foul = replay.scenes.at(-1);
+					const direction = attackDirection(data, receiving.id, period);
+					assert(foul.attackTeam === receiving.id, "previous scoring team kept the attack");
+					const inbound = foul.frames.find((frame) => {
+						const owner = frame.players.find((p) => p.id === frame.ball.owner);
+						return owner?.x === (direction === 1 ? -1.5 : 95.5) && owner.y === 30;
+					});
+					assert(inbound && inbound.time < foul.liveAt && foul.liveAt < foul.eventAt,
+						"foul happened before the next team's baseline inbound");
+					assert(replay.attacks.includes(foul.start), "restart was missing from possession navigation");
+					assert(getReplayFrame(replay, foul.start + inbound.time).clock === 480,
+						"inbound consumed game-clock time");
+					const event = getReplayFrame(replay, foul.start + foul.eventAt);
+					assert(event.clock === 480 - seconds, "foul did not reach its recorded clock");
+					assert(event.ball.owner !== victim.id && receiving.players.some((p) => p.id === event.ball.owner),
+						"off-ball foul incorrectly gave the victim the ball or retained the old possession");
+					const carrier = event.players.find((p) => p.id === event.ball.owner);
+					depths.push(direction === 1 ? carrier.x : 94 - carrier.x);
+					assert(JSON.stringify(data) === original, "foul preparation rewrote source events");
+					const sample = getReplayFrame(replay, foul.start + foul.liveAt + 0.1);
+					getReplayFrame(replay, 0);
+					assert(JSON.stringify(sample) === JSON.stringify(getReplayFrame(replay, sample.time)),
+						"seeking changed the restart");
+				}
+				assert(depths[0] < depths[1] && depths[1] < depths[2] && depths[0] < 47 && depths[2] > 47,
+					"early and late fouls occurred at the same stage of the next attack");
+			}
+		}
+	}
+});
+
+Deno.test("recorded ordinary fouls after baskets start the next attack while same-clock and-ones stay with the scorer", async () => {
+	let restarts = 0;
+	let andOnes = 0;
+	for (const id of ["0022600007", "0022600008", "0022600094", "0022600105", "1042600304"]) {
+		const data = await readData(`replay-${id}.json`);
+		const replay = compileReplay(data);
+		for (let i = 1; i < replay.scenes.length; i++) {
+			const scene = replay.scenes[i];
+			const previous = replay.scenes[i - 1];
+			if (scene.kind !== "foul" || previous.action.shotResult !== "Made" ||
+				!["2pt", "3pt"].includes(previous.kind) || scene.action.period !== previous.action.period) {
+				continue;
+			}
+			if (scene.action.descriptor === "shooting" && scene.action.clock === previous.action.clock &&
+				scene.action.possession === previous.action.teamId) {
+				assert(scene.attackTeam === previous.action.teamId && scene.liveAt === undefined,
+					"and-one foul incorrectly triggered the opponent's inbound");
+				andOnes++;
+			} else if (scene.liveSeconds > 0 && scene.action.subType === "personal" &&
+				!["shooting", "take", "transition take"].includes(scene.action.descriptor)) {
+				const receiving = data.teams.find((team) => team.id !== previous.action.teamId);
+				const direction = attackDirection(data, receiving.id, scene.action.period);
+				assert(scene.attackTeam === receiving.id && scene.frames.some((frame) => {
+					const owner = frame.players.find((p) => p.id === frame.ball.owner);
+					return owner?.x === (direction === 1 ? -1.5 : 95.5) && frame.time < scene.liveAt;
+				}), "recorded off-ball foul skipped the baseline inbound");
+				restarts++;
+			}
+		}
+	}
+	assert(restarts > 10 && andOnes > 5, "missing real next-possession fouls or and-one coverage");
+});
+
 Deno.test("default uses the local example; an explicit ID always loads both backend feeds", async () => {
 	const example = await readData("replay-0022600007.json");
 	const boxscore = await readData("raw/boxscore-0022600094.json");
@@ -1570,7 +1660,9 @@ Deno.test("the PG advances while all off-ball players fill their spots, then def
 				for (const [defender, attacker] of Object.entries(scene.matchups)) {
 					const d = end.players.find((player) => player.id === Number(defender));
 					const a = end.players.find((player) => player.id === attacker);
-					assert(Math.hypot(d.x - a.x, d.y - a.y) < 4.5, "defender never established the planned matchup");
+					if (!scene.foulAdvance || scene.foulAdvance.progress === 1) {
+						assert(Math.hypot(d.x - a.x, d.y - a.y) < 4.5, "defender never established the planned matchup");
+					}
 				}
 				for (const fraction of [0.2, 0.5, 0.8]) {
 					const time = scene.start + run.start + (run.end - run.start) * fraction;
@@ -1876,11 +1968,15 @@ Deno.test("unanchored half-court possessions give an available center an interio
 	for (const game of ["0022600007", "1042600304"]) {
 		const data = await readData(`replay-${game}.json`);
 		const replay = compileReplay(data);
+		const checkedFormations = new Set();
 		for (const scene of replay.scenes) {
 			const formation = scene.formation;
-			if (!formation || formation.evidenceActionNumber || formation.foulActionNumber || formation.backcourt) {
+			if (!formation || formation.evidenceActionNumber || formation.foulActionNumber || formation.backcourt ||
+				checkedFormations.has(formation.id)) {
 				continue;
 			}
+			// A later substitution inherits a slot; assess available roles when the formation is planned.
+			checkedFormations.add(formation.id);
 			const lineup = scene.lineups[scene.attackTeam];
 			const center = lineup.slice(1).find((id) =>
 				["C", "C-F", "F-C"].includes(replay.players.find((player) => player.id === id).position)

@@ -787,6 +787,16 @@ function reactDefense(state, scene, matchups, contacts, direction, delay) {
 function advanceFormation(state, scene, offense, direction, targets, record, duration, inbounder = null) {
 	const lineup = state.lineups[offense];
 	const origins = Object.fromEntries(Object.entries(state.positions).map(([id, point]) => [id, { ...point }]));
+	// A live foul may interrupt the advance before either team reaches its set positions.
+	if (scene.kind === "foul" && scene.action.descriptor !== "shooting" && scene.liveSeconds > 0) {
+		const progress = Math.min(1, scene.liveSeconds / 8);
+		scene.foulAdvance = { progress, ballHandler: lineup[0] };
+		for (const id of Object.values(state.lineups).flat()) {
+			const fraction = id === lineup[0] ? progress : Math.min(1, progress * 1.25);
+			targets[id].x = origins[id].x + (targets[id].x - origins[id].x) * fraction;
+			targets[id].y = origins[id].y + (targets[id].y - origins[id].y) * fraction;
+		}
+	}
 	const longest = Math.max(...lineup.map((id) =>
 		Math.hypot(targets[id].x - origins[id].x, targets[id].y - origins[id].y)
 	));
@@ -1610,7 +1620,10 @@ function returnToCourt(state, record) {
 
 function compileScene(replay, scene, index, state, data) {
 	const action = scene.action;
-	const offense = eventOffense(scene, state.possession, data);
+	const liveFoul = scene.kind === "foul" && action.subType !== "technical" && scene.liveSeconds > 0;
+	const pendingOffense = liveFoul && state.restart === "baseline"
+		? otherTeam(data, state.possession) : state.possession;
+	const offense = eventOffense(scene, pendingOffense, data);
 	const direction = attackDirection(data, offense, action.period);
 	const hoop = { x: direction === 1 ? 88.75 : 5.25, y: 25 };
 	const matchups = {};
@@ -1920,10 +1933,15 @@ function compileScene(replay, scene, index, state, data) {
 		const offensive = scene.kind === "foul" && action.subType === "offensive";
 		const onBall = scene.kind === "turnover" || offensive ||
 			["shooting", "take", "transition take"].includes(action.descriptor);
-		if (onBall) {
+		if (onBall || liveFoul) {
+			if (liveFoul && (state.restart || state.possession !== offense || state.needsAdvance)) {
+				replay.attacks.push(scene.start);
+			}
 			followAttackers = true;
 			prepareAttack(state, scene, offense, direction, matchups, recordMovement, data, replay, index);
 			pacePreparation(state, scene, time, scene.action.descriptor === "shooting" ? 2 : 0.8, record, direction);
+		}
+		if (onBall) {
 			if (scene.kind === "foul" && action.descriptor === "shooting") {
 				prepareShootingFoul(state, scene, replay, index, hoop, direction, record);
 			} else {

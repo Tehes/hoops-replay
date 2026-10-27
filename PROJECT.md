@@ -1513,3 +1513,25 @@ JavaScript-Syntaxprüfung und `git diff --check` bestehen. Abgetastete Laufwege 
 für DEN–OKC, Aktionen 341 und 13, visuell geprüft. Keine neue Browser-Abnahme:
 Chrome über Cloud Browser konnte die Vorschau auf `http://127.0.0.1:5500` nicht erreichen
 (`ERR_CONNECTION_REFUSED`). Deno ist hier nicht installiert; keine native Deno-Prüfung.
+
+### Neuer Angriff vor einem Foul nach einem Treffer (27.10.2026)
+
+Auch gewöhnliche Fouls abseits des Balls erhalten jetzt einen vorbereiteten Ballbesitz,
+wenn seit dem vorherigen Ereignis Spielzeit vergangen ist. Nach einem Treffer erfolgt
+zuerst der Grundlinieneinwurf des anderen Teams; der Einwurf verbraucht weiterhin keine
+Spieluhrzeit. Fehlt am Foul das Besitzfeld, dient bei einem noch ausstehenden Grundlinieneinwurf
+das empfangende Team als Besitz-Fallback. Der neue Aufbau ist auch über die Ballbesitznavigation erreichbar.
+
+Bei Fouls ohne Wurfabschluss wird der zurückgelegte Aufbauweg durch den Spieluhrabstand
+begrenzt: Ein sehr frühes Foul kann noch im Rückfeld stattfinden, bei längeren Abständen
+erreicht der Angriff die geplante Aufstellung. Mitspieler laufen weiterhin vor dem PG auf
+ihre Plätze. Ein Foul abseits des Balls überträgt den Ball nicht künstlich an den Gefoulten.
+Die bestehende Wurffoul- und Zwei-/Dreipunktlogik bleibt erhalten. Zeitgleiche And-one-Fouls
+lösen keinen Einwurf des Gegners aus; technische Fouls werden nicht pauschal als Live-Aufbau behandelt.
+
+Verifiziert: 66 Tests unter Node mit Deno-Kompatibilitätsschicht bestanden. Neue Regressionen
+prüfen 0,5 / 4 / 20 Spielsekunden nach dem Treffer, beide Angriffsrichtungen, vorhandene und
+fehlende Besitzfelder, stehende Einwurfuhr, Ballbesitznavigation, unveränderte Quelldaten,
+Seeking sowie echte NBA-/WNBA-Fouls nach Treffern und zeitgleiche And-ones.
+Alle fünf Referenzspiele bestehen den Audit mit 35.163 Frames und null Fehlern.
+Syntaxprüfung und `git diff --check` bestehen. Keine zusätzliche Browser-Abnahme.
