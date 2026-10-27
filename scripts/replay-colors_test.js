@@ -1,5 +1,5 @@
 import { selectMatchupJerseys } from "../js/replay-colors.js";
-import { getJerseyColors, getTeamColors, TEAM_COLORS, WNBA_TEAM_COLORS } from "../js/replay-teams.js";
+import { getJerseyColors, TEAM_COLORS, WNBA_TEAM_COLORS } from "../js/replay-teams.js";
 
 function assert(condition, message) {
 	if (!condition) {
@@ -37,24 +37,45 @@ Deno.test("MEM at SAC keeps home white when the schedule rejects Memphis alterna
 	assert(getJerseyColors(away, home).shirt === TEAM_COLORS.MEM.shirt, "Memphis must keep primary blue");
 	const improved = selectMatchupJerseys(TEAM_COLORS.SAC, { ...TEAM_COLORS.MEM, alternate: "#ffffff" });
 	assert(
-		improved.home.shirt === TEAM_COLORS.SAC.shirt,
-		"an actually improving team alternate must enable the switch",
+		improved.home.shirt === "#ffffff" && improved.away.shirt === "#000000",
+		"an improving but white alternate should lead to black away while keeping home white",
 	);
 });
 
-Deno.test("similar primaries with improving alternates allow alternate, white or black away jerseys", () => {
+Deno.test("home stays white with away alternate or black before considering a home change", () => {
 	for (
-		const [homeCode, awayCode, shirt] of [["BOS", "MIL", "#000000"], ["NYK", "PHX", TEAM_COLORS.PHX.alternate], [
-			"BKN",
-			"SAS",
-			"#ffffff",
-		]]
+		const [homeCode, awayCode, shirt] of [
+			["OKC", "PHX", TEAM_COLORS.PHX.alternate],
+			["BOS", "MIL", "#000000"],
+			["NYK", "PHX", TEAM_COLORS.PHX.alternate],
+		]
 	) {
 		const home = { code: homeCode, home: true };
 		const away = { code: awayCode, home: false };
-		assert(getJerseyColors(home, away).shirt === getTeamColors(home).shirt, "home must match its paint");
+		assert(getJerseyColors(home, away).shirt === "#ffffff", "home should stay white");
 		assert(getJerseyColors(away, home).shirt === shirt, "away chose the wrong variant");
 	}
+});
+
+Deno.test("a suitable alternate precedes black even when black would have higher number contrast", () => {
+	const away = { shirt: TEAM_COLORS.ATL.shirt, alternate: TEAM_COLORS.OKC.alternate };
+	const jerseys = selectMatchupJerseys(TEAM_COLORS.OKC, away);
+	assert(jerseys.home.shirt === "#ffffff", "home should stay white");
+	assert(jerseys.away.shirt === away.alternate, "a suitable alternate must precede black");
+	assert(
+		contrast(away.shirt, "#000000") > contrast(jerseys.away.ink, jerseys.away.shirt),
+		"example must have more readable team numbers on black without overriding alternate priority",
+	);
+});
+
+Deno.test("home changes to primary only after white-home options fail, then prefers away alternate", () => {
+	const jerseys = selectMatchupJerseys(TEAM_COLORS.BKN, TEAM_COLORS.SAS);
+	assert(
+		jerseys.home.shirt === TEAM_COLORS.BKN.shirt,
+		"grey alternate is too close to white and black conflicts with paint",
+	);
+	assert(jerseys.away.shirt === TEAM_COLORS.SAS.alternate, "home in primary should allow the grey alternate");
+	assert(jerseys.away.ink === "#000000", "grey should use readable black numbers");
 });
 
 Deno.test("jerseys retain team identity and use readable primary, alternate or neutral details", () => {
@@ -76,6 +97,7 @@ Deno.test("ATL at CHI prefers black with readable red details", () => {
 	const home = { code: "CHI", home: true };
 	const away = { code: "ATL", home: false };
 	const jersey = getJerseyColors(away, home);
+	assert(getJerseyColors(home, away).shirt === "#ffffff", "readable red details on black should keep home white");
 	assert(jersey.shirt === "#000000", "Atlanta red is more readable on black");
 	assert(
 		jersey.trim === TEAM_COLORS.ATL.shirt && jersey.ink === TEAM_COLORS.ATL.shirt,
@@ -88,9 +110,16 @@ Deno.test("ATL at CHI prefers black with readable red details", () => {
 	);
 });
 
-Deno.test("DEN at PHI uses white with navy details, while Magic and Knicks retain away primary", () => {
+Deno.test("DEN at PHI uses its red alternate, while Magic and Knicks retain away primary", () => {
 	const denver = getJerseyColors({ code: "DEN", home: false }, { code: "PHI", home: true });
-	assert(denver.shirt === "#ffffff" && denver.ink === TEAM_COLORS.DEN.shirt, "Denver needs white with navy details");
+	assert(
+		denver.shirt === TEAM_COLORS.DEN.alternate && denver.ink === "#ffffff",
+		"Denver should try red before neutral jerseys",
+	);
+	assert(
+		getJerseyColors({ code: "PHI", home: true }, { code: "DEN", home: false }).shirt === "#ffffff",
+		"Philadelphia should stay white",
+	);
 	for (const [homeCode, awayCode] of [["ORL", "NYK"], ["NYK", "ORL"]]) {
 		const home = { code: homeCode, home: true };
 		const away = { code: awayCode, home: false };
@@ -142,18 +171,30 @@ Deno.test("former palette conflicts retain team colors without a fixed graphic m
 	);
 });
 
-Deno.test("after the schedule triggers a switch, away primary is excluded even with readable numbers", () => {
+Deno.test("a schedule conflict excludes away primary and delays neutral details until after the home change", () => {
 	const jerseys = selectMatchupJerseys(TEAM_COLORS.CLE, TEAM_COLORS.ATL);
-	assert(jerseys.home.shirt === TEAM_COLORS.CLE.shirt, "similar red hues must put home in primary");
+	assert(jerseys.home.shirt === "#ffffff", "readable team details on black should keep home white");
 	assert(contrast(TEAM_COLORS.ATL.shirt, "#000000") >= 4, "Atlanta primary must have readable black numbers");
 	assert(
 		jerseys.away.shirt === "#000000" && jerseys.away.ink === TEAM_COLORS.ATL.shirt,
 		"readable numbers must not allow a primary jersey that conflicts with home paint",
 	);
-	const miami = selectMatchupJerseys(TEAM_COLORS.NYK, TEAM_COLORS.MIA).away;
+	const matchup = selectMatchupJerseys(TEAM_COLORS.NYK, TEAM_COLORS.MIA);
+	const miami = matchup.away;
+	assert(matchup.home.shirt === TEAM_COLORS.NYK.shirt, "home must change before team details are discarded");
 	assert(
 		miami.shirt === "#000000" && miami.ink === "#ffffff",
 		"use neutral details instead of returning to a conflicting away primary",
+	);
+});
+
+Deno.test("unreadable team numbers on black change home to primary and allow readable white away", () => {
+	assert(contrast(TEAM_COLORS.CHI.shirt, "#000000") < 4, "Chicago red must fail the black-jersey detail minimum");
+	const jerseys = selectMatchupJerseys(TEAM_COLORS.NYK, TEAM_COLORS.CHI);
+	assert(jerseys.home.shirt === TEAM_COLORS.NYK.shirt, "unreadable black-away details must change home first");
+	assert(
+		jerseys.away.shirt === "#ffffff" && jerseys.away.ink === TEAM_COLORS.CHI.shirt,
+		"white away with readable red details should precede neutral-detail fallback",
 	);
 });
 
@@ -222,6 +263,11 @@ Deno.test("all matchups are deterministic, use allowed bases and preserve court 
 						assert(["#ffffff", "#000000"].includes(jersey.shirt), "neutral details need a neutral base");
 						if (index === 0) {
 							assert(jersey.shirt === "#ffffff", "home must retain primary when not wearing white");
+						} else {
+							assert(
+								jerseys[0].shirt === teams[homeCode].shirt,
+								"neutral away details require trying home primary first",
+							);
 						}
 						assert(
 							colors.every((color) => contrast(color, jersey.shirt) < 4),

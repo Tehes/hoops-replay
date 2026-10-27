@@ -70,9 +70,10 @@ festgelegt. Der Nutzer findet den Prototyp interessant, möchte aber weiter erku
   Kontur, damit sie sowohl auf dunklen als auch auf hellen Teamfarben sichtbar bleiben.
 - Spieler als ärmellose Basketball-Jerseys mit schmalen Schulterträgern, gerundetem Halsausschnitt,
   seitlichen Armausschnitten und Rückennummern: Normalerweise Heimteam in Weiß, Auswärtsteam
-  in Primary. Nur wenn die Primaries ähnlich sind und die eigene Away-Alternative die Spielplan-
-  Verbesserungsschwelle erreicht, trägt Home Primary; Away wählt dann aus Alternate, Weiß und Schwarz.
-  Away-Primary ist bei diesem Farbkonflikt ausgeschlossen. Auf neutralen Jerseys bestimmt
+  in Primary. Sind die Primaries ähnlich und erreicht die eigene Away-Alternative die Spielplan-
+  Verbesserungsschwelle, versucht Away zuerst Alternate, dann Schwarz, während Home weiß bleibt.
+  Erst wenn keine geeignete Variante lesbare Teamdetails erlaubt, trägt Home Primary. Dann versucht Away
+  zuerst Alternate, danach Weiß/Schwarz nach Nummernkontrast. Away-Primary ist bei diesem Farbkonflikt ausgeschlossen. Auf neutralen Jerseys bestimmt
   die kontrastreichere lesbare eigene Primary-/Alternate-Farbe Rand und Nummer, sonst Weiß oder Schwarz.
   Es gibt keinen festen Mindestkontrast zwischen Jerseys/Paint; Ränder und Nummern müssen 4:1 erreichen.
   Die eigene Primary oder Alternate bleibt nach Möglichkeit in Grundfarbe oder Details sichtbar. Auf farbigen Primary-Jerseys sind
@@ -1003,19 +1004,26 @@ Die aktuelle Auswahlregel folgt der Farbähnlichkeit und den Verbesserungsschwel
   Ein Wechsel benötigt ähnliche Primaries und genügend Verbesserung durch die eigene Away-Alternative;
   bei leerem Alternate wird dafür implizites Schwarz verwendet. Weiß und Schwarz als weitere Jersey-
   Optionen dürfen diesen Wechsel nicht auslösen. Die Nähe allein genügt nicht.
+  Diese Entscheidung startet die Away-Farbsuche; sie erzwingt keinen Home-Wechsel.
   Niedriger Helligkeitskontrast allein erzwingt keinen Wechsel. Ein Detailkonflikt auf dem weißen
   Home-Jersey wird durch lesbare neutrale Details gelöst, nicht durch einen Wechsel der Grundfarbe.
-- Erst nach dieser Wechselentscheidung trägt Home Primary. Away prüft Alternate, Weiß und Schwarz gegen Home-Primary
-  (zugleich Paint). Away-Primary ist dann ausgeschlossen, auch als Rückfalloption.
+- Home bleibt zunächst weiß. Away versucht Alternate, dann Schwarz. Beide Varianten müssen gegen die
+  Paint die Verbesserungsschwelle erreichen und gegen Weiß mindestens 0,30 OKLab-Helligkeitsabstand haben.
+  Ein neutrales Away-Jersey benötigt lesbare eigene Teamdetails, bevor diese Stufe erfolgreich ist.
+- Erst wenn diese Optionen scheitern, trägt Home Primary. Away bevorzugt ein geeignetes Alternate.
+  Andernfalls werden Weiß und Schwarz gegen Home-Primary (zugleich Paint) geprüft. Away-Primary bleibt
+  bei dieser Suche ausgeschlossen, auch als Rückfalloption.
 - Eine Ausweichfarbe muss die Trennung gegenüber dem Primary-Paar um mindestens 0,04 OKLab-Abstand
   verbessern; bei neutralen Primary-Paaren gilt stattdessen eine Verbesserung des Kontrastverhältnisses
   um mindestens 0,5. Es gibt keinen festen Mindestkontrast zwischen Jerseys/Paint.
-- Unter geeigneten Varianten mit sichtbarer Teamfarbe gewinnt die mit dem höchsten Nummernkontrast.
-  Gleichstand entscheidet der höhere Jersey-Kontrast gegen Home-Primary, danach die stabile Reihenfolge
-  Alternate, Weiß, Schwarz. Ränder/Nummern müssen mindestens 4:1 gegen das eigene Jersey erreichen.
+- Die Reihenfolge Alternate vor Schwarz beziehungsweise Alternate vor Weiß/Schwarz hat Vorrang vor
+  dem Nummernkontrast. Erst unter geeigneten neutralen Varianten bei Home-Primary entscheidet der höhere
+  Nummernkontrast, dann der Jersey-Kontrast gegen Home-Primary, danach Weiß durch stabile Reihenfolge.
+  Ränder/Nummern müssen mindestens 4:1 gegen das eigene Jersey erreichen.
 - Eigene Primary oder Alternate wird in Grundfarbe oder Rand/Nummer bevorzugt. Auf neutralen
   Jerseys gewinnt die eigene Teamfarbe mit dem höheren Detailkontrast; bei Gleichstand Primary.
-  Wenn keine geeignete Teamfarbvariante lesbare Details erlaubt, werden neutrale Details gewählt.
+  Bei Away kommen neutrale Details erst nach dem Versuch mit Home-Primary zum Einsatz, wenn keine
+  geeignete Teamfarbvariante lesbare Details erlaubt.
   Diese allgemeine Regel gilt dynamisch für jede Paarung, ohne feste Ausnahmeliste.
 - Ein neutrales Jersey kann kontrastierende neutrale Ränder und Nummern erhalten, wenn die
   eigene Teamfarbe dort keine 4:1 erreicht. Die sichtbare Teamfarbe am Jersey darf dann entfallen.
@@ -1167,6 +1175,9 @@ bleibt außerhalb dieser Farbänderung.
 
 ### Vollständige Spielplan-Wechselentscheidung: MEM@SAC (26.10.2026)
 
+Historischer Stand mit direktem Home-Wechsel; die nachfolgende Prioritätenfolge erhält den Einstieg
+über die Spielplan-Regel und verzögert den Home-Wechsel.
+
 Eine ähnliche Primary-Paarung löst den Home-Wechsel nur aus, wenn die eigene Away-Alternative die
 Spielplan-Verbesserungsschwelle erreicht. Zuvor konnten stattdessen Weiß oder Schwarz als allgemeine
 Jersey-Option diesen Wechsel auslösen. Dieser Übertragungsfehler ist korrigiert, ohne die 45°-Grenze
@@ -1183,3 +1194,30 @@ identischen Replay-Paletten verglichen (leeres Alternate entspricht Schwarz): ke
 1.080 Paarungen, zuvor 44 unnötige Wechsel. Die Originaldatei hatte den Blob-SHA
 `95780b1273c14d624e69fa64c1b07f245081c3cb`.
 Der erneute Browserlauf traf auf den oben dokumentierten Canvas-Bestandsfehler; keine neue visuelle Abnahme.
+
+
+### Home bleibt vorrangig weiß (27.10.2026)
+
+Die vollständige Spielplan-Entscheidung bleibt Einstieg der Away-Farbsuche. Bei einem Konflikt bleibt
+Home zunächst weiß, Away versucht Alternate und danach Schwarz. Die Paint-Trennung folgt weiter den
+Verbesserungsschwellen; gegen Home-Weiß gilt die neutrale 0,30-OKLab-Helligkeitsregel. Auf neutralen
+Away-Jerseys sind lesbare eigene Primary-/Alternate-Details erforderlich, bevor Home weiß bleiben kann.
+
+Erst wenn das nicht funktioniert, wechselt Home zu Primary. Dann hat ein geeignetes Away-Alternate
+Vorrang; sonst entscheidet zwischen Weiß und Schwarz der lesbare Team-Nummernkontrast. Neutrale
+Away-Details sind der letzte Ausweg nach diesem Home-Wechsel. Es bleibt bei 4:1 für Ränder/Nummern,
+ohne feste Mindest-Kontrastrate für Jersey-Flächen und ohne Änderung der Court-Paletten.
+
+Beispiele: PHX@OKC → OKC weiß/blau, PHX lila/weiß. MEM@SAC bleibt SAC weiß/lila, MEM blau/schwarz.
+MIL@BOS → BOS weiß/grün, MIL schwarz/cream; das Cream-Jersey wäre Weiß zu ähnlich. SAS@BKN →
+BKN schwarz/grau, SAS grau/schwarz, weil Grau zu nahe an Weiß und Schwarz zu nahe an der Paint liegt.
+CHI@NYK → NYK orange/schwarz, CHI weiß/rot; lesbare rote Nummern auf Schwarz fehlen. MIA@NYK
+benötigt erst Home-Primary und danach neutrale weiße Details auf schwarzem Away-Jersey.
+
+Verifiziert: 14 Farbtests mit allen 1.080 Paarungen, Deno-Check, Lint, Formatcheck und
+`git diff --check` bestanden. Der Einstieg in die Away-Farbsuche stimmt bei identischen Paletten für
+alle Paarungen mit den Originalfunktionen des Spielplans überein. Home bleibt jetzt in 791 von 870
+NBA- und 202 von 210 WNBA-Paarungen weiß; Home-Primary wird nur noch 79 beziehungsweise achtmal benötigt.
+Chromium über Playwright auf Port 5500: PHX@OKC, MEM@SAC, SAS@BKN, CHI@NYK und MIA@NYK als
+synthetische Paletten auf dem unveränderten DEN–OKC-Replay bei 1280 und 390 Pixeln geprüft,
+einschließlich Play/Pause und Seeking, ohne Seitenfehler. PHX@OKC auf Desktop/Mobil visuell geprüft.

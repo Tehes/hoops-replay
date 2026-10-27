@@ -90,12 +90,28 @@ export function selectMatchupJerseys(home, away) {
 	if (!improvesSeparation(away.alternate || "#000000")) {
 		return { home: normalHome, away: normalAway };
 	}
-	const homeJersey = createJerseyColors(home.shirt, home);
 	const teamColors = [away.shirt, away.alternate].filter(Boolean);
 	const candidates = [...new Set([away.alternate, "#ffffff", "#000000"].filter(Boolean))]
 		.filter(improvesSeparation).map((shirt) => createJerseyColors(shirt, away));
-	const branded = candidates.filter((jersey) => teamColors.includes(jersey.shirt) || teamColors.includes(jersey.ink));
-	const awayJersey = (branded.length ? branded : candidates).reduce((first, next) => {
+	const hasTeamColor = (jersey) => teamColors.includes(jersey.shirt) || teamColors.includes(jersey.ink);
+	const whiteLab = hexToOklab("#ffffff");
+	// Keep home white by trying alternate, then black with readable team details.
+	const whiteHomeAway = candidates.find((jersey) =>
+		hasTeamColor(jersey) && !compareAppearance(whiteLab, hexToOklab(jersey.shirt), SIMILARITY_DEFAULTS).similar
+	);
+	if (whiteHomeAway) {
+		return { home: normalHome, away: whiteHomeAway };
+	}
+
+	const homeJersey = createJerseyColors(home.shirt, home);
+	const alternate = candidates.find((jersey) => jersey.shirt === away.alternate);
+	if (alternate) {
+		return { home: homeJersey, away: alternate };
+	}
+	// Neutral details are the last resort, after both home bases have been considered.
+	const neutrals = candidates.filter((jersey) => jersey.shirt === "#ffffff" || jersey.shirt === "#000000");
+	const branded = neutrals.filter(hasTeamColor);
+	const awayJersey = (branded.length ? branded : neutrals).reduce((first, next) => {
 		const firstContrast = getColorContrast(first.ink, first.shirt);
 		const nextContrast = getColorContrast(next.ink, next.shirt);
 		if (nextContrast !== firstContrast) {
