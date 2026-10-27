@@ -1314,3 +1314,38 @@ Visuell zusätzlich in Chromium/Playwright geprüft: Aktionen 9 (`patient-inboun
 und 539 (`spread-inbound`), jeweils eine zeitlich gestaffelte Court-Bildfolge über den gesamten
 Übergang und laufende Wiedergabe ohne Seitenfehler. Die Bildfolgen zeigen frühe Außenbahnen,
 nachkommenden Ballführer/Trailer und Rückzug vor der Matchup-Übernahme.
+
+### Positionsrollen und Guard-Drives (27.10.2026)
+
+Die Rollen geben bevorzugte Ausgangsräume vor und sind keine festen Aufenthaltszonen.
+Guard-Rollen (`PG`, `SG`, `G`, `G-F`) werden beim freien Spacing außen bevorzugt; Center,
+danach große Forwards, erhalten freie Innenpositionen. Schützen, Assistgeber und vorbereitete
+Folgeempfänger bleiben von dieser freien Rollenverteilung ausgenommen. So kann ein Center
+am Flügel anspielbar sein, einen Dreier vorbereiten oder als Passgeber außen bleiben.
+Belegte Wurfpositionen und unmittelbare Ereignisse haben weiterhin Vorrang vor der Positionsrolle.
+
+Der bisherige Anlauf von vier bis sieben Fuß ließ Guards schon während der Vorbereitung in
+Korbnähe warten. Für passende Guard-Drives (Driving-Abschluss oder unassistierter Layup/Dunk bis
+18 Fuß Korbabstand) beginnt die Vorbereitung jetzt 1,5 Fuß außerhalb der ligaspezifischen
+Dreierdistanz. Erst nach der Ballannahme startet der durchgehend abgetastete Drive mit maximal
+zwölf Fuß pro Replay-Sekunde bis zur Aufnahme nahe am Korb. Danach folgt die bisherige
+Abschlussanimation. Die Drive-Samples werden ohne erneutes Abbremsen an jedem Zehntelsekunden-
+Zwischenpunkt dargestellt; der gehaltene Ball bleibt am Besitzer. Die Vorbereitung reserviert
+zusätzliche Zeit für diese Strecke, dadurch können solche Szenen länger dauern.
+
+Cutting, Alley-oops, Tip-ins, Putbacks, unmittelbare eigene Offensiv-Rebound-Abschlüsse,
+Stepbacks/Fadeaways und reine Catch-Abschlüsse behalten ihre passende bisherige Behandlung.
+Nicht jeder Guard-Abschluss wird pauschal zu einem langen Drive. Ohne spezifischeren Beleg
+bleibt der vorgeschaltete Lauf eine schematische Ergänzung, kein rekonstruierter Spielzug.
+
+Verifiziert: 54 Tests unter Node mit Deno-Test-/Dateilese-Kompatibilitätsschicht sowie alle fünf
+Referenzspiel-Audits bestanden; Deno selbst ist hier nicht verfügbar. Neue echte NBA-/WNBA-Prüfungen
+kontrollieren Vorbereitung außerhalb des Perimeters, keinen Aufenthalt in der Zone vor dem Drive,
+Bewegung zum Korb mit begrenzter Geschwindigkeit, Ballbesitz und freie Center-Dreier in beiden
+Richtungen. Die Zirkulationsprüfung fordert weiterhin Fälle mit Assists und Shot-Clock-Verstößen,
+aber keine feste Anzahl von vier Zirkulationen: Rollenbasiertes Spacing kann einen bislang
+freien Passweg belegen und dann die vorhandene Dribbelvorbereitung verwenden.
+Chromium über Playwright: DEN–OKC Aktion 246 als Bildfolge von Vorbereitung über Drive bis zum
+Wurf sowie laufende Wiedergabe ohne Seitenfehler geprüft. `git diff --check` bestanden.
+Zusätzlich Jokićs Dreier in DEN–OKC Aktion 81 als Court-Bildfolge und laufende Chromium-Wiedergabe
+geprüft: Vorbereitung und Abschluss bleiben außen, ohne Seitenfehler.

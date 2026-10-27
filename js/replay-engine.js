@@ -1,4 +1,4 @@
-import { animateShot, flyBall, getShotEntry, getShotStyle, landPlayers } from "./replay-shots.js";
+import { animateShot, flyBall, getDriveStart, getShotEntry, getShotStyle, landPlayers } from "./replay-shots.js";
 import { movePlayers } from "./replay-motion.js";
 import { getLeague } from "./replay-leagues.js";
 
@@ -259,10 +259,11 @@ function findOpenSpace(origin, occupied, lane = null, interior = false, guard = 
 		return cost;
 	};
 	let best = origin.slice();
-	let bestScore = interior && Math.hypot(best[0] - 88.75, best[1] - 25) > 12 ? Infinity : score(best);
+	const radius = Math.hypot(best[0] - 88.75, best[1] - 25);
+	let bestScore = (interior && radius > 12) || (guard && radius < 22) ? Infinity : score(best);
 	for (let x = backcourt ? 8 : 58; x <= (backcourt ? 43 : 88); x += 5) {
 		for (let y = 5; y <= 45; y += 5) {
-			if ((interior && Math.hypot(x - 88.75, y - 25) > 12) || (guard && x > 68)) {
+			if ((interior && Math.hypot(x - 88.75, y - 25) > 12) || (guard && Math.hypot(x - 88.75, y - 25) < 22)) {
 				continue;
 			}
 			const candidate = [x, y];
@@ -394,6 +395,18 @@ function planFormation(replay, index, offense, direction, lineup, state) {
 				? 4
 				: 0;
 			slots[shooterSlot] = [Math.max(54, Math.min(89, shot.x - approach)), Math.max(4, Math.min(46, shot.y))];
+			if (evidence) {
+				const drive = getDriveStart({
+					action: evidence,
+					shotStyle: style,
+					shooterPosition: state.players.find((player) => player.id === shooterId).position,
+					threePointRadius: replay.league.threePointRadius,
+				}, { x: direction === 1 ? shot.x : 94 - shot.x, y: shot.y },
+				{ x: direction === 1 ? 88.75 : 5.25, y: 25 }, direction);
+				if (drive) {
+					slots[shooterSlot] = [direction === 1 ? drive.x : 94 - drive.x, drive.y];
+				}
+			}
 		}
 		if (assistSlot >= 0 && assistSlot !== shooterSlot) {
 			const [x, y] = origins[assistSlot];
@@ -405,6 +418,11 @@ function planFormation(replay, index, offense, direction, lineup, state) {
 				Math.max(56, Math.min(84, shot.x + (distance > 0.1 ? dx / distance : -1) * length)),
 				Math.max(5, Math.min(45, shot.y + (distance > 0.1 ? dy / distance : -side * 0.5) * length)),
 			];
+			const position = state.players.find((player) => player.id === lineup[assistSlot]).position;
+			if (["PG", "SG", "G", "G-F"].includes(position) &&
+				Math.hypot(slots[assistSlot][0] - 88.75, slots[assistSlot][1] - 25) < 22) {
+				slots[assistSlot] = [66, Math.max(13, Math.min(37, y))];
+			}
 		}
 		if (continuation) {
 			const target = continuation.target;
@@ -420,9 +438,16 @@ function planFormation(replay, index, offense, direction, lineup, state) {
 		const available = lineup.map((_, slot) => slot).filter((slot) =>
 			slot !== shooterSlot && slot !== assistSlot && slot !== continuationSlot
 		);
-		interiorSlot = available.includes(rebounderSlot)
+		const bigs = available.filter((slot) =>
+			["C", "PF", "F-C", "C-F"].includes(state.players.find((player) => player.id === lineup[slot]).position)
+		);
+		const centers = bigs.filter((slot) =>
+			["C", "C-F", "F-C"].includes(state.players.find((player) => player.id === lineup[slot]).position)
+		);
+		const insideCandidates = centers.length ? centers : bigs.length ? bigs : available;
+		interiorSlot = insideCandidates.includes(rebounderSlot)
 			? rebounderSlot
-			: available.reduce((best, slot) =>
+			: insideCandidates.reduce((best, slot) =>
 				Math.hypot(slots[slot][0] - 88.75, slots[slot][1] - 25) <
 						Math.hypot(slots[best][0] - 88.75, slots[best][1] - 25)
 					? slot
@@ -498,7 +523,8 @@ function planFormation(replay, index, offense, direction, lineup, state) {
 				occupied,
 				lane,
 				slot === interiorSlot,
-				!backcourt && slot === 0 && slot !== interiorSlot,
+				!backcourt && slot !== interiorSlot &&
+					["PG", "SG", "G", "G-F"].includes(state.players.find((player) => player.id === lineup[slot]).position),
 				backcourt,
 			);
 		}
@@ -1314,6 +1340,12 @@ function compileScene(replay, scene, index, state, data) {
 			: { x: action.x * 0.94, y: action.y * 0.5 };
 		scene.hoop = hoop;
 		scene.shotPoint = shot;
+		scene.shooterPosition = state.players.find((player) => player.id === action.personId).position;
+		scene.threePointRadius = replay.league.threePointRadius;
+		const previous = replay.scenes[index - 1];
+		scene.immediateReboundFinish = previous?.kind === "rebound" && previous.action.subType === "offensive" &&
+			previous.action.personId === action.personId && scene.liveSeconds <= 3;
+		scene.driveStart = getDriveStart(scene, shot, hoop, direction);
 		if (scene.kind !== "heave" && !scene.shotStyle.tip && !scene.shotStyle.putback) {
 			scene.shotEntry = getShotEntry(scene, shot, hoop, direction);
 		}
@@ -1344,7 +1376,8 @@ function compileScene(replay, scene, index, state, data) {
 					occupied,
 					lane,
 					false,
-					!scene.formation.backcourt && slot === 0,
+					!scene.formation.backcourt &&
+						["PG", "SG", "G", "G-F"].includes(state.players.find((player) => player.id === id).position),
 					scene.formation.backcourt,
 				);
 				const distance = Math.hypot(target[0] - points[slot][0], target[1] - points[slot][1]);
@@ -1377,7 +1410,9 @@ function compileScene(replay, scene, index, state, data) {
 			};
 		}
 		if (scene.kind !== "heave" && !scene.shotStyle.tip && !scene.shotStyle.putback) {
-			pacePreparation(state, scene, time, 2.5, record, direction);
+			const driveTime = scene.driveStart
+				? Math.hypot(scene.driveStart.x - shot.x, scene.driveStart.y - shot.y) / 12 : 0;
+			pacePreparation(state, scene, time, 2.5 + driveTime, record, direction);
 		}
 		animateShot(state, scene, shot, hoop, direction, record, contacts, matchups);
 		if (action.blockPersonId) {

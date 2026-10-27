@@ -56,9 +56,32 @@ export function flyBall(state, record, target, height, duration, curve = 0, move
 	}
 }
 
+export function getDriveStart(scene, shot, hoop, direction) {
+	const style = scene.shotStyle;
+	const guard = ["PG", "SG", "G", "G-F"].includes(scene.shooterPosition);
+	const rimFinish = style.family === "layup" || style.family === "dunk";
+	if (!guard || scene.immediateReboundFinish || style.tip || style.putback || style.cutting || style.alleyOop ||
+		style.stepBack || style.fadeaway || style.family === "heave" ||
+		(!style.driving && !(rimFinish && !scene.action.assistPersonId)) ||
+		Math.hypot(shot.x - hoop.x, shot.y - hoop.y) > 18) {
+		return null;
+	}
+	const side = Math.sign(shot.y - hoop.y) || (scene.action.actionNumber % 2 ? 1 : -1);
+	const lateral = Math.max(-17, Math.min(17, (shot.y - hoop.y) * 1.5 + side * 8));
+	const radius = scene.threePointRadius + 1.5;
+	return {
+		x: hoop.x - direction * Math.sqrt(radius ** 2 - lateral ** 2),
+		y: hoop.y + lateral,
+	};
+}
+
 export function getShotEntry(scene, shot, hoop, direction) {
 	const action = scene.action;
 	const style = scene.shotStyle;
+	const driveStart = getDriveStart(scene, shot, hoop, direction);
+	if (driveStart) {
+		return driveStart;
+	}
 	const side = Math.sign(shot.y - hoop.y) || (action.actionNumber % 2 ? 1 : -1);
 	const rimFinish = style.family === "dunk" || style.family === "layup";
 	const approachLength = style.running ? 12 : style.driving || style.cutting || style.pullup ? 7 : rimFinish ? 4 : 0;
@@ -90,7 +113,7 @@ export function animateShot(state, scene, shot, hoop, direction, record, contact
 	const direct = style.tip || style.putback;
 	const rimFinish = style.family === "dunk" || style.family === "layup";
 	const approachLength = style.running ? 12 : style.driving || style.cutting || style.pullup ? 7 : rimFinish ? 4 : 0;
-	const entry = getShotEntry(scene, shot, hoop, direction);
+	let entry = getShotEntry(scene, shot, hoop, direction);
 	if (style.family === "heave") {
 		Object.assign(shooter, entry);
 		if (state.ball.owner !== action.personId) {
@@ -157,6 +180,26 @@ export function animateShot(state, scene, shot, hoop, direction, record, contact
 		state.ball.owner = action.personId;
 		state.ball.dribble = !style.cutting && Boolean(approachLength || style.stepBack);
 		record(0.32);
+		if (scene.driveStart) {
+			const from = { ...shooter };
+			const gather = style.reverse
+				? { x: hoop.x - direction * 4, y: hoop.y - side * 6 }
+				: { x: shot.x - direction * 4, y: shot.y + side * 2 };
+			const distance = Math.hypot(gather.x - from.x, gather.y - from.y);
+			const duration = Math.max(0.8, distance / 12);
+			const steps = Math.ceil(duration / 0.1);
+			scene.driveAt = scene.frames.at(-1).time;
+			state.ball.dribble = true;
+			for (let i = 1; i <= steps; i++) {
+				const fraction = i / steps;
+				shooter.x = from.x + (gather.x - from.x) * fraction;
+				shooter.y = from.y + (gather.y - from.y) * fraction;
+				shooter.angle = direction * 0.16;
+				record(duration / steps);
+			}
+			scene.gatherAt = scene.frames.at(-1).time;
+			entry = gather;
+		}
 		if (style.reverse) {
 			Object.assign(shooter, { x: hoop.x + direction * 0.8, y: hoop.y - side * 3, angle: -side * 0.3 });
 			record(style.running ? 0.3 : 0.4);

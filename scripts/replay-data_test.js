@@ -1182,7 +1182,8 @@ Deno.test("schematic circulation has free pass flights, visible catches and the 
 		}
 		assert(checkReplay(data, replay).errors.length === 0, "circulation failed replay validation");
 	}
-	assert(sequences > 0 && assists > 0 && shotClocks === 4, "missing circulation scenarios");
+	// Role-aware spacing can replace circulation with a dribble when passing lanes are occupied.
+	assert(sequences > 0 && assists > 0 && shotClocks > 0, "missing circulation scenarios");
 });
 
 Deno.test("backcourt finishes keep inbound, outlet, circulation and shot approach behind half court", async () => {
@@ -1577,4 +1578,60 @@ Deno.test("transitions stagger wings, guard and trailer, then establish defensiv
 	}
 	assert(staggered > 50 && retreats > 50, "insufficient staggered advance and retreat coverage");
 	assert(variants.size === 4 && directions.size === 2, "missing situational variants or a court direction");
+});
+
+Deno.test("guards prepare outside and enter the paint during the drive; centers can prepare threes outside", async () => {
+	const directions = new Set();
+	let drives = 0;
+	let centerThrees = 0;
+	for (const game of ["0022600007", "0022600008", "1042600304"]) {
+		const data = await readData(`replay-${game}.json`);
+		const original = JSON.stringify(data);
+		const replay = compileReplay(data);
+		for (const scene of replay.scenes) {
+			if (scene.driveStart) {
+				directions.add(attackDirection(data, scene.attackTeam, scene.action.period));
+				assert(scene.driveAt > scene.approachAt && scene.gatherAt > scene.driveAt, "missing drive phase");
+				const playerAt = (time) => getReplayFrame(replay, scene.start + time).players.find((p) =>
+					p.id === scene.action.personId
+				);
+				const radius = (p) => Math.hypot(p.x - scene.hoop.x, p.y - scene.hoop.y);
+				const ready = playerAt(scene.preparationAt);
+				assert(radius(ready) >= replay.league.threePointRadius + 1.4, "guard waits for the drive inside the arc");
+				for (let fraction = 0; fraction <= 1; fraction += 0.2) {
+					const time = scene.preparationAt + (scene.driveAt - scene.preparationAt) * fraction;
+					assert(radius(playerAt(time)) > 18, "guard dribbles in the paint before starting the drive");
+				}
+				const start = playerAt(scene.driveAt);
+				const middle = playerAt((scene.driveAt + scene.gatherAt) / 2);
+				const gather = playerAt(scene.gatherAt);
+				assert(radius(start) > radius(middle) && radius(middle) > radius(gather),
+					"drive did not move toward the rim");
+				const frames = scene.frames.filter((f) => f.time >= scene.driveAt && f.time <= scene.gatherAt);
+				for (let i = 1; i < frames.length; i++) {
+					const a = frames[i - 1].players.find((p) => p.id === scene.action.personId);
+					const b = frames[i].players.find((p) => p.id === scene.action.personId);
+					assert(Math.hypot(b.x - a.x, b.y - a.y) <= 12 * (frames[i].time - frames[i - 1].time) + 0.001,
+						"guard teleported into the paint");
+				}
+				const frame = getReplayFrame(replay, scene.start + (scene.driveAt + scene.gatherAt) / 2);
+				const owner = frame.players.find((p) => p.id === scene.action.personId);
+				assert(frame.ball.owner === owner.id && frame.ball.dribble &&
+					Math.hypot(frame.ball.x - owner.x - 1, frame.ball.y - owner.y - 0.8) < 0.00001,
+					"drive detached the dribbling ball");
+				drives++;
+			}
+			if (scene.kind === "3pt" && scene.shooterPosition === "C") {
+				const ready = getReplayFrame(replay, scene.start + scene.preparationAt).players.find((p) =>
+					p.id === scene.action.personId
+				);
+				assert(!scene.driveStart && Math.hypot(ready.x - scene.shotEntry.x, ready.y - scene.shotEntry.y) < 0.001,
+					"center was forced into the zone instead of preparing the perimeter shot");
+				centerThrees++;
+			}
+		}
+		assert(JSON.stringify(data) === original, "role planning changed source data");
+		assert(checkReplay(data, replay).errors.length === 0, "role planning changed replay invariants");
+	}
+	assert(drives > 20 && centerThrees > 5 && directions.size === 2, "missing role and court direction coverage");
 });
