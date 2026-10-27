@@ -92,3 +92,64 @@ Deno.test("a planned reversal decelerates, then returns without overshooting the
 	assert(before.x <= 36 && after.x <= 36, "player overshot the reversal");
 	assert(returning.x < after.x, "player did not change direction");
 });
+
+
+Deno.test("unobstructed travel is straight and a holding player never drifts", () => {
+	const scene = scenario();
+	scene.frames[0].players[1] = { ...scene.frames[0].players[1], x: 75, y: 40 };
+	scene.frames[1].players[1] = { ...scene.frames[0].players[1] };
+	for (let step = 0; step <= 40; step++) {
+		const players = movePlayers(scene, 0, step / 40, step === 40 ? scene.frames[1].players : scene.frames[0].players);
+		assert(players[0].y === 25, "clear straight route acquired lateral motion");
+		assert(players[1].x === 75 && players[1].y === 40, "holding player wandered away from their spot");
+	}
+});
+
+Deno.test("a planned detour has one bow without alternating lateral corrections", () => {
+	const scene = scenario();
+	const original = JSON.stringify(scene.frames);
+	let side = 0;
+	let peak = 0;
+	let previousOffset = 0;
+	let falling = false;
+	for (let step = 1; step < 100; step++) {
+		const player = movePlayers(scene, 0, step / 100, scene.frames[0].players)[1];
+		const offset = player.x - 40;
+		if (Math.abs(offset) > 0.001) {
+			side ||= Math.sign(offset);
+			assert(Math.sign(offset) === side, "detour changed sides halfway through");
+		}
+		if (Math.abs(offset) < previousOffset - 0.00001) {
+			falling = true;
+		}
+		if (falling) {
+			assert(Math.abs(offset) <= previousOffset + 0.00001, "detour started weaving after its peak");
+		}
+		peak = Math.max(peak, Math.abs(offset));
+		previousOffset = Math.abs(offset);
+	}
+	assert(peak > 0.1, "crossing did not reserve an avoidance route");
+	assert(JSON.stringify(scene.frames) === original, "route planning rewrote recorded anchors");
+});
+
+Deno.test("a deliberate cut stops at its corner without rounding into a snake", () => {
+	const scene = scenario();
+	scene.frames = [[20, 10], [30, 10], [30, 20]].map(([x, y], time) => ({
+		time, players: [{ id: 1, x, y, opacity: 1 }], ball: {},
+	}));
+	for (let step = 1; step < 20; step++) {
+		const before = movePlayers(scene, 0, step / 20, scene.frames[0].players)[0];
+		const after = movePlayers(scene, 1, step / 20, scene.frames[1].players)[0];
+		assert(before.y === 10 && after.x === 30, "cut wandered off its two deliberate legs");
+	}
+});
+
+Deno.test("an obstacle cannot make a stationary player dodge out of their held spot", () => {
+	const scene = scenario();
+	scene.frames[0].players[1] = { ...scene.frames[0].players[1], x: 40, y: 25 };
+	scene.frames[1].players[1] = { ...scene.frames[0].players[1] };
+	for (let step = 1; step < 20; step++) {
+		const held = movePlayers(scene, 0, step / 20, scene.frames[0].players)[1];
+		assert(held.x === 40 && held.y === 25, "stationary player was pushed aside by a passing runner");
+	}
+});

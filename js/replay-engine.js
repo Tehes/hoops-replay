@@ -1087,44 +1087,35 @@ function pacePreparation(state, scene, time, finishDuration, record, direction) 
 			occupied.push(finish);
 		}
 		const side = origin.y < 25 ? 1 : -1;
-		const offsets = [[-direction * 2, side * 4], [-direction * 4, side], [-direction * 2, -side * 3]];
-		const steps = Math.min(3, Math.floor(remaining / 3));
-		const phase = remaining / steps;
-		scene.dribbleRoute = { owner, start: time + 0.01, end: time + scene.preparationWait, points: [] };
-		for (let i = 0; i < steps; i++) {
-			const [dx, dy] = offsets[i];
-			// Keep short routes clear of other players and the planned finish, without inventing a play.
-			const target = [1, -1, 0.5, -0.5].map((scale) => ({
-				x: Math.max(
-					scene.formation.backcourt && direction === -1 ? 49 : direction === 1 && origin.x >= 47 ? 47 : 2,
-					Math.min(
-						scene.formation.backcourt && direction === 1
-							? 45
-							: direction === -1 && origin.x <= 47
-							? 47
-							: 92,
-						origin.x + dx,
-					),
+		const phase = Math.min(2.5, remaining * 0.55);
+		// One lateral probe creates a new passing angle; the remaining time is a read/hold.
+		const target = [1, -1, 0.5, -0.5].map((scale) => ({
+			x: Math.max(
+				scene.formation.backcourt && direction === -1 ? 49 : direction === 1 && origin.x >= 47 ? 47 : 2,
+				Math.min(
+					scene.formation.backcourt && direction === 1 ? 45 : direction === -1 && origin.x <= 47 ? 47 : 92,
+					origin.x - direction * 2,
 				),
-				y: Math.max(3, Math.min(47, origin.y + dy * scale)),
-			})).find((point) =>
-				Math.hypot(point.x - carrier.x, point.y - carrier.y) >= 1 &&
-				occupied.every((other) =>
-					[0.25, 0.5, 0.75, 1].every((fraction) =>
-						Math.hypot(
-							carrier.x + (point.x - carrier.x) * fraction - other.x,
-							carrier.y + (point.y - carrier.y) * fraction - other.y,
-						) >= Math.min(4, Math.hypot(carrier.x - other.x, carrier.y - other.y))
-					)
+			),
+			y: Math.max(3, Math.min(47, origin.y + side * 4 * scale)),
+		})).find((point) =>
+			Math.hypot(point.x - carrier.x, point.y - carrier.y) >= 1 &&
+			occupied.every((other) =>
+				[0.25, 0.5, 0.75, 1].every((fraction) =>
+					Math.hypot(
+						carrier.x + (point.x - carrier.x) * fraction - other.x,
+						carrier.y + (point.y - carrier.y) * fraction - other.y,
+					) >= Math.min(4, Math.hypot(carrier.x - other.x, carrier.y - other.y))
 				)
-			);
-			if (target) {
-				Object.assign(carrier, target);
-			}
-			record(phase - 0.4);
-			scene.dribbleRoute.points.push({ x: carrier.x, y: carrier.y });
-			record(0.4);
+			)
+		);
+		scene.dribbleRoute = { owner, start: time + 0.01, end: time + scene.preparationWait, points: [] };
+		if (target) {
+			Object.assign(carrier, target);
 		}
+		record(phase);
+		scene.dribbleRoute.points.push({ x: carrier.x, y: carrier.y });
+		record(remaining - phase);
 		if (!scene.dribbleRoute.points.some((point) => Math.hypot(point.x - origin.x, point.y - origin.y) >= 1)) {
 			delete scene.dribbleRoute;
 		}
@@ -1460,7 +1451,19 @@ function compileScene(replay, scene, index, state, data) {
 				) {
 					return;
 				}
+				if (spacingMoves.length >= 2) {
+					return;
+				}
 				const occupied = points.filter((_, other) => other !== slot).concat([finish]);
+				const [[ax, ay], [bx, by]] = lane;
+				const dx = bx - ax;
+				const dy = by - ay;
+				const u = Math.max(0, Math.min(1,
+					((points[slot][0] - ax) * dx + (points[slot][1] - ay) * dy) / (dx * dx + dy * dy || 1)));
+				const laneDistance = Math.hypot(points[slot][0] - ax - dx * u, points[slot][1] - ay - dy * u);
+				if (laneDistance >= 6 && occupied.every(([x, y]) => Math.hypot(x - points[slot][0], y - points[slot][1]) >= 9)) {
+					return;
+				}
 				const target = findOpenSpace(
 					points[slot],
 					occupied,
@@ -2027,3 +2030,4 @@ export function getReplayFrame(replay, time) {
 		banner: scene.banner && local > 0.15 ? scene.banner : "",
 	};
 }
+

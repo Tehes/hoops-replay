@@ -25,10 +25,12 @@ Without a Game ID in the URL, the app opens the bundled DEN–OKC example.
 - **NBA and WNBA:** League detection from the Game ID, with league-specific team names, colors, logos,
   quarter lengths (NBA: 12 minutes; WNBA: 10 minutes), and three-point lines.
 - **Full-court replay:** Follow both teams as numbered jerseys on a court with the home team's logo and colors.
-- **Coordinated movement:** Players use individual timing, continuous routes, delayed defensive reactions, and
-  anticipatory avoidance during buildup. Wings lead, the guard follows, and a big trails while defenders retreat
-  before matching up. The advance varies with the inbound, outlet, and available time. Shooters move into
-  receiving positions during the buildup, with travel time based on route length and the available time budget.
+- **Coordinated movement:** Players follow planned straight runs or simple curves between meaningful positions.
+  Open spots are held, with at most two congestion-clearing off-ball adjustments during preparation.
+  Perimeter relocations follow the arc; deliberate cuts brake at their turns. Routes anticipate crossings
+  with one planned detour or a delayed start instead of repeated sideways corrections. Defenders react later.
+  Wings lead the advance, the guard follows, and a big trails while defenders retreat before matching up.
+  Ball handlers can probe one open lane and then hold while reading the defense.
 - **Play-by-play display:** See the score, game clock, player photos, and original event descriptions.
 - **Different shot animations:** Dunks, layups, jump shots, and other finishes have different movements and ball flights.
 - **Shot markers:** Made shots appear as green dots; misses appear as red crosses. Markers fade with replay time.
@@ -138,7 +140,7 @@ Include the relevant local action links when presenting a change so its behavior
 ├── js/
 │   ├── app.js               # Application entry point, rendering, and playback
 │   ├── replay-engine.js     # Scenes, lineups, possession, and movement planning
-│   ├── replay-motion.js     # Individual routes, defensive reactions, and anticipatory avoidance
+│   ├── replay-motion.js     # Planned routes, holds, reaction timing, and crossing reservations
 │   ├── replay-shots.js      # Shot profiles and ball trajectories
 │   ├── replay-teams.js      # NBA/WNBA team names, color palettes, and logos
 │   ├── replay-colors.js     # Color similarity, contrast, and jersey selection
@@ -216,3 +218,4 @@ See [LICENSE.txt](LICENSE.txt) for the terms.
 NBA and WNBA game data, team names, logos, and player photos belong to their respective owners.
 Player photos load from the respective league's CDN; team logos are stored locally.
 Hoops Replay is an independent, unofficial project.
+

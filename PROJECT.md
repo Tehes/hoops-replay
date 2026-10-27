@@ -1391,3 +1391,46 @@ und GSV–ATL Aktion 34 anhand zeitlicher Court-Bildfolgen und Wiedergabe geprü
 Abschließend 55 Tests unter Node mit der bestehenden Deno-Test-/Dateilese-Kompatibilitätsschicht
 sowie alle fünf Referenzspiel-Audits bestanden; Deno selbst ist hier weiterhin nicht installiert.
 `git diff --check` bestanden.
+
+
+
+### Zielgerichtete Laufwege und ruhige Haltepositionen (27.10.2026)
+
+Dieser Stand ersetzt die überlagerten Interpolationskorrekturen der früheren Bewegungslogik.
+Jede verbindende Route wird einmal aus den unveränderten Szenenankern geplant: Gerade,
+Perimeterbogen oder ein einfacher seitlicher Bogen um einen Konflikt. Der geometrische Weg
+bleibt während der Wiedergabe fest; eine gemeinsame Fortschrittskurve steuert Beschleunigung
+und Abbremsen. Nur annähernd gleichgerichtete Zwischenpunkte tragen Geschwindigkeit weiter.
+An bewussten Knicken, Umkehrpunkten und Haltepositionen wird gebremst. Ruhende Spieler bleiben
+auf ihrem Spot und werden nicht von einer Laufzeit-Abstoßung verschoben.
+
+Ballbesitzer und Ereignisbeteiligte reservieren ihre Wege zuerst. Andere laufende Spieler prüfen
+vorab zeitgleich belegte Wege und ruhende Spieler und wählen gegebenenfalls einen einzigen
+Ausweichbogen oder einen späteren Start. Perimeterbögen bleiben geometrisch erhalten;
+Verteidiger beginnen verzögert. Direkte Gegenspieler bleiben für absichtliche Deckungsnähe von
+der Kollisionsbewertung ausgenommen. Es gibt kein nachträgliches Hin-und-her-Korrigieren.
+Die Wege werden intern pro Szene/Intervall gecacht; die Berechnung bleibt unabhängig von der
+Reihenfolge des Seekings und verändert weder Quelldaten noch Ereignisanker.
+
+In der Wurfvorbereitung reagieren höchstens zwei freie Angreifer auf belegte Räume oder den
+geplanten Pass-/Drive-Korridor. Bereits freie Spots bleiben besetzt. Die Dribbelvorbereitung
+verwendet höchstens eine kurze Sondierung in eine freie Richtung, danach hält der Ballführer
+seine Position. Die vorhandene Ballzirkulation, belegten Cuts, Drives, Folgeempfänger,
+Übergangsvarianten und Abschlussanimationen bleiben erhalten. Es werden keine unbelegten
+festen Set-Plays oder zusätzlichen Ballbesitzwechsel erfunden.
+
+Grenze: Die Reservierung minimiert Konflikte, garantiert aber keine kollisionsfreie Simulation
+aller zehn Spieler. Dichte Ereignisanker und priorisierte Kontakte bleiben möglich; die Daten
+enthalten weiterhin kein Tracking. Einfachere Wege können solche bestehenden Engstellen
+sichtbarer machen. Keine Änderung am Datenvertrag, an Dependencies oder an der Oberfläche.
+
+Verifiziert: 60 Tests unter Node mit der vorhandenen Deno-Test-/Dateilese-Kompatibilitätsschicht
+bestanden, einschließlich fünf neuer Bewegungs-/Vorbereitungsprüfungen. Alle fünf Referenzspiele
+bestehen den Audit mit zusammen 34.392 geprüften Frames und null Fehlern. JavaScript-Syntaxcheck
+und `git diff --check` bestanden. Laufspuren der DEN–OKC-Aktionen 95, 246, 539 und 566 wurden
+als abgetastete Diagramme visuell geprüft. Keine neue Browser-Abnahme: Das vorhandene Playwright
+findet hier kein Chromium; der Installationsversuch lieferte ein ungültiges Downloadarchiv.
+Deno ist ebenfalls nicht installiert, deshalb keine native Deno-Check-/Lint-/Formatprüfung.
+Zur manuellen Abnahme in der lokalen Vorschau: `http://127.0.0.1:5500/?action=95`,
+`?action=246`, `?action=539` und `?action=566`; jeweils vor das Ereignis zurückspulen,
+Aufbau und Vorbereitung abspielen sowie Pause und wiederholtes Seeking prüfen.

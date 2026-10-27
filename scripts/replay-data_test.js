@@ -1698,3 +1698,33 @@ Deno.test("steals have a reachable approach, a visible loose ball and possession
 	}
 	assert(interceptions > 20 && strips > 5 && directions.size === 2, "missing steal variants or court directions");
 });
+
+
+Deno.test("preparations probe once then hold, with at most two purposeful spacing adjustments", async () => {
+	let probes = 0;
+	let holds = 0;
+	for (const game of ["0022600007", "0022600008", "0022600094", "0022600105", "1042600304"]) {
+		const data = await readData(`replay-${game}.json`);
+		const source = JSON.stringify(data);
+		const replay = compileReplay(data);
+		for (const scene of replay.scenes) {
+			assert((scene.spacingMoves?.length ?? 0) <= 2, "whole offense relocated during preparation");
+			const route = scene.dribbleRoute;
+			if (!route) {
+				continue;
+			}
+			assert(route.points.length === 1, "preparation invented repeated dribble direction changes");
+			const at = (fraction) => getReplayFrame(replay, scene.start + route.start + (route.end - route.start) * fraction);
+			const before = at(0.8);
+			const after = at(0.95);
+			const a = before.players.find((player) => player.id === route.owner);
+			const b = after.players.find((player) => player.id === route.owner);
+			assert(Math.hypot(a.x - b.x, a.y - b.y) < 0.00001, "ball carrier kept wandering after the probe");
+			assert(after.ball.owner === route.owner, "holding changed possession");
+			holds++;
+			probes++;
+		}
+		assert(JSON.stringify(data) === source, "movement planning changed recorded data");
+	}
+	assert(probes > 50 && holds === probes, "reference fixtures did not exercise probe-and-hold behavior");
+});
