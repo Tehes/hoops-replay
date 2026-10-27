@@ -674,6 +674,116 @@ function releaseBall(state) {
 	}
 }
 
+function planAttackContext(replay, index, offense, state) {
+	const scene = replay.scenes[index];
+	let origin = state.restart ? "inbound" : "continuity";
+	let interrupted = Boolean(state.restart);
+	for (let i = index - 1; i >= 0; i--) {
+		const previous = replay.scenes[i];
+		if (previous.action.period !== scene.action.period ||
+			["timeout", "period", "foul", "freethrow", "violation"].includes(previous.kind)) {
+			interrupted = true;
+			break;
+		}
+		if (previous.kind === "rebound") {
+			origin = previous.action.teamId === offense && previous.action.subType === "offensive"
+				? "second-chance" : "rebound-outlet";
+			break;
+		}
+		if (previous.kind === "turnover" || previous.kind === "steal") {
+			origin = previous.action.stealPersonId || previous.kind === "steal" ? "steal" : "inbound";
+			break;
+		}
+		if (["2pt", "3pt", "heave", "jumpball"].includes(previous.kind)) {
+			origin = previous.kind === "jumpball" ? "tip" : origin;
+			break;
+		}
+	}
+	const style = scene.shotStyle;
+	const quick = scene.liveSeconds > 0 && scene.liveSeconds <= 8 && origin !== "second-chance" &&
+		(!interrupted || style?.running || style?.family === "layup" || style?.family === "dunk");
+	return { origin, interrupted, quick, liveSeconds: scene.liveSeconds };
+}
+
+function planReceivingEntry(state, scene, direction) {
+	if (!scene.shotEntry || scene.liveSeconds < 14 || scene.immediateReboundFinish ||
+		scene.formation.backcourt || scene.shotStyle.tip || scene.shotStyle.putback ||
+		scene.formation.continuation?.playerId === scene.action.personId) {
+		return;
+	}
+	const lineup = state.lineups[scene.attackTeam];
+	const slot = lineup.indexOf(scene.action.personId);
+	const [x, y] = scene.formation.origins[slot];
+	const origin = { x: direction === 1 ? x : 94 - x, y };
+	const entry = scene.shotEntry;
+	const hoop = scene.hoop;
+	const radius = Math.hypot(entry.x - hoop.x, entry.y - hoop.y);
+	const angle = Math.atan2(entry.y - hoop.y, entry.x - hoop.x);
+	const candidates = [entry, ...[-0.24, 0.24].map((turn) => ({
+		x: hoop.x + Math.cos(angle + turn) * radius,
+		y: hoop.y + Math.sin(angle + turn) * radius,
+	})), { x: entry.x - direction * 6, y: entry.y }];
+	const occupied = scene.formation.slots.filter((_, i) => i !== slot)
+		.map(([x, y]) => ({ x: direction === 1 ? x : 94 - x, y }));
+	const score = (point) => {
+		const approach = Math.hypot(entry.x - point.x, entry.y - point.y);
+		if (point.x < 2 || point.x > 92 || point.y < 3 || point.y > 47 ||
+			(point.x - 47) * direction < 7 || approach > 8 || (approach > 0 && approach < 3)) {
+			return Infinity;
+		}
+		return Math.hypot(point.x - origin.x, point.y - origin.y) + approach * 0.25 +
+			occupied.reduce((sum, other) => sum + Math.max(0, 7 - Math.hypot(point.x - other.x, point.y - other.y)) ** 2, 0);
+	};
+	const sorted = candidates.map((point) => ({ point, cost: score(point) })).sort((a, b) => a.cost - b.cost);
+	if (sorted[0].point !== entry && sorted[0].cost + 1 < score(entry)) {
+		scene.stagedEntry = { ...sorted[0].point };
+		scene.receivingCandidates = sorted.map(({ point, cost }) => ({ ...point, cost }));
+	}
+}
+
+function reactDefense(state, scene, matchups, contacts, direction, delay) {
+	const hoop = scene.hoop ?? { x: direction === 1 ? 88.75 : 5.25, y: 25 };
+	const ball = state.positions[state.ball.owner] ?? state.ball;
+	const driving = state.ball.dribble && Math.hypot(ball.x - hoop.x, ball.y - hoop.y) < 18;
+	if (driving && !scene.helpDefender) {
+		const eligible = Object.entries(matchups).filter(([id, attacker]) =>
+			attacker !== state.ball.owner && !contacts.has(Number(id)) &&
+			!scene.formation.contactMatchups.some((contact) => contact.defender === Number(id))
+		);
+		eligible.sort(([a], [b]) => Math.hypot(state.positions[a].x - ball.x, state.positions[a].y - ball.y) -
+			Math.hypot(state.positions[b].x - ball.x, state.positions[b].y - ball.y));
+		if (eligible.length) {
+			scene.helpDefender = Number(eligible[0][0]);
+		}
+	}
+	for (const [id, attacker] of Object.entries(matchups)) {
+		if (contacts.has(Number(id))) {
+			continue;
+		}
+		const player = state.positions[id];
+		const target = state.positions[attacker];
+		const onBall = attacker === state.ball.owner;
+		const distance = Math.hypot(hoop.x - target.x, hoop.y - target.y) || 1;
+		const reach = onBall ? 3.2 : 3.6;
+		let x = target.x + (hoop.x - target.x) / distance * reach;
+		let y = target.y + (hoop.y - target.y) / distance * reach;
+		if (!onBall) {
+			const shade = Number(id) === scene.helpDefender && driving ? 0.45 : 0.13;
+			const dx = ball.x - x;
+			const dy = ball.y - y;
+			const scale = Math.min(shade, 6 / (Math.hypot(dx, dy) || 1));
+			x += dx * scale;
+			y += dy * scale;
+		}
+		x = Math.max(1, Math.min(93, x));
+		y = Math.max(2, Math.min(48, y));
+		const travel = Math.hypot(x - player.x, y - player.y);
+		const fraction = Math.min(1 - Math.exp(-delay / 0.16), delay * 16 / (travel || 1));
+		player.x += (x - player.x) * fraction;
+		player.y += (y - player.y) * fraction;
+	}
+}
+
 function advanceFormation(state, scene, offense, direction, targets, record, duration, inbounder = null) {
 	const lineup = state.lineups[offense];
 	const origins = Object.fromEntries(Object.entries(state.positions).map(([id, point]) => [id, { ...point }]));
@@ -689,7 +799,7 @@ function advanceFormation(state, scene, offense, direction, targets, record, dur
 	}
 	const offBall = lineup.slice(1);
 	const wings = lineup.slice(1, 4).filter((id) => id !== inbounder).slice(0, 2);
-	const quick = scene.liveSeconds <= 8 || scene.shotStyle?.running;
+	const quick = scene.attackContext.quick;
 	const variant = quick ? "quick-push" : state.restart === "baseline" && scene.liveSeconds >= 12
 		? "patient-inbound" : state.needsAdvance ? "live-outlet" : "spread-inbound";
 	const progressions = variant === "quick-push"
@@ -767,6 +877,7 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 	const carrier = state.ball.owner;
 	const origin = carrier ? { ...state.positions[carrier] } : { ...state.ball };
 	scene.attackTeam = offense;
+	scene.attackContext = planAttackContext(replay, index, offense, state);
 	const newAttack = !state.formation || state.formation.offense !== offense ||
 		state.formation.period !== scene.action.period || state.needsAdvance || restart === "baseline";
 	if (newAttack) {
@@ -781,9 +892,11 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 	scene.matchups = { ...matchups };
 	scene.matchupPlanId = state.formation.id;
 	scene.formation = state.formation;
+	planReceivingEntry(state, scene, direction);
+	const entry = scene.stagedEntry ?? scene.shotEntry;
 	if (!restart && !changed && !state.needsAdvance && carrier) {
 		if (scene.shotEntry) {
-			Object.assign(state.positions[scene.action.personId], scene.shotEntry);
+			Object.assign(state.positions[scene.action.personId], entry);
 		}
 		for (const [defender, attacker] of Object.entries(matchups)) {
 			const target = state.positions[attacker];
@@ -806,7 +919,7 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 	const origins = Object.fromEntries(Object.entries(state.positions).map(([id, position]) => [id, { ...position }]));
 	const buildup = destinations.map((point, slot) => {
 		return scene.shotEntry && lineup[slot] === scene.action.personId
-			? [direction === 1 ? scene.shotEntry.x : 94 - scene.shotEntry.x, scene.shotEntry.y]
+			? [direction === 1 ? entry.x : 94 - entry.x, entry.y]
 			: point;
 	});
 	placeFormation(state, offense, direction, matchups, data, buildup);
@@ -883,9 +996,79 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 	state.needsAdvance = false;
 }
 
+function preparationPosition(state, scene, id, time) {
+	const arrival = scene.arrivalMove?.id === id ? scene.arrivalMove : null;
+	const move = arrival ?? scene.spacingMoves?.find((move) => move.id === id && move.duration);
+	if (!move) {
+		return state.positions[id];
+	}
+	const fraction = Math.max(0, Math.min(1, (time - move.startAt) / move.duration));
+	return { x: move.from.x + (move.x - move.from.x) * fraction, y: move.from.y + (move.y - move.from.y) * fraction };
+}
+
+function relocatePasser(state, scene, id, receiver, time, remaining) {
+	const moves = scene.spacingMoves;
+	if (!["2pt", "3pt"].includes(scene.kind) || moves.length >= 2 || remaining < 1 ||
+		[scene.action.personId, scene.action.assistPersonId, scene.formation.interiorId,
+			scene.continuationMove?.playerId].includes(id) || moves.some((move) => move.id === id)) {
+		return;
+	}
+	const direction = scene.hoop?.x < 47 ? -1 : 1;
+	const local = (point) => [direction === 1 ? point.x : 94 - point.x, point.y];
+	const origin = state.positions[id];
+	const occupied = state.lineups[scene.attackTeam].filter((other) => other !== id)
+		.map((other) => local(preparationPosition(state, scene, other, time + remaining)));
+	const ball = local(state.positions[receiver]);
+	const finish = local(scene.shotPoint ?? state.positions[receiver]);
+	const [x, y] = local(origin);
+	const dx = finish[0] - ball[0];
+	const dy = finish[1] - ball[1];
+	const lane = [ball, finish];
+	const position = state.players.find((player) => player.id === id).position;
+	const target = findOpenSpace([x, y], occupied, lane, false,
+		["PG", "SG", "G", "G-F"].includes(position), scene.formation.backcourt);
+	const defenders = Object.keys(scene.matchups).map((id) => local(state.positions[id]));
+	const score = ([px, py]) => {
+		if (px < (scene.formation.backcourt ? 2 : 54) || px > (scene.formation.backcourt ? 45 : 92) || py < 3 || py > 47) {
+			return Infinity;
+		}
+		let cost = Math.hypot(px - x, py - y) * 0.2;
+		for (const [ox, oy] of occupied) {
+			cost += Math.max(0, 9 - Math.hypot(px - ox, py - oy)) ** 2;
+		}
+		const fraction = Math.max(0, Math.min(1, ((px - ball[0]) * dx + (py - ball[1]) * dy) / (dx * dx + dy * dy || 1)));
+		cost += Math.max(0, 5 - Math.hypot(px - ball[0] - dx * fraction, py - ball[1] - dy * fraction)) ** 2;
+		// A passer may relocate to reopen a return lane; an already open option holds.
+		const bx = px - ball[0];
+		const by = py - ball[1];
+		for (const [ox, oy] of defenders) {
+			cost += Math.max(0, 3 - Math.hypot(px - ox, py - oy)) ** 2 * 3;
+			const along = ((ox - ball[0]) * bx + (oy - ball[1]) * by) / (bx * bx + by * by || 1);
+			if (along > 0.1 && along < 0.9) {
+				cost += Math.max(0, 3 - Math.hypot(ox - ball[0] - bx * along, oy - ball[1] - by * along)) ** 2 * 3;
+			}
+		}
+		return cost;
+	};
+	const options = [target, [x, y - 5], [x, y + 5], [x - 4, y - 3], [x - 4, y + 3]].map(([px, py]) => {
+		const fraction = Math.min(1, 6 / (Math.hypot(px - x, py - y) || 1),
+			remaining * 4 / (Math.hypot(px - x, py - y) || 1));
+		return [x + (px - x) * fraction, y + (py - y) * fraction];
+	});
+	options.sort((a, b) => score(a) - score(b));
+	const best = options[0];
+	const distance = Math.hypot(best[0] - x, best[1] - y);
+	if (distance < 2 || score(best) + 1 >= score([x, y])) {
+		return;
+	}
+	moves.push({ id, x: direction === 1 ? best[0] : 94 - best[0], y: best[1],
+		from: { ...origin }, startAt: time, duration: remaining, reason: "pass-and-space" });
+}
+
 function circulateBall(state, scene, duration, record) {
 	const owner = state.ball.owner;
-	const moving = new Set((scene.spacingMoves ?? []).map((move) => move.id));
+	const start = scene.frames.at(-1).time;
+	const moving = new Set();
 	if (scene.continuationMove) {
 		moving.add(scene.continuationMove.playerId);
 	}
@@ -898,62 +1081,84 @@ function circulateBall(state, scene, duration, record) {
 		? owner
 		: null;
 	const defenders = Object.keys(scene.matchups).map((id) => state.positions[id]);
-	const passCount = duration >= 10 ? 3 : 2;
-	let paths = [[owner]];
-	for (let step = 0; step < passCount; step++) {
-		const nextPaths = [];
-		for (const path of paths) {
-			const from = state.positions[path.at(-1)];
-			const targets = step === passCount - 1 && finish ? [finish] : receivers.slice().sort((a, b) => {
-				const first = state.positions[a];
-				const second = state.positions[b];
-				return Math.hypot(first.x - from.x, first.y - from.y) -
-					Math.hypot(second.x - from.x, second.y - from.y);
-			});
-			for (const id of targets) {
-				if (id === path.at(-1) || (path.includes(id) && !(step === passCount - 1 && id === finish))) {
-					continue;
+	const candidates = [];
+	for (const passCount of duration >= 10 ? [2, 3] : [2]) {
+		let paths = [[owner]];
+		for (let step = 0; step < passCount; step++) {
+			const nextPaths = [];
+			for (const path of paths) {
+				const at = start + duration * (step + 1) / (passCount + 1);
+				const from = preparationPosition(state, scene, path.at(-1), at);
+				const targets = step === passCount - 1 && finish ? [finish] : receivers.slice().sort((a, b) => {
+					const first = state.positions[a];
+					const second = state.positions[b];
+					return Math.hypot(first.x - from.x, first.y - from.y) -
+						Math.hypot(second.x - from.x, second.y - from.y);
+				});
+				for (const id of targets) {
+					if (id === path.at(-1) || (path.includes(id) && !(step === passCount - 1 && id === finish))) {
+						continue;
+					}
+					const to = preparationPosition(state, scene, id, at + 0.7);
+					const dx = to.x - from.x;
+					const dy = to.y - from.y;
+					const length = Math.hypot(dx, dy);
+					if (
+						length < 6 || length > 32 || defenders.some((defender) => {
+							const fraction = ((defender.x - from.x) * dx + (defender.y - from.y) * dy) / length ** 2;
+							return fraction > 0.1 && fraction < 0.9 &&
+								Math.hypot(defender.x - from.x - dx * fraction, defender.y - from.y - dy * fraction) < 2.5;
+						})
+					) {
+						continue;
+					}
+					nextPaths.push([...path, id]);
 				}
-				const to = state.positions[id];
-				const dx = to.x - from.x;
-				const dy = to.y - from.y;
-				const length = Math.hypot(dx, dy);
-				if (
-					length < 6 || length > 32 || defenders.some((defender) => {
-						const fraction = ((defender.x - from.x) * dx + (defender.y - from.y) * dy) / length ** 2;
-						return fraction > 0.1 && fraction < 0.9 &&
-							Math.hypot(defender.x - from.x - dx * fraction, defender.y - from.y - dy * fraction) < 2.5;
-					})
-				) {
-					continue;
-				}
-				nextPaths.push([...path, id]);
 			}
+			paths = nextPaths;
 		}
-		paths = nextPaths;
+		candidates.push(...paths);
 	}
-	const path = paths.find((candidate) => new Set(candidate).size >= 3);
+	const score = (path) => path.slice(1).reduce((cost, id, i) => {
+		const at = start + duration * (i + 1) / path.length;
+		const from = preparationPosition(state, scene, path[i], at);
+		const to = preparationPosition(state, scene, id, at + 0.7);
+		const distance = Math.hypot(to.x - from.x, to.y - from.y);
+		const clearance = Math.min(...defenders.map((defender) => {
+			const u = Math.max(0.1, Math.min(0.9,
+				((defender.x - from.x) * (to.x - from.x) + (defender.y - from.y) * (to.y - from.y)) / distance ** 2));
+			return Math.hypot(defender.x - from.x - (to.x - from.x) * u,
+				defender.y - from.y - (to.y - from.y) * u);
+		}));
+		return cost + distance * 0.04 + Math.max(0, 5 - clearance) ** 2;
+	}, (path.length - 1) * 0.5);
+	const ranked = candidates.filter((candidate) => new Set(candidate).size >= 3)
+		.map((path) => ({ path, cost: score(path) })).sort((a, b) => a.cost - b.cost);
+	const path = ranked[0]?.path;
 	if (!path) {
 		return false;
 	}
-	const flights = path.slice(1).map((id, index) => {
-		const from = state.positions[path[index]];
-		const to = state.positions[id];
-		return 0.35 + Math.hypot(to.x - from.x, to.y - from.y) / 60;
-	});
-	const hold = (duration - flights.reduce((sum, flight) => sum + flight + 0.02, 0)) / (passCount + 1);
+	scene.preparationChoices = { candidates: ranked.length, cost: ranked[0].cost };
+	const passCount = path.length - 1;
+	// Fixed flight windows make moving catch points predictable before recording frames.
+	const flight = 0.85;
+	const hold = (duration - passCount * (flight + 0.02)) / (passCount + 1);
 	scene.preparationPasses = [];
 	record(hold);
 	for (let i = 0; i < passCount; i++) {
-		const receiver = state.positions[path[i + 1]];
+		const releaseAt = scene.frames.at(-1).time + 0.01;
+		const receiver = preparationPosition(state, scene, path[i + 1], releaseAt + flight);
 		releaseBall(state);
 		record(0.01);
-		const releaseAt = scene.frames.at(-1).time;
-		flyBall(state, record, { x: receiver.x + 1, y: receiver.y + 0.8, z: 0.5 }, 0.6, flights[i]);
+		flyBall(state, record, { x: receiver.x + 1, y: receiver.y + 0.8, z: 0.5 }, 0.6, flight);
 		state.ball.owner = path[i + 1];
 		state.ball.dribble = true;
 		record(0.01);
 		scene.preparationPasses.push({ from: path[i], to: path[i + 1], releaseAt, catchAt: scene.frames.at(-1).time });
+		if (!path.slice(i + 1).includes(path[i])) {
+			relocatePasser(state, scene, path[i], path[i + 1], scene.frames.at(-1).time,
+				start + duration - scene.frames.at(-1).time);
+		}
 		record(hold);
 	}
 	return true;
@@ -1108,6 +1313,22 @@ function pacePreparation(state, scene, time, finishDuration, record, direction) 
 		: Math.min(12, scene.liveSeconds * 0.5);
 	const elapsed = time - (scene.liveAt ?? 0);
 	scene.preparationWait = Math.max(0, budget - elapsed - finishDuration);
+	if (scene.stagedEntry) {
+		const player = state.positions[scene.action.personId];
+		const distance = Math.hypot(scene.shotEntry.x - player.x, scene.shotEntry.y - player.y);
+		const duration = Math.max(0.8, distance / 5);
+		if (scene.preparationWait >= duration + 0.5) {
+			scene.arrivalMove = { id: scene.action.personId, from: { ...player },
+				x: scene.shotEntry.x, y: scene.shotEntry.y, duration,
+				startAt: time + scene.preparationWait - duration - 0.15 };
+		} else {
+			Object.assign(player, scene.shotEntry);
+			record(duration, true);
+			time += duration;
+			scene.preparationWait = Math.max(0, scene.preparationWait - duration);
+			delete scene.stagedEntry;
+		}
+	}
 	scene.preparationAt = time;
 	const spacingMoves = scene.spacingMoves ?? [];
 	if (scene.preparationWait >= 3) {
@@ -1401,8 +1622,13 @@ function compileScene(replay, scene, index, state, data) {
 	let time = 0;
 	let followAttackers = false;
 	const spacingMoves = [];
+	scene.spacingMoves = spacingMoves;
 	const contacts = new Set();
 	const record = (delay, movement = false) => {
+		const arrival = scene.arrivalMove;
+		if (arrival && scene.approachAt === undefined) {
+			Object.assign(state.positions[arrival.id], preparationPosition(state, scene, arrival.id, time + delay));
+		}
 		if (scene.releaseAt === undefined) {
 			for (const move of spacingMoves) {
 				const position = state.positions[move.id];
@@ -1426,15 +1652,7 @@ function compileScene(replay, scene, index, state, data) {
 			player.y = continuation.from.y + (continuation.target.y - continuation.from.y) * fraction;
 		}
 		if (followAttackers && !movement) {
-			for (const [defender, attacker] of Object.entries(matchups)) {
-				if (!contacts.has(Number(defender))) {
-					const target = state.positions[attacker];
-					Object.assign(state.positions[defender], {
-						x: Math.max(1, Math.min(93, target.x + direction * 3.6)),
-						y: target.y + (25 - target.y) * 0.09,
-					});
-				}
-			}
+			reactDefense(state, scene, matchups, contacts, direction, delay);
 		}
 		if (movement) {
 			const previous = scene.frames.at(-1);
@@ -1510,7 +1728,8 @@ function compileScene(replay, scene, index, state, data) {
 				) {
 					return;
 				}
-				if (spacingMoves.length >= 2) {
+				// Reserve one adjustment for a useful relocation after a connecting pass.
+				if (spacingMoves.length >= 1) {
 					return;
 				}
 				const occupied = points.filter((_, other) => other !== slot).concat([finish]);

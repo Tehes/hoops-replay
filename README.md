@@ -32,6 +32,11 @@ Without a Game ID in the URL, the app opens the bundled DEN–OKC example.
   The PG carries the ball forward while all four teammates fill their spots ahead of him,
   including the interior player; defenders retreat before matching up.
   Ball handlers can probe one open lane and then hold while reading the defense.
+- **Possession choreography:** Buildup accounts for live possession changes, interruptions and second chances.
+  Where time and spacing allow, receivers approach their finishing spots later rather than waiting there throughout.
+  Connecting passes can meet moving receivers; passers can relocate to reopen a useful passing option.
+  Defenders shade toward the ball, help against penetration and recover to their assigned player.
+  Feasible receiving routes and pass sequences are compared deterministically by continuity, spacing and passing lanes.
 - **Play-by-play display:** See the score, game clock, player photos, and original event descriptions.
 - **Different shot animations:** Dunks, layups, jump shots, and other finishes have different movements and ball flights.
 - **Shot markers:** Made shots appear as green dots; misses appear as red crosses. Markers fade with replay time.

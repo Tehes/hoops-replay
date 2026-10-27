@@ -1372,9 +1372,14 @@ Deno.test("buildup overlaps player travel, bounds speed and positions the shoote
 				const ready = scene.frames.find((frame) => frame.time === scene.preparationAt);
 				const shooter = ready.players.find((player) => player.id === scene.action.personId);
 				assert(
-					Math.hypot(shooter.x - scene.shotEntry.x, shooter.y - scene.shotEntry.y) < 0.00001,
-					"shooter waited until the finish to approach the receiving position",
+					Math.hypot(shooter.x - (scene.stagedEntry ?? scene.shotEntry).x,
+						shooter.y - (scene.stagedEntry ?? scene.shotEntry).y) < 0.00001,
+					"shooter did not reach the planned preparation position",
 				);
+				const finish = scene.frames.find((frame) => frame.time === scene.approachAt)
+					.players.find((player) => player.id === scene.action.personId);
+				assert(!scene.arrivalMove || Math.hypot(finish.x - scene.shotEntry.x, finish.y - scene.shotEntry.y) < 0.00001,
+					"shooter did not finish the staged approach before the shot animation");
 			}
 		}
 		if (id === "0022600007") {
@@ -1428,8 +1433,8 @@ Deno.test("next receivers move during the preceding shot without anticipating it
 				);
 				const defender = frames[i].players.find((player) => player.id === defenderId);
 				assert(
-					Math.hypot(defender.x - current.x, defender.y - current.y) < 4.5,
-					"receiver lost their defender",
+					Math.hypot(defender.x - current.x, defender.y - current.y) < 10.5,
+					"assigned defender left the receiver beyond the allowed help and reaction range",
 				);
 				distance += step;
 			}
@@ -1629,7 +1634,8 @@ Deno.test("guards prepare outside and enter the paint during the drive; centers 
 				const ready = getReplayFrame(replay, scene.start + scene.preparationAt).players.find((p) =>
 					p.id === scene.action.personId
 				);
-				assert(!scene.driveStart && Math.hypot(ready.x - scene.shotEntry.x, ready.y - scene.shotEntry.y) < 0.001,
+				const entry = scene.stagedEntry ?? scene.shotEntry;
+				assert(!scene.driveStart && Math.hypot(ready.x - entry.x, ready.y - entry.y) < 0.001,
 					"center was forced into the zone instead of preparing the perimeter shot");
 				centerThrees++;
 			}
@@ -1731,6 +1737,138 @@ Deno.test("preparations probe once then hold, with at most two purposeful spacin
 		assert(JSON.stringify(data) === source, "movement planning changed recorded data");
 	}
 	assert(probes > 50 && holds === probes, "reference fixtures did not exercise probe-and-hold behavior");
+});
+
+Deno.test("possession context needs time and a live opportunity, not a turnover label alone", async () => {
+	const source = await readData("replay-0022600007.json");
+	const [away, home] = source.teams;
+	const tip = source.actions.find((action) => action.actionType === "jumpball");
+	const passer = home.players.find((player) => player.starter);
+	const shooter = away.players.find((player) => player.starter);
+	for (const seconds of [4, 24]) {
+		for (const stopped of [false, true]) {
+			const data = structuredClone(source);
+			data.actions = [
+				{ ...tip, clock: "PT11M50S", jumpBallRecoverdPersonId: passer.id },
+				{ actionType: "turnover", subType: "bad pass", teamId: home.id, personId: passer.id,
+					stealPersonId: shooter.id, clock: "PT11M50S" },
+				...(stopped ? [{ actionType: "timeout", subType: "full", teamId: away.id, clock: "PT11M50S" }] : []),
+				{ actionType: "2pt", subType: "Jump Shot", teamId: away.id, personId: shooter.id,
+					isFieldGoal: 1, shotResult: "Made", x: 20, y: 50, qualifiers: ["fromturnover"],
+					clock: `PT11M${50 - seconds}S` },
+			].map((action, i) => ({ period: 1, scoreAway: "0", scoreHome: "0", ...action,
+				actionNumber: i + 1, orderNumber: i + 1 }));
+			const shot = compileReplay(data).scenes.at(-1);
+			assert(shot.attackContext.quick === (seconds === 4 && !stopped), "incorrect transition tempo");
+			assert(shot.attackContext.interrupted === stopped, "interruption was ignored");
+		}
+	}
+});
+
+Deno.test("staged receiving routes and moving catches preserve anchors, timing and deterministic choices", async () => {
+	let staged = 0;
+	let movingCatches = 0;
+	let choices = 0;
+	let unassistedCirculation = 0;
+	let relocations = 0;
+	for (const id of ["0022600007", "0022600008", "0022600094", "0022600105", "1042600304"]) {
+		const data = await readData(`replay-${id}.json`);
+		const original = JSON.stringify(data);
+		const replay = compileReplay(data);
+		for (const scene of replay.scenes) {
+			const arrival = scene.arrivalMove;
+			for (const move of scene.spacingMoves.filter((move) => move.reason === "pass-and-space")) {
+				assert(scene.preparationPasses.some((pass) => pass.from === move.id && pass.catchAt <= move.startAt),
+					"passer relocated before releasing the ball");
+				assert(Math.hypot(move.x - move.from.x, move.y - move.from.y) <= Math.min(6, move.duration * 4) + 0.001,
+					"passer invented a long or rushed relocation");
+				relocations++;
+			}
+			if (arrival) {
+				assert(arrival.startAt > scene.preparationAt, "receiver was parked at the finish too early");
+				const at = (time) => getReplayFrame(replay, scene.start + time).players.find((p) => p.id === arrival.id);
+				const first = at(scene.preparationAt);
+				const last = at(scene.approachAt);
+				assert(Math.hypot(first.x - last.x, first.y - last.y) >= 3, "staged route had no meaningful approach");
+				assert(Math.hypot(last.x - scene.shotEntry.x, last.y - scene.shotEntry.y) < 0.001,
+					"receiving route missed its finish anchor");
+				const frames = scene.frames.filter((f) => f.time >= scene.preparationAt && f.time <= scene.approachAt);
+				for (let i = 1; i < frames.length; i++) {
+					const a = frames[i - 1].players.find((p) => p.id === arrival.id);
+					const b = frames[i].players.find((p) => p.id === arrival.id);
+					assert(Math.hypot(b.x - a.x, b.y - a.y) <= 5 * (frames[i].time - frames[i - 1].time) + 0.001,
+						"receiver rushed to recover the final spot");
+				}
+				staged++;
+			}
+			if (scene.preparationChoices?.candidates > 1) {
+				choices++;
+			}
+			if (scene.preparationPasses && !scene.action.assistPersonId && ["2pt", "3pt"].includes(scene.kind)) {
+				unassistedCirculation++;
+			}
+			for (const pass of scene.preparationPasses ?? []) {
+				const release = getReplayFrame(replay, scene.start + pass.releaseAt);
+				const catchFrame = getReplayFrame(replay, scene.start + pass.catchAt);
+				const a = release.players.find((p) => p.id === pass.to);
+				const b = catchFrame.players.find((p) => p.id === pass.to);
+				const before = scene.frames.findLast((f) => f.time < pass.catchAt && !f.ball.owner);
+				const receiver = before.players.find((p) => p.id === pass.to);
+				assert(Math.hypot(before.ball.x - receiver.x - 1, before.ball.y - receiver.y - 0.8) < 0.1,
+					"moving catch relied on snapping the ball to a different point");
+				if (Math.hypot(a.x - b.x, a.y - b.y) > 0.3) {
+					movingCatches++;
+				}
+			}
+		}
+		assert(JSON.stringify(data) === original, "choreography changed source data");
+		const changedTimestamps = structuredClone(data);
+		for (const action of changedTimestamps.actions) {
+			action.timeActual = "2099-01-01T00:00:00.000Z";
+		}
+		const repeated = compileReplay(changedTimestamps);
+		assert(JSON.stringify(replay.scenes.map((s) => s.frames)) === JSON.stringify(repeated.scenes.map((s) => s.frames)),
+			"wall-clock timestamps changed the choreography or a choice was nondeterministic");
+	}
+	assert(staged > 10 && movingCatches > 0 && choices > 0 && unassistedCirculation > 0 && relocations > 0,
+		"fixtures did not exercise staged entries, moving catches and alternate pass sequences");
+});
+
+Deno.test("ball-aware defenders close out after passes without switching assignments or teleporting", async () => {
+	let closeouts = 0;
+	let helpers = 0;
+	for (const id of ["0022600007", "0022600008", "1042600304"]) {
+		const replay = compileReplay(await readData(`replay-${id}.json`));
+		for (const scene of replay.scenes) {
+			if (scene.helpDefender) {
+				assert(Object.hasOwn(scene.matchups, scene.helpDefender), "helper has no stable assignment");
+				helpers++;
+			}
+			for (const pass of scene.preparationPasses ?? []) {
+				if (pass.catchAt + 0.5 >= scene.preparationAt + scene.preparationWait) {
+					continue;
+				}
+				const defender = Number(Object.keys(scene.matchups).find((id) => scene.matchups[id] === pass.to));
+				const gap = (time) => {
+					const frame = getReplayFrame(replay, scene.start + time);
+					const a = frame.players.find((p) => p.id === pass.to);
+					const b = frame.players.find((p) => p.id === defender);
+					return Math.hypot(a.x - b.x, a.y - b.y);
+				};
+				if (gap(pass.releaseAt) > gap(pass.catchAt + 0.5) + 0.2) {
+					closeouts++;
+				}
+				const frames = scene.frames.filter((f) => f.time >= pass.releaseAt && f.time <= pass.catchAt);
+				for (let i = 1; i < frames.length; i++) {
+					const a = frames[i - 1].players.find((p) => p.id === defender);
+					const b = frames[i].players.find((p) => p.id === defender);
+					assert(Math.hypot(b.x - a.x, b.y - a.y) <= 16 * (frames[i].time - frames[i - 1].time) + 0.001,
+						"closeout teleported the defender");
+				}
+			}
+		}
+	}
+	assert(closeouts > 0 && helpers > 0, "no defensive help or recovery was exercised");
 });
 
 Deno.test("unanchored half-court possessions give an available center an interior spot", async () => {

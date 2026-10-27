@@ -1473,3 +1473,43 @@ Center-Innenpositionen in Formationen ohne Wurfanker; belegte Center-Dreier blei
 bestehenden Rollen-/Drive-Test geschützt. Alle fünf Spiel-Audits bestehen mit 34.507 Frames
 und null Fehlern. Syntaxcheck und `git diff --check` bestanden. Die oben beschriebene Grenze
 für Browser- und native Deno-Prüfungen gilt weiterhin; keine neue Browser-Abnahme.
+
+### Zusammenhängende Choreografie aus dem Angriffskontext (27.10.2026)
+
+Die Engine ergänzt den bestehenden Aufbau in fünf Bereichen:
+
+- `attackContext` unterscheidet Einwurf, Rebound-Outlet, Steal, zweite Chance und
+  Fortsetzung. Kurze Spieluhrabstände und eine passende Live-Situation erlauben einen
+  schnellen Vorstoß; ein Turnover-Label oder ein Running-Abschluss allein erzwingt ihn nicht.
+  Unterbrechungen werden beim Rückblick berücksichtigt. Der Abstand zweier Ereignisse
+  bleibt ein Zeitbudget, keine behauptete vollständige Ballbesitzdauer.
+- Bei längerer Vorbereitung vergleicht die Engine kurze Ausgangswege zum Abschluss.
+  Eine zeitlich gestaffelte `arrivalMove` bringt den Schützen erst später zu seinem
+  Anlauf- oder Empfangspunkt. Ohne ausreichendes Zeitbudget entfällt die zusätzliche
+  Haltephase. Wurfkoordinate, Wurfart und bereits vorbereitete Folgeempfänger bleiben erhalten.
+- Verbindende Pässe dürfen bewegte Empfänger an deren vorausberechnetem Fangpunkt treffen.
+  Nach einer Ballabgabe kann ein kurzer Positionswechsel Raum oder einen Rückpassweg öffnen,
+  sofern die Bewertung eine Verbesserung ergibt. Bereits freie Optionen bleiben stehen.
+  Höchstens zwei freie Spieler korrigieren ihr Spacing; belegte Abschlussbeteiligte,
+  Innenoption und Folgeempfänger werden durch solche Passgeber-Korrekturen nicht verdrängt.
+- Die Defense hält ihre Zuordnungen, orientiert sich aber zusätzlich an Ball und Korb.
+  Ballferne Verteidiger rücken etwas ein, ein geeigneter Helfer reagiert auf Penetration,
+  und der neue Ballverteidiger schließt nach einem Pass zum Empfänger auf.
+  Reaktion und Weg werden zeitlich begrenzt; belegte Kontakte behalten Vorrang.
+- Kurze Empfangswege und verfügbare Passfolgen werden deterministisch bewertet.
+  Kontinuität, Laufstrecke, Zeitbudget, Abstände und freie Passlinien bestimmen die Wahl.
+  Längere Vorbereitung erzwingt keinen zusätzlichen Pass; fehlt eine geeignete Folge,
+  bleibt die vorhandene kurze Dribbelsondierung mit anschließender Haltephase möglich.
+
+Die Ergänzungen bleiben schematisch. Es werden keine weiteren PbP-Ereignisse, Statistiken,
+Ballbesitzwechsel oder unbelegten Screens und Set-Plays erzeugt. Die Northstar-Leitlinie
+enthält weiterhin keine Arbeitsplanung oder Umsetzungsprioritäten.
+
+Verifiziert: 64 Tests unter Node mit Deno-Kompatibilitätsschicht bestanden. Die neuen
+Regressionen prüfen Kontextgrenzen, späte Empfangswege, bewegte Ballannahmen, Passgeber-Spacings,
+defensive Closeouts sowie deterministische Planung unabhängig von `timeActual`.
+Alle fünf NBA-/WNBA-Referenzspiele bestehen den Audit mit 34.595 Frames und null Fehlern.
+JavaScript-Syntaxprüfung und `git diff --check` bestehen. Abgetastete Laufwege wurden
+für DEN–OKC, Aktionen 341 und 13, visuell geprüft. Keine neue Browser-Abnahme:
+Chrome über Cloud Browser konnte die Vorschau auf `http://127.0.0.1:5500` nicht erreichen
+(`ERR_CONNECTION_REFUSED`). Deno ist hier nicht installiert; keine native Deno-Prüfung.
