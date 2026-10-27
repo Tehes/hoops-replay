@@ -161,9 +161,12 @@ All 30 NBA and 15 WNBA teams have local logos and primary colors adapted from
 with cream for the Bucks and black available implicitly. The active values live in `js/replay-teams.js`;
 they are replay display colors and do not depend on a particular season's uniform rotation.
 
-- Normally, home wears white and away wears primary. Only similar primaries switch home to primary.
-  Similarity follows the schedule's OKLab rule: less than 45° hue separation for chromatic colors;
-  less than 0.30 lightness separation when either color's chroma is below 0.04.
+- Normally, home wears white and away wears primary. The schedule's full decision controls a switch:
+  primaries must be similar **and the away team's own alternate must improve separation sufficiently**.
+  Similarity means less than 45° hue separation for chromatic colors, or less than 0.30 lightness separation
+  when either color's chroma is below 0.04. The alternate must improve OKLab distance by at least 0.04,
+  or the contrast ratio by at least 0.5 for neutral primary pairs. An absent alternate means implicit black.
+  If that alternate fails, home stays white and away keeps primary; white/black jersey options do not trigger a switch.
 - When home switches, away evaluates **alternate, white, and black**. Away primary is excluded because
   it conflicts with home paint. Bases qualify if they improve separation from home primary by at least 0.04 OKLab
   distance for chromatic primary pairs, or 0.5 contrast-ratio points for neutral pairs, as in the schedule.
@@ -176,7 +179,8 @@ they are replay display colors and do not depend on a particular season's unifor
 
 Selection runs once when a game loads and stays consistent during playback, seeking, and side changes.
 Court colors and logos stay with the home team. Regression tests cover all **1,080** ordered matchups
-within the two leagues, including alternate jerseys, exclusion of conflicting away primary, and readable details.
+within the two leagues, including the MEM-at-SAC decision, alternate jerseys, exclusion of conflicting away primary,
+and readable details.
 
 ### Import a Regression Fixture
 

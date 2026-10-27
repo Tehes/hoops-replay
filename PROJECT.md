@@ -70,7 +70,8 @@ festgelegt. Der Nutzer findet den Prototyp interessant, möchte aber weiter erku
   Kontur, damit sie sowohl auf dunklen als auch auf hellen Teamfarben sichtbar bleiben.
 - Spieler als ärmellose Basketball-Jerseys mit schmalen Schulterträgern, gerundetem Halsausschnitt,
   seitlichen Armausschnitten und Rückennummern: Normalerweise Heimteam in Weiß, Auswärtsteam
-  in Primary. Bei ähnlichen Primary-Farben trägt Home Primary; Away wählt aus Alternate, Weiß und Schwarz.
+  in Primary. Nur wenn die Primaries ähnlich sind und die eigene Away-Alternative die Spielplan-
+  Verbesserungsschwelle erreicht, trägt Home Primary; Away wählt dann aus Alternate, Weiß und Schwarz.
   Away-Primary ist bei diesem Farbkonflikt ausgeschlossen. Auf neutralen Jerseys bestimmt
   die kontrastreichere lesbare eigene Primary-/Alternate-Farbe Rand und Nummer, sonst Weiß oder Schwarz.
   Es gibt keinen festen Mindestkontrast zwischen Jerseys/Paint; Ränder und Nummern müssen 4:1 erreichen.
@@ -998,10 +999,13 @@ unabhängig von der Jersey-Auswahl. `shirt` ist die Primary-Farbe; `trim` und `i
 Teamdaten dienen weiterhin der bisherigen Darstellung außerhalb der Jerseys.
 
 Die aktuelle Auswahlregel folgt der Farbähnlichkeit und den Verbesserungsschwellen des Spielplans:
-- Der Normalfall Home weiß / Away Primary bleibt erhalten, solange die Primaries nicht ähnlich sind.
+- Der Normalfall Home weiß / Away Primary bleibt erhalten, solange die Spielplan-Auswahl die Primaries behält.
+  Ein Wechsel benötigt ähnliche Primaries und genügend Verbesserung durch die eigene Away-Alternative;
+  bei leerem Alternate wird dafür implizites Schwarz verwendet. Weiß und Schwarz als weitere Jersey-
+  Optionen dürfen diesen Wechsel nicht auslösen. Die Nähe allein genügt nicht.
   Niedriger Helligkeitskontrast allein erzwingt keinen Wechsel. Ein Detailkonflikt auf dem weißen
   Home-Jersey wird durch lesbare neutrale Details gelöst, nicht durch einen Wechsel der Grundfarbe.
-- Bei ähnlichen Primaries trägt Home Primary. Away prüft Alternate, Weiß und Schwarz gegen Home-Primary
+- Erst nach dieser Wechselentscheidung trägt Home Primary. Away prüft Alternate, Weiß und Schwarz gegen Home-Primary
   (zugleich Paint). Away-Primary ist dann ausgeschlossen, auch als Rückfalloption.
 - Eine Ausweichfarbe muss die Trennung gegenüber dem Primary-Paar um mindestens 0,04 OKLab-Abstand
   verbessern; bei neutralen Primary-Paaren gilt stattdessen eine Verbesserung des Kontrastverhältnisses
@@ -1135,6 +1139,9 @@ JavaScript-Dateien und `git diff --check` bestehen. Keine neue Browser-Abnahme f
 
 ### Spielplan-Logik statt fester Grafik-Kontrastgrenze (26.10.2026)
 
+Historischer Stand mit unvollständig übertragenem Wechsel-Auslöser; die nachfolgende Korrektur
+übernimmt die vollständige Wechselentscheidung des Spielplans.
+
 Die feste 2,5:1-Grenze entfällt. Home bleibt weiß, außer die Spielplan-Regel erkennt ähnliche Primaries.
 Dann trägt Home Primary, Away wählt aus Alternate, Weiß und Schwarz unter den oben dokumentierten
 Verbesserungsschwellen. Away-Primary ist bei ähnlichen Primaries ausdrücklich ausgeschlossen.
@@ -1156,3 +1163,23 @@ Separater Bestandsfehler: Beim Wechsel des Viewports von Desktop auf Mobil im ge
 tritt ein `drawImage`-Fehler wegen einer Canvas-Größe von 0 auf. Mit dem vorherigen Farbmodul aus
 Commit `5128f49` reproduziert; nicht durch die Jersey-Auswahl verursacht. Die Größenänderungslogik
 bleibt außerhalb dieser Farbänderung.
+
+
+### Vollständige Spielplan-Wechselentscheidung: MEM@SAC (26.10.2026)
+
+Eine ähnliche Primary-Paarung löst den Home-Wechsel nur aus, wenn die eigene Away-Alternative die
+Spielplan-Verbesserungsschwelle erreicht. Zuvor konnten stattdessen Weiß oder Schwarz als allgemeine
+Jersey-Option diesen Wechsel auslösen. Dieser Übertragungsfehler ist korrigiert, ohne die 45°-Grenze
+zu verändern. Die nachgelagerte Auswahl aus Alternate, Weiß und Schwarz und 4:1 für Details bleiben erhalten.
+
+Bei MEM@SAC beträgt der Farbtonabstand rund 41,17°. Memphis-Alternate verschlechtert aber den
+OKLab-Abstand um rund 0,00308, statt ihn um mindestens 0,04 zu verbessern. Deshalb bleibt Sacramento
+weiß mit lila Details, Memphis spielt in Primary-Blau mit schwarzen Details.
+
+Verifiziert: elf Farbtests einschließlich MEM@SAC und aller 1.080 Paarungen bestanden; Formatcheck,
+Deno-Check, Lint und `git diff --check` bestehen. Die Home-Wechselentscheidung wurde zusätzlich mit
+den Originalfunktionen `compareMatchupColors` und `selectSimilarMatchup` aus dem Spielplan bei
+identischen Replay-Paletten verglichen (leeres Alternate entspricht Schwarz): keine Abweichung in
+1.080 Paarungen, zuvor 44 unnötige Wechsel. Die Originaldatei hatte den Blob-SHA
+`95780b1273c14d624e69fa64c1b07f245081c3cb`.
+Der erneute Browserlauf traf auf den oben dokumentierten Canvas-Bestandsfehler; keine neue visuelle Abnahme.

@@ -77,21 +77,23 @@ export function selectMatchupJerseys(home, away) {
 		return { home: normalHome, away: normalAway };
 	}
 
-	const homeJersey = createJerseyColors(home.shirt, home);
 	const neutral = primary.hue === null;
 	const primaryContrast = getColorContrast(home.shirt, away.shirt);
 	const minimum = neutral ? SIMILARITY_DEFAULTS.contrastImprovement : SIMILARITY_DEFAULTS.improvement;
-	// Like the schedule, alternatives must improve separation enough. Primary conflicts with home paint.
+	const improvesSeparation = (shirt) => {
+		const improvement = neutral
+			? getColorContrast(home.shirt, shirt) - primaryContrast
+			: compareAppearance(homeLab, hexToOklab(shirt), SIMILARITY_DEFAULTS).distance - primary.distance;
+		return improvement > 0 && improvement >= minimum;
+	};
+	// The schedule tests the team's alternate before deciding to switch, not white or black candidates.
+	if (!improvesSeparation(away.alternate || "#000000")) {
+		return { home: normalHome, away: normalAway };
+	}
+	const homeJersey = createJerseyColors(home.shirt, home);
 	const teamColors = [away.shirt, away.alternate].filter(Boolean);
-	const candidates = [...new Set([away.alternate, "#ffffff", "#000000"].filter(Boolean))].map((shirt) =>
-		createJerseyColors(shirt, away)
-	)
-		.filter((jersey) => {
-			const improvement = neutral
-				? getColorContrast(home.shirt, jersey.shirt) - primaryContrast
-				: compareAppearance(homeLab, hexToOklab(jersey.shirt), SIMILARITY_DEFAULTS).distance - primary.distance;
-			return improvement > 0 && improvement >= minimum;
-		});
+	const candidates = [...new Set([away.alternate, "#ffffff", "#000000"].filter(Boolean))]
+		.filter(improvesSeparation).map((shirt) => createJerseyColors(shirt, away));
 	const branded = candidates.filter((jersey) => teamColors.includes(jersey.shirt) || teamColors.includes(jersey.ink));
 	const awayJersey = (branded.length ? branded : candidates).reduce((first, next) => {
 		const firstContrast = getColorContrast(first.ink, first.shirt);

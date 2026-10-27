@@ -27,7 +27,22 @@ Deno.test("distinct primaries keep home white and away primary even with low gra
 	assert(contrast(TEAM_COLORS.BOS.shirt, TEAM_COLORS.PHI.shirt) < 2.5, "example must cover the removed limit");
 });
 
-Deno.test("similar primaries put home in primary and allow alternate, white or black away jerseys", () => {
+Deno.test("MEM at SAC keeps home white when the schedule rejects Memphis alternate", () => {
+	const home = { code: "SAC", home: true };
+	const away = { code: "MEM", home: false };
+	assert(
+		getJerseyColors(home, away).shirt === "#ffffff",
+		"Sacramento must stay white despite a hue gap below 45 degrees",
+	);
+	assert(getJerseyColors(away, home).shirt === TEAM_COLORS.MEM.shirt, "Memphis must keep primary blue");
+	const improved = selectMatchupJerseys(TEAM_COLORS.SAC, { ...TEAM_COLORS.MEM, alternate: "#ffffff" });
+	assert(
+		improved.home.shirt === TEAM_COLORS.SAC.shirt,
+		"an actually improving team alternate must enable the switch",
+	);
+});
+
+Deno.test("similar primaries with improving alternates allow alternate, white or black away jerseys", () => {
 	for (
 		const [homeCode, awayCode, shirt] of [["BOS", "MIL", "#000000"], ["NYK", "PHX", TEAM_COLORS.PHX.alternate], [
 			"BKN",
@@ -46,8 +61,8 @@ Deno.test("jerseys retain team identity and use readable primary, alternate or n
 	const green = { shirt: "#00471a", alternate: "#eee1c6" };
 	let jerseys = selectMatchupJerseys(green, { shirt: "#008348", alternate: null });
 	assert(jerseys.away.ink === "#008348", "primary should decorate white when readable");
-	jerseys = selectMatchupJerseys({ shirt: "#87d5b5" }, green);
-	assert(jerseys.away.shirt === "#000000", "light green paint needs black away");
+	jerseys = selectMatchupJerseys({ shirt: "#008348" }, green);
+	assert(jerseys.away.shirt === "#000000", "similar green primaries can use black away");
 	assert(jerseys.away.ink === "#eee1c6", "cream should win against black");
 	jerseys = selectMatchupJerseys({ shirt: "#fdb927", alternate: null }, { shirt: "#0d2240" });
 	assert(jerseys.home.ink === "#000000", "light primary on white needs neutral fallback");
@@ -100,8 +115,11 @@ Deno.test("optional alternates are explicit and league palettes remain separate"
 	assert(brooklynJersey.ink !== "#000000", "Brooklyn details must remain visible");
 	const home = { code: "TOR", league: "wnba", home: true };
 	const away = { code: "ATL", league: "wnba", home: false };
-	assert(getJerseyColors(home, away).shirt === WNBA_TEAM_COLORS.TOR.shirt, "WNBA matchup should switch");
-	assert(getJerseyColors(away, home).shirt === "#ffffff", "WNBA away needs white");
+	assert(
+		getJerseyColors(home, away).shirt === "#ffffff",
+		"WNBA home should stay white without sufficient alternate improvement",
+	);
+	assert(getJerseyColors(away, home).shirt === WNBA_TEAM_COLORS.ATL.shirt, "WNBA away must use its league's primary");
 });
 
 Deno.test("former palette conflicts retain team colors without a fixed graphic minimum", () => {
@@ -124,7 +142,7 @@ Deno.test("former palette conflicts retain team colors without a fixed graphic m
 	);
 });
 
-Deno.test("similar away primary is excluded even when its numbers would be readable", () => {
+Deno.test("after the schedule triggers a switch, away primary is excluded even with readable numbers", () => {
 	const jerseys = selectMatchupJerseys(TEAM_COLORS.CLE, TEAM_COLORS.ATL);
 	assert(jerseys.home.shirt === TEAM_COLORS.CLE.shirt, "similar red hues must put home in primary");
 	assert(contrast(TEAM_COLORS.ATL.shirt, "#000000") >= 4, "Atlanta primary must have readable black numbers");
@@ -141,18 +159,20 @@ Deno.test("similar away primary is excluded even when its numbers would be reada
 
 Deno.test("alternate jerseys must meet the schedule's chromatic and neutral improvement thresholds", () => {
 	const redHome = { shirt: "#ff0000" };
+	const smallRedImprovement = selectMatchupJerseys(redHome, { shirt: "#cc0000", alternate: "#cb0000" });
 	assert(
-		selectMatchupJerseys(redHome, { shirt: "#cc0000", alternate: "#cb0000" }).away.shirt !== "#cb0000",
-		"a tiny chromatic improvement must not qualify alternate as a jersey base",
+		smallRedImprovement.home.shirt === "#ffffff" && smallRedImprovement.away.shirt === "#cc0000",
+		"a tiny chromatic improvement must keep home white and away primary, regardless of neutral jersey options",
 	);
 	assert(
 		selectMatchupJerseys(redHome, { shirt: "#cc0000", alternate: "#400000" }).away.shirt === "#400000",
 		"a sufficient chromatic improvement should allow alternate as a jersey base",
 	);
 	const greyHome = { shirt: "#999999" };
+	const smallGreyImprovement = selectMatchupJerseys(greyHome, { shirt: "#555555", alternate: "#545454" });
 	assert(
-		selectMatchupJerseys(greyHome, { shirt: "#555555", alternate: "#545454" }).away.shirt !== "#545454",
-		"a tiny neutral contrast improvement must not qualify alternate as a jersey base",
+		smallGreyImprovement.home.shirt === "#ffffff" && smallGreyImprovement.away.shirt === "#555555",
+		"a tiny neutral contrast improvement must keep home white and away primary",
 	);
 	assert(
 		selectMatchupJerseys(greyHome, { shirt: "#555555", alternate: "#333333" }).away.shirt === "#333333",
