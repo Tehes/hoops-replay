@@ -237,8 +237,16 @@ export function animateShot(state, scene, shot, hoop, direction, record, contact
 	if (style.fingerRoll) {
 		shooter.angle = -side * 0.35;
 	}
+	if (scene.andOneFoul) {
+		const fouler = state.positions[scene.andOneFoul.personId];
+		contacts.add(scene.andOneFoul.personId);
+		Object.assign(fouler, { x: shot.x + direction * 1.8, y: shot.y - 0.5, jump: 0.6, angle: direction * 0.2 });
+	}
 	record(style.tip ? 0.12 : 0.25);
 	scene.releaseAt = scene.frames.at(-1).time;
+	if (scene.andOneFoul) {
+		scene.foulContactAt = scene.releaseAt;
+	}
 	if (action.blockPersonId) {
 		const blocker = state.positions[action.blockPersonId];
 		contacts.add(action.blockPersonId);

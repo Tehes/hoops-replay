@@ -219,6 +219,86 @@ Deno.test("recorded ordinary fouls after baskets start the next attack while sam
 	assert(restarts > 10 && andOnes > 5, "missing real next-possession fouls or and-one coverage");
 });
 
+Deno.test("Burton's Q4 6:27 and-one leads to the missed free throw and Hillmon's 6:25 rebound without another attack", async () => {
+	const data = await readData("replay-1042600304.json");
+	data.gameId = "1042600305";
+	data.teams.sort((a, b) => a.id - b.id);
+	for (const team of data.teams) {
+		team.home = team.id === 1611661331;
+		team.score = team.home ? 54 : 44;
+	}
+	const tip = data.actions.find((action) => action.actionType === "jumpball");
+	const common = { period: 4, clock: "PT06M27.00S", scoreAway: "44", scoreHome: "54" };
+	data.actions = [
+		{ ...tip, actionNumber: 1, orderNumber: 1 },
+		{ ...common, actionNumber: 450, orderNumber: 4410000, actionType: "2pt", subType: "Jump Shot",
+			descriptor: "turnaround", qualifiers: ["pointsinthepaint", "2ndchance"], teamId: 1611661331,
+			personId: 1631007, isFieldGoal: 1, shotResult: "Made", x: 84.27083333333333,
+			y: 48.03184672561835, side: "right", shotDistance: 10.14, possession: 1611661331 },
+		{ ...common, actionNumber: 451, orderNumber: 4420000, actionType: "foul", subType: "personal",
+			descriptor: "shooting", qualifiers: ["1freethrow"], teamId: 1611661330,
+			personId: 1628886, foulDrawnPersonId: 1631007, possession: 1611661331 },
+		{ ...common, actionNumber: 453, orderNumber: 4440000, actionType: "freethrow", subType: "1 of 1",
+			teamId: 1611661331, personId: 1631007, shotResult: "Missed", possession: 1611661331 },
+		{ ...common, actionNumber: 454, orderNumber: 4450000, actionType: "rebound", subType: "defensive",
+			clock: "PT06M25.00S", teamId: 1611661330, personId: 1631044, shotActionNumber: 453,
+			possession: 1611661330 },
+	];
+	const original = JSON.stringify(data);
+	const replay = compileReplay(data);
+	const shot = replay.scenes.find((scene) => scene.action.actionNumber === 450);
+	const foul = replay.scenes.find((scene) => scene.action.actionNumber === 451);
+	const freeThrow = replay.scenes.find((scene) => scene.action.actionNumber === 453);
+	const rebound = replay.scenes.find((scene) => scene.action.actionNumber === 454);
+	assert(replay.scenes[foul.andOneShotIndex] === shot && shot.andOneFoul === foul.action,
+		"recorded made basket and shooting foul were not linked");
+	const contact = getReplayFrame(replay, shot.start + shot.foulContactAt);
+	const shooter = contact.players.find((p) => p.id === 1631007);
+	const fouler = contact.players.find((p) => p.id === 1628886);
+	assert(shot.foulContactAt <= shot.releaseAt && shooter.jump > 0 && fouler.jump > 0 &&
+		Math.hypot(shooter.x - fouler.x, shooter.y - fouler.y) < 2,
+		"foul contact did not take place during Burton's shot");
+	assert(!foul.buildupMoves && !foul.preparationWait && foul.liveAt === undefined,
+		"and-one created another buildup after the basket");
+	const landed = shot.frames.at(-1).players;
+	assert(foul.frames.every((frame) => !frame.ball.owner && !frame.ball.dribble &&
+		JSON.stringify(frame.players) === JSON.stringify(landed)),
+		"players resumed the attack or Burton received the ball again after scoring");
+	assert(freeThrow.action.shotResult === "Missed" && rebound.reboundContinuous &&
+		replay.scenes[rebound.reboundShotIndex] === freeThrow && rebound.frames.at(-1).ball.owner === 1631044,
+		"missed additional free throw did not lead to Hillmon's defensive rebound");
+	assert(getReplayFrame(replay, rebound.start + rebound.eventAt + 0.000001).clock === 385,
+		"sequence did not end at Q4 6:25");
+	assert(JSON.stringify(data) === original, "linking changed the recorded events");
+	const time = shot.start + shot.foulContactAt;
+	const first = getReplayFrame(replay, time);
+	getReplayFrame(replay, replay.duration);
+	assert(JSON.stringify(first) === JSON.stringify(getReplayFrame(replay, time)), "contact seeking changed");
+	for (const boundary of ["later-clock", "different-victim", "two-free-throws", "missed-shot", "intervening-turnover"]) {
+		const changed = structuredClone(data);
+		const a = changed.actions.find((a) => a.actionNumber === 451);
+		if (boundary === "later-clock") {
+			a.clock = "PT06M26.00S";
+		}
+		if (boundary === "different-victim") {
+			a.foulDrawnPersonId = changed.teams.find((team) => team.id === 1611661331)
+				.players.find((player) => player.starter && player.id !== 1631007).id;
+		}
+		if (boundary === "two-free-throws") {
+			a.qualifiers = ["2freethrow"];
+		}
+		if (boundary === "missed-shot") {
+			changed.actions.find((a) => a.actionNumber === 450).shotResult = "Missed";
+		}
+		if (boundary === "intervening-turnover") {
+			changed.actions.push({ ...common, actionNumber: 452, orderNumber: 4415000, actionType: "turnover",
+				subType: "traveling", teamId: 1611661331, personId: 1631007 });
+		}
+		const unlinked = compileReplay(changed).scenes.find((scene) => scene.action.actionNumber === 451);
+		assert(unlinked.andOneShotIndex === undefined, `and-one link crossed ${boundary}`);
+	}
+});
+
 Deno.test("default uses the local example; an explicit ID always loads both backend feeds", async () => {
 	const example = await readData("replay-0022600007.json");
 	const boxscore = await readData("raw/boxscore-0022600094.json");
@@ -823,7 +903,10 @@ Deno.test("shooting fouls respect two-point and three-point territory in both di
 			const replay = compileReplay(changed);
 			for (const scene of replay.scenes.filter((item) => item.action.descriptor === "shooting")) {
 				const action = scene.action;
-				const frame = getReplayFrame(replay, scene.start + scene.eventAt);
+				const linkedShot = replay.scenes[scene.andOneShotIndex];
+				const frame = linkedShot
+					? getReplayFrame(replay, linkedShot.start + linkedShot.foulContactAt)
+					: getReplayFrame(replay, scene.start + scene.eventAt);
 				const victim = frame.players.find((player) => player.id === action.foulDrawnPersonId);
 				const offense = changed.teams.find((team) => team.id !== action.teamId).id;
 				const direction = attackDirection(changed, offense, action.period);

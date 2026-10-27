@@ -144,6 +144,35 @@ function buildScenes(actions) {
 	return scenes;
 }
 
+function linkAndOneFouls(scenes) {
+	scenes.forEach((scene, index) => {
+		const action = scene.action;
+		if (scene.kind !== "foul" || action.descriptor !== "shooting" ||
+			action.qualifiers?.some((value) => ["2freethrow", "3freethrow"].includes(value))) {
+			return;
+		}
+		for (let i = index - 1; i >= 0; i--) {
+			const previous = scenes[i];
+			if (previous.action.period !== action.period || previous.action.clock !== action.clock) {
+				break;
+			}
+			if (["2pt", "3pt"].includes(previous.kind)) {
+				if (previous.action.shotResult === "Made" && !previous.andOneFoul &&
+					previous.action.personId === action.foulDrawnPersonId && previous.action.teamId !== action.teamId) {
+					previous.andOneFoul = action;
+					previous.participants = [...new Set([...previous.participants, ...scene.participants])];
+					scene.andOneShotIndex = i;
+				}
+				break;
+			}
+			if (["foul", "freethrow", "rebound", "turnover", "steal", "heave", "violation", "jumpball", "period"]
+				.includes(previous.kind)) {
+				break;
+			}
+		}
+	});
+}
+
 function linkRebounds(scenes) {
 	const shotIndices = new Map(scenes.map((scene, index) => [scene.action.actionNumber, index]));
 	scenes.forEach((scene, index) => {
@@ -223,6 +252,7 @@ function planMatchups(scenes, index, offense, state, data) {
 	for (let i = index; i < scenes.length; i++) {
 		const scene = scenes[i];
 		const action = scene.action;
+		const foul = scene.kind === "foul" ? action : scene.andOneFoul;
 		if (scene.kind === "rebound" && action.teamId !== offense) {
 			rebounderId = defense.includes(action.personId) ? action.personId : null;
 		}
@@ -238,9 +268,9 @@ function planMatchups(scenes, index, offense, state, data) {
 		if (action.blockPersonId) {
 			attacker = action.personId;
 			defender = action.blockPersonId;
-		} else if (scene.kind === "foul") {
-			attacker = action.subType === "offensive" ? action.personId : action.foulDrawnPersonId;
-			defender = action.subType === "offensive" ? action.foulDrawnPersonId : action.personId;
+		} else if (foul) {
+			attacker = foul.subType === "offensive" ? foul.personId : foul.foulDrawnPersonId;
+			defender = foul.subType === "offensive" ? foul.foulDrawnPersonId : foul.personId;
 		} else if (action.stealPersonId) {
 			attacker = action.personId;
 			defender = action.stealPersonId;
@@ -250,7 +280,7 @@ function planMatchups(scenes, index, offense, state, data) {
 		) {
 			assignments[defender] = attacker;
 			assigned.add(attacker);
-			contacts.push({ defender, attacker, actionNumber: action.actionNumber });
+			contacts.push({ defender, attacker, actionNumber: foul?.actionNumber ?? action.actionNumber });
 		}
 		if (scene.kind === "turnover" || (["2pt", "3pt"].includes(scene.kind) && action.shotResult === "Made")) {
 			break;
@@ -1807,7 +1837,7 @@ function compileScene(replay, scene, index, state, data) {
 		addMarker(replay, scene, time, made ? "made" : "miss", shot, made ? `+${scene.kind === "3pt" ? 3 : 2}` : "");
 		if (made) {
 			setScore(state, action);
-			state.restart = "baseline";
+			state.restart = scene.andOneFoul ? null : "baseline";
 			state.ball = { ...hoop, z: 0, owner: null };
 		} else {
 			const reboundPoint = {
@@ -1925,6 +1955,16 @@ function compileScene(replay, scene, index, state, data) {
 			state.positions = previousPositions;
 		}
 		record(0.65);
+	} else if (scene.kind === "foul" && scene.andOneShotIndex !== undefined) {
+		const shot = replay.scenes[scene.andOneShotIndex];
+		scene.attackTeam = shot.action.teamId;
+		scene.formation = shot.formation;
+		scene.matchups = { ...state.matchups };
+		scene.foulPoint = { ...shot.shotPoint };
+		scene.eventAt = 0;
+		// The contact already happened during the made shot; retain a separate event for the whistle.
+		addMarker(replay, scene, time, "foul", scene.foulPoint);
+		record(0.7);
 	} else if (scene.kind === "foul" && action.subType === "technical" && !state.positions[action.personId]) {
 		// Unlisted people can receive technical fouls; keep the action without inventing a court player.
 		scene.eventAt = time;
@@ -2235,6 +2275,7 @@ export function compileReplay(data) {
 		players,
 		duration: 0,
 	};
+	linkAndOneFouls(replay.scenes);
 	linkRebounds(replay.scenes);
 	planShotClockPressure(replay.scenes);
 	replay.scenes.forEach((scene, index) => {

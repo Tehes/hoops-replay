@@ -1535,3 +1535,25 @@ fehlende Besitzfelder, stehende Einwurfuhr, Ballbesitznavigation, unveränderte 
 Seeking sowie echte NBA-/WNBA-Fouls nach Treffern und zeitgleiche And-ones.
 Alle fünf Referenzspiele bestehen den Audit mit 35.163 Frames und null Fehlern.
 Syntaxprüfung und `git diff --check` bestehen. Keine zusätzliche Browser-Abnahme.
+
+### And-one-Kontakt im Treffer statt eines zweiten Aufbaus (27.10.2026)
+
+Im Spiel `1042600305` gehört Burtons Treffer bei Q4 6:27 (Aktion 450) zum Wurffoul von
+Canada bei derselben Spieluhrzeit (451). Danach folgen der verworfene Zusatzfreiwurf (453)
+und Hillmons defensiver Rebound bei 6:25 (454). Die bisherige separate Foul-Choreografie
+gab der Schützin nach ihrem Treffer den Ball zurück und wiederholte einen kleinen Aufbau.
+
+`linkAndOneFouls()` verknüpft einen Treffer mit einem nachfolgenden Wurffoul nur bei gleicher
+Periode und Spieluhr, derselben Schützin beziehungsweise demselben Schützen als gefoulter
+Person und einem gegnerischen Foul. Explizite Zwei-/Drei-Freiwurf-Hinweise sowie dazwischenliegende
+Spielaktionen schließen die Verknüpfung aus. Der belegte Kontakt beeinflusst die Zuordnung
+bereits vor dem Treffer und wird während des Wurfs animiert. Das Foul bleibt mit seiner
+ursprünglichen Ereignis-ID und Beschreibung als kurze Unterbrechung erhalten, ohne erneuten
+Ballbesitz oder Aufbau. Der ausstehende Zusatzfreiwurf verhindert den Grundlinieneinwurf.
+
+Verifiziert: 67 Tests unter Node mit Deno-Kompatibilitätsschicht bestanden, einschließlich
+der konkreten Burton/Canada-Sequenz bis zu Hillmons Rebound, unveränderter Quelldaten,
+reproduzierbarem Seeking und negativer Link-Grenzen. Alle fünf gebündelten Spiel-Audits
+bestehen mit 35.107 Frames. Das vollständige Spiel `1042600305` besteht zusätzlich mit
+5.432 Frames, Endstand 55:64 und null Fehlern. Syntaxprüfung und `git diff --check` bestehen.
+Der Fehler wurde im veröffentlichten Replay mit Chrome über Cloud Browser nachvollzogen.
