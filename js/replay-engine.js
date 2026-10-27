@@ -1,3 +1,52 @@
+/*
+ * CHOREOGRAPHY NORTH STAR
+ *
+ * Goal: Turn recorded events into coherent, readable basketball possessions.
+ * This is a direction for future changes, not a claim that every principle below
+ * is already implemented. See PROJECT.md for the current behavior and limits.
+ *
+ * Evidence comes first. Preserve event order, participants, scores, recorded
+ * clocks and available shot coordinates. Treat formations, matchups, passes and
+ * movement between anchors as schematic choices, never as measured tracking.
+ * Show specific screens, pick-and-rolls or pick-and-pops only with explicit
+ * source evidence. A missing assist does not establish an isolation, and a
+ * turnover alone does not establish a fast break.
+ *
+ * Plan connected possessions, not isolated animations:
+ * - Use the possession origin, game-clock gaps, interruptions, shot descriptors
+ *   and linked rebounds to choose a plausible transition or half-court buildup.
+ * - Work backward from recorded finishes, but stage the approach in time.
+ *   Preserve positional continuity instead of parking the next shooter at the
+ *   final spot for the entire possession. Lookahead may inform positioning;
+ *   stage plausible reactions instead of anticipating exact rebound or
+ *   interception points.
+ * - Coordinate the ball, its receiver and off-ball space. Time passes to arriving
+ *   receivers; clear drive/pass corridors and fill useful vacant spots. Holding
+ *   an open spot is purposeful too: do not move everyone after every pass.
+ * - Keep roles useful and flexible, with recorded involvement taking priority.
+ *   During a normal PG-led advance, teammates fill their spots ahead of the ball;
+ *   do not manufacture a trailing big man or force an evidenced outside shooter
+ *   into the paint. An inbounder or rebounder can trail until releasing the ball.
+ * - Preserve defensive assignments while reacting to both the ball and danger:
+ *   protect the rim in transition, shade toward help, then recover or close out
+ *   after a pass. Avoid rigidly copying an attacker's path at a fixed offset.
+ *
+ * Prefer simple, feasible routes: straight runs, perimeter arcs and deliberate
+ * cuts with acceleration and braking. Resolve crossings through planned spacing,
+ * one detour or yielding, not repeated weaving or decorative motion.
+ * Compare a small set of plausible sequences by continuity, travel time, spacing,
+ * pass-lane clearance and unnecessary movement. When time or evidence is scarce,
+ * simplify the choreography rather than forcing an elaborate sequence to fit.
+ *
+ * Compile every choice deterministically into the same replay timebase so play,
+ * pause, speed changes and seeking agree. Game-clock gaps guide live-action
+ * budgets; wall-clock timestamps must not turn stoppages into extra running time.
+ *
+ * First priorities: staged finish preparation, passes to moving receivers, and
+ * ball-aware defensive reactions. Success means each movement has a readable
+ * purpose, the next action follows naturally, and all recorded anchors survive.
+ */
+
 import { animateShot, flyBall, getDriveStart, getShotEntry, getShotStyle, landPlayers } from "./replay-shots.js";
 import { movePlayers } from "./replay-motion.js";
 import { getLeague } from "./replay-leagues.js";
