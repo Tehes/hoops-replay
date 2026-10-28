@@ -1,49 +1,84 @@
 /*
  * CHOREOGRAPHY NORTH STAR
  *
- * Goal: Turn recorded events into coherent, readable basketball possessions.
- * This is a direction for future changes, not a claim that every principle below
- * is already implemented. See PROJECT.md for the current behavior and limits.
+ * Goal: Turn recorded events into rule-consistent, coherent and readable
+ * basketball possessions, with purposeful movement by the ball and all players.
+ * This is the enduring target, not a claim of complete implementation.
+ * See PROJECT.md for current behavior and limits; work plans belong elsewhere.
  *
  * Evidence comes first. Preserve event order, participants, scores, recorded
- * clocks and available shot coordinates. Treat formations, matchups, passes and
- * movement between anchors as schematic choices, never as measured tracking.
+ * clocks and available shot coordinates. Link related events without losing
+ * their source identity. Formations, matchups, passes and movement between
+ * anchors are schematic choices, never measured tracking.
  * Show specific screens, pick-and-rolls or pick-and-pops only with explicit
  * source evidence. A missing assist does not establish an isolation, and a
  * turnover alone does not establish a fast break.
  *
+ * Rules define the legal space for choreography:
+ * - Use the official NBA or WNBA rules applicable to the game's season.
+ *   Account explicitly for the full rulebook: state transitions, constraints on
+ *   generated movement, recorded officiating decisions, and rules outside the
+ *   representation's scope. Keep coverage, exceptions and gaps inspectable.
+ * - Derive live/dead ball, entitlement to possession, pending penalties and
+ *   restarts from linked evidence and explicit game state. Keep that state
+ *   separate from visual positions, poses and the current ball holder.
+ * - Preserve recorded rulings and their consequences. Prevent violations
+ *   introduced by schematic movement instead of inventing additional whistles.
+ *   Evaluate time-based restrictions, including lane occupancy with its
+ *   conditions and exceptions, in represented game time, not compressed
+ *   animation time. Do not claim precision beyond the modeled detail.
+ *
+ * Keep responsibilities clear: evidence establishes what happened; rules
+ * determine the permitted continuation; choreography selects a plausible plan;
+ * motion turns the plan into feasible trajectories; rendering displays the
+ * compiled state. Keep rules and planning testable without a browser.
+ * Neither animation nor rendering may independently change game outcomes.
+ *
+ * Ground heuristic choices in established coaching principles from WABC,
+ * USA Basketball and Jr. NBA, while league rules remain authoritative.
+ * Make each major heuristic's principle, source, applicability and rationale
+ * inspectable. Coaching knowledge justifies plausible additions; it does not
+ * prove that a particular real-world play occurred.
+ *
  * Plan connected possessions, not isolated animations:
- * - Use the possession origin, game-clock gaps, interruptions, shot descriptors
- *   and linked rebounds to choose a plausible transition or half-court buildup.
+ * - Use possession origin, game-clock gaps, interruptions, shot descriptors and
+ *   linked rebounds to choose transition or half-court buildup.
  * - Work backward from recorded finishes, but stage the approach in time.
  *   Preserve positional continuity instead of parking the next shooter at the
- *   final spot for the entire possession. Lookahead may inform positioning;
- *   stage plausible reactions instead of anticipating exact rebound or
- *   interception points.
- * - Coordinate the ball, its receiver and off-ball space. Time passes to arriving
- *   receivers; clear drive/pass corridors and fill useful vacant spots. Holding
- *   an open spot is purposeful too: do not move everyone after every pass.
- * - Keep roles useful and flexible, with recorded involvement taking priority.
- *   During a normal PG-led advance, teammates fill their spots ahead of the ball;
- *   do not manufacture a trailing big man or force an evidenced outside shooter
- *   into the paint. An inbounder or rebounder can trail until releasing the ball.
- * - Preserve defensive assignments while reacting to both the ball and danger:
- *   protect the rim in transition, shade toward help, then recover or close out
- *   after a pass. Avoid rigidly copying an attacker's path at a fixed offset.
+ *   finish or in the lane. Lookahead may inform positioning; visible reactions
+ *   must not anticipate exact rebound or interception points.
+ * - Coordinate the ball, receivers and off-ball space. Time passes to arriving
+ *   receivers; clear drive/pass corridors and fill useful vacant spots.
+ *   Holding an open spot is purposeful; not everyone must move after every pass.
+ * - Keep roles flexible, with recorded involvement taking priority. During
+ *   normal PG-led advance, teammates fill their spots ahead of the ball.
+ *   An inbounder or rebounder may trail until releasing it; do not force an
+ *   evidenced outside shooter into the paint.
+ * - Coordinate defensive assignments with the ball and danger: protect the rim
+ *   in transition, provide help and recover or close out when appropriate.
+ *   Avoid rigidly copying an attacker's path at a fixed offset.
  *
- * Prefer simple, feasible routes: straight runs, perimeter arcs and deliberate
- * cuts with acceleration and braking. Resolve crossings through planned spacing,
- * one detour or yielding, not repeated weaving or decorative motion.
- * Compare a small set of plausible sequences by continuity, travel time, spacing,
- * pass-lane clearance and unnecessary movement. When time or evidence is scarce,
- * simplify the choreography rather than forcing an elaborate sequence to fit.
+ * Combine reusable basketball actions with simple routes, acceleration and
+ * braking. Resolve crossings through spacing, a detour or yielding, not repeated
+ * weaving. Reject illegal or infeasible plans before comparing continuity,
+ * travel time, spacing, pass-lane clearance and unnecessary movement.
+ * Simplify when time or evidence is scarce. Keep important choices explainable.
  *
- * Compile every choice deterministically into the same replay timebase so play,
- * pause, speed changes and seeking agree. Game-clock gaps guide live-action
- * budgets; wall-clock timestamps must not turn stoppages into extra running time.
+ * Compile choices deterministically into one replay timebase so play, pause,
+ * speed changes and seeking agree. Game-clock gaps guide live-action budgets;
+ * wall-clock timestamps must not turn stoppages into extra running time.
  *
- * Success means each movement has a readable purpose, the next action follows
- * naturally, and all recorded anchors survive.
+ * Improvement must be reproducible across recorded games, focused scenarios
+ * and systematic variants. Compare against the last accepted baseline with
+ * stable criteria: evidence and rule correctness first, contextual motion
+ * quality second, visual basketball plausibility as a complementary judgment.
+ * Diagnose shared causes, improve general models and protect neighboring cases.
+ * Metrics are diagnostics, not substitutes for basketball judgment. Preserve
+ * concise accepted and rejected learnings rather than accumulating symptom
+ * patches or optimizing a single score.
+ *
+ * Success means recorded anchors survive, generated play respects the rules,
+ * each movement has a readable purpose and the next action follows naturally.
  */
 
 import { animateShot, flyBall, getDriveStart, getShotEntry, getShotStyle, landPlayers } from "./replay-shots.js";

@@ -30,19 +30,37 @@ Das Interesse gilt zunächst dem Erlebnis: Kann man einen Spielverlauf auf diese
 und unterhaltsam verfolgen? Ein endgültiger Anwendungsfall oder ein Geschäftsmodell ist noch nicht
 festgelegt. Der Nutzer findet den Prototyp interessant, möchte aber weiter erkunden, was daraus wird.
 
-## Northstar für die Choreografie (27.10.2026)
+## Northstar für die Choreografie (28.10.2026)
 
 Der englische Kopfkommentar in `js/replay-engine.js` beschreibt das dauerhafte Zielbild:
-Aus belegten Ereignissen entstehen zusammenhängende, nachvollziehbare Ballbesitze.
-Ball, Angreifer und Verteidiger handeln räumlich und zeitlich abgestimmt; jede Bewegung
-hat einen erkennbaren Zweck. Freie Positionen dürfen gehalten werden. Laufwege sollen
-einfach, zeitlich machbar und aus den bisherigen Positionen anschlussfähig sein.
+Aus belegten Ereignissen entstehen regelkonforme, zusammenhängende und nachvollziehbare
+Ballbesitze. Ball, Angreifer und Verteidiger handeln räumlich und zeitlich abgestimmt;
+jede Bewegung hat einen erkennbaren Zweck. Ergänzte Abläufe bleiben schematisch.
 
-Dies beschreibt das Entwicklungsziel, nicht zusätzliche bereits implementierte Funktionen.
-Belegte Ereignisse haben Vorrang; ergänzte Abläufe bleiben schematisch. Die bestehende
-Grenze für konkrete Screens und Pick-and-Roll-/Pick-and-Pop-Abläufe gilt unverändert.
-Planungsentscheidungen müssen deterministisch bleiben und Wiedergabe, Pause,
-Geschwindigkeit sowie Seeking auf derselben Replay-Zeitbasis erhalten.
+Das Zielbild trennt Ereignisverknüpfung, Spielregeln, Choreografie, Bewegung und Darstellung.
+Spielzustand und Darstellungszustand sind getrennte Verantwortlichkeiten. Die jeweils zur
+Liga und Saison passenden NBA-/WNBA-Regeln bestimmen Fortsetzungen und Grenzen ergänzter
+Bewegungen. Die Abdeckung des gesamten Regelwerks einschließlich Ausnahmen, nicht prüfbarer
+Vorschriften und Lücken soll nachvollziehbar sein. Zeitabhängige Regeln beziehen sich auf
+abgebildete Spielzeit statt verkürzte Animationszeit. Aufgezeichnete Entscheidungen bleiben
+maßgeblich; durch ergänzte Bewegungen entstehende Verstöße dürfen keine erfundenen Pfiffe erzeugen.
+
+Coaching-Prinzipien aus WABC, USA Basketball und Jr. NBA begründen die Heuristiken, ohne
+tatsächlich gespielte Systeme zu behaupten. Die bestehende Grenze für konkrete Screens und
+Pick-and-Roll-/Pick-and-Pop-Abläufe gilt unverändert. Pläne müssen regelkonform, zeitlich
+machbar, anschlussfähig und erklärbar sein. Freie Positionen dürfen gehalten werden.
+Planungsentscheidungen bleiben deterministisch; Wiedergabe, Pause, Geschwindigkeit und
+Seeking verwenden dieselbe Replay-Zeitbasis.
+
+Zum Zielbild gehört eine reproduzierbare Bewertung anhand echter Spiele, gezielter Szenarien
+und systematischer Varianten gegen den letzten akzeptierten Stand. Belegte Ereignisse und
+Regelkorrektheit haben Vorrang, Bewegungsqualität wird kontextabhängig gemessen und visuelle
+Basketball-Plausibilität ergänzend beurteilt. Gemeinsame Ursachen und allgemeine Modelle
+stehen im Mittelpunkt; akzeptierte und verworfene Ansätze bleiben nachvollziehbar.
+
+Dies beschreibt Entwicklungsziele, keine bereits vollständige Regelabdeckung, neue
+Modulstruktur oder zusätzlich implementierte Prüfungen. Arbeitsplanung und Prioritäten
+sind kein Teil des Northstars. Die folgende Implementierungsdokumentation bleibt maßgeblich.
 
 ## Beschlossene Produktentscheidungen
 
