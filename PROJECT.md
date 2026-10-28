@@ -416,6 +416,76 @@ Die lokale Vorschau verwendet ausdrücklich `http://127.0.0.1:5500` wegen der Ba
 Browsercode setzen. Ein CLI-Import ersetzt keine Browser-CORS-Freigabe.
 Custom-Domain und weitere Spielplan-Integration sind kein eingerichteter Produktbestandteil.
 
+### API-Endpunkte und Auswahl von Game IDs
+
+Maßgebliche Serverlogik:
+[Tehes/nba-spielplan: api/main.js](https://github.com/Tehes/nba-spielplan/blob/master/api/main.js).
+Basis-URL: `https://nba-spielplan.tehes.deno.net`. Die folgenden Abrufe verwenden `GET`.
+
+| Daten | NBA | WNBA | Relevante Antwortfelder |
+| --- | --- | --- | --- |
+| Schedule | `/schedule` | `/schedule?league=wnba` | `leagueSchedule.gameDates[].games[]` mit `gameId`, `gameStatus`, `gameDateTimeUTC`, `homeTeam` und `awayTeam` |
+| Boxscore | `/boxscore/GAME_ID` | `/boxscore/GAME_ID?league=wnba` | `game.gameId`, `game.gameStatus`, Teams, Spieler und Statistiken |
+| Play-by-Play | `/playbyplay/GAME_ID` | `/playbyplay/GAME_ID?league=wnba` | `game.gameId` und `game.actions[]` |
+
+Beispiel-URLs:
+
+- `https://nba-spielplan.tehes.deno.net/schedule`
+- `https://nba-spielplan.tehes.deno.net/schedule?league=wnba`
+- `https://nba-spielplan.tehes.deno.net/boxscore/0022600007`
+- `https://nba-spielplan.tehes.deno.net/playbyplay/0022600007`
+- `https://nba-spielplan.tehes.deno.net/boxscore/1042600304?league=wnba`
+- `https://nba-spielplan.tehes.deno.net/playbyplay/1042600304?league=wnba`
+
+Der Server wählt die Liga ausschließlich über `league=nba|wnba`; ohne Parameter gilt NBA.
+Anders als der Replay-Client leitet er WNBA nicht aus der GameID ab.
+`GAME_ID` muss genau zehn Ziffern enthalten und als String mit führenden Nullen erhalten bleiben.
+
+Für den Schedule ist zusätzlich `region=de|us` möglich. Standard ist `de` (Broadcast-Code 14),
+`us` verwendet Code 1. `region=none` und unbekannte Werte fallen ebenfalls auf Code 14 zurück;
+`none` bedeutet auf diesem Server nicht „ohne Broadcaster“.
+Die Region wählt die Broadcast-Variante des Schedules, keine Replay-Liga oder Saison.
+
+Schedule, Boxscore und Play-by-Play werden aus den jeweiligen offiziellen CDN-Feeds durchgereicht.
+Der Schedule verweist auf `scheduleLeagueV2_<regionCode>.json`; es gibt in diesen Routen keinen
+implementierten Saison-, Datums-, Pagination- oder Mehrfach-GameID-Parameter.
+Der verfügbare Saisonstand stammt aus der Upstream-Antwort
+(`leagueSchedule.seasonYear`, ersatzweise `meta.seasonYear`).
+Ein Abruf ist kein beliebiges historisches Saisonarchiv. Für reproduzierbare Auswahl muss deshalb
+auch die verwendete Schedule-Antwort beziehungsweise die daraus gewählte ID-Liste archiviert werden.
+
+Alle drei Routen verlangen bereits serverseitig einen freigegebenen `Origin`; ohne passenden
+Header liefert der Server 403. Für CLI-/Importwerkzeuge ist
+`Origin: http://127.0.0.1:5500` zu verwenden. Im Browser entsteht der Header aus der tatsächlichen
+Seitenherkunft. Ungültige Liga oder GameID liefern 400; Upstream- und Netzwerkfehler müssen
+auch bei einer Batch-Auswahl ausdrücklich behandelt werden.
+
+### Gewinnung größerer Testbestände
+
+Der vorgesehene Weg ist Schedule → abgeschlossene Game IDs → Boxscore und Play-by-Play →
+Normalisierung und Prüfung → archivierter Testbestand.
+
+1. Schedule je gewünschter Liga laden, HTTP-Status und Antwortstruktur prüfen.
+2. `leagueSchedule.gameDates` über die jeweiligen `games` abflachen.
+   Nur Spiele mit `gameStatus === 3` und gültiger zehnstelliger String-`gameId` auswählen.
+3. IDs je Liga deduplizieren. Auswahl nach Datum, Teams und gewünschter Spielvielfalt festhalten;
+   IDs nicht erraten oder aus fortlaufenden Nummern konstruieren.
+4. Für jede ID beide Detailfeeds mit derselben Liga laden. Abschlussstatus, übereinstimmende IDs
+   und den vollständigen Replay-Audit weiterhin prüfen: Ein Final-Status im Schedule allein
+   garantiert weder verfügbare noch kompatible Detailfeeds.
+5. Rohdaten, normalisierte freigegebene Snapshots sowie Auswahlmanifest mit Liga, Saisonangabe,
+   Schedule-Quelle, Erfassung und ausgewählten IDs für den Vergleich erhalten.
+   Fehlgeschlagene Spiele mit Ursache getrennt erfassen, statt sie stillschweigend zu ersetzen.
+
+Downloads sollen mit begrenzter Parallelität erfolgen und vorhandene Archive wiederverwenden.
+Für einen Baseline-Vergleich bleiben Auswahl und Datenbestand unverändert.
+Der Top-Excitement-Filter des Spielplans ist keine allgemeine Auswahlregel für Replay-Tests;
+er schränkt Spieltypen und Alter für seinen eigenen Anwendungsfall ein.
+
+Dies beschreibt den Anschluss für größere Testsammlungen. Schedule-basierte GameID-Auswahl,
+Auswahlmanifest und Batch-Downloader sind in Hoops Replay noch nicht implementiert.
+Vorhanden ist der einzelne Import mit vorgegebener GameID.
+
 ### Normalisiertes Schema
 
 | Feld | Bedeutung |
