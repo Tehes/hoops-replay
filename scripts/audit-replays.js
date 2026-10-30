@@ -16,7 +16,7 @@ async function init() {
 			requestedIds.push(argument);
 		} else {
 			throw new Error(
-				"Usage: audit-replays.js [--league=nba|wnba|all] [--limit=10] [GAME_ID ...]; limit=0 selects all.",
+				"Usage: deno task audit [--league=nba|wnba|all] [--limit=10] [GAME_ID ...]; limit=0 selects all.",
 			);
 		}
 	}

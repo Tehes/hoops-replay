@@ -1,4 +1,10 @@
 {
+    "tasks": {
+        "audit": "deno run --allow-net=nba-spielplan.tehes.deno.net scripts/audit-replays.js",
+        "test": "deno test --allow-net=nba-spielplan.tehes.deno.net scripts/",
+        "test:data": "deno test --allow-net=nba-spielplan.tehes.deno.net scripts/replay-data_test.js",
+        "test:local": "deno test scripts/replay-motion_test.js scripts/replay-colors_test.js"
+    },
     "fmt": {
         "useTabs": true,
         "indentWidth": 4,

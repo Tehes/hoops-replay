@@ -111,23 +111,23 @@ next shooter can move toward the receiving position during the preceding action.
 
 ## Development checks
 
-Serve this directory at `http://127.0.0.1:5500` for browser development; the backend permits this
-specific origin. With a Game ID, the app loads both feeds from the server. Only the default demo
+Serve this directory with a local static server for browser development.
+With a Game ID, the app loads both feeds from the server. Only the default demo
 is stored locally; there is no local fallback when a requested game fails.
 
 Run the server batch with Deno:
 
 ```sh
-deno run --allow-net=nba-spielplan.tehes.deno.net scripts/audit-replays.js
+deno task audit
 ```
 
 The default selects up to ten completed games per league, spread across the available NBA and WNBA
 schedules, including preseason and postseason. To change the selection:
 
 ```sh
-deno run --allow-net=nba-spielplan.tehes.deno.net scripts/audit-replays.js --league=nba --limit=20
-deno run --allow-net=nba-spielplan.tehes.deno.net scripts/audit-replays.js --league=wnba --limit=0
-deno run --allow-net=nba-spielplan.tehes.deno.net scripts/audit-replays.js 0022600007 1042600304
+deno task audit --league=nba --limit=20
+deno task audit --league=wnba --limit=0
+deno task audit 0022600007 1042600304
 ```
 
 `--limit=0` selects every completed game. Explicit IDs bypass schedule selection and the limit.
@@ -143,12 +143,13 @@ The current audit does not establish complete rule coverage or visual basketball
 Existing individual checks can still be run; real-game inputs also come from the server:
 
 ```sh
-deno test --allow-net=nba-spielplan.tehes.deno.net scripts/replay-data_test.js
-deno test scripts/replay-motion_test.js scripts/replay-colors_test.js
+deno task test:data
+deno task test:local
 ```
 
 These checks depend on server availability and current feed contents. No game-data read or write
 permission is needed for development checks.
+Use `deno task test` to run all existing individual checks together.
 
 ---
 
