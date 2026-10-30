@@ -2070,7 +2070,14 @@ Deno.test("the PG advances while all off-ball players fill their spots, then def
 				const settled = scene.frames.find((frame) => frame.time === run.stages[1].end);
 				for (const id of run.offBall) {
 					const lead = progress(id);
-					if (lead !== null && guard !== null) {
+					const origin = from.players.find((player) => player.id === id);
+					const firstPoint = first.players.find((player) => player.id === id);
+					const direction = attackDirection(data, scene.attackTeam, scene.action.period);
+					const exit = getLaneWaitingPoint(origin, direction);
+					const clearingLane = scene.shotEntry && scene.liveSeconds > 3 &&
+						isInOffensiveLane(origin, direction) &&
+						Math.hypot(firstPoint.x - exit.x, firstPoint.y - exit.y) < 0.00001;
+					if (lead !== null && guard !== null && !clearingLane) {
 						assert(lead > guard, "off-ball player was held behind the advancing PG");
 						staggered++;
 					}

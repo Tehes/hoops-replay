@@ -1,6 +1,6 @@
 import { attackDirection, compileReplay, getReplayFrame } from "./replay-engine.js";
 import { getLeague } from "./replay-leagues.js";
-import { isInOffensiveLane } from "./replay-rules.js";
+import { getLaneWaitingPoint, isInOffensiveLane } from "./replay-rules.js";
 
 export function checkReplay(data, replay = compileReplay(data)) {
 	const id = data.gameId;
@@ -309,9 +309,13 @@ export function checkReplay(data, replay = compileReplay(data)) {
 				const previous = (scene.frames.find((frame) => frame.time === scene.returnAt) || scene.frames[0])
 					.players.find((player) => player.id === playerId);
 				const [x, y] = scene.spacingDestinations[slot];
+				const target = { x: direction === 1 ? x : 94 - x, y };
+				const exit = getLaneWaitingPoint(previous, direction);
 				check(
-					Math.hypot(previous.x - (direction === 1 ? x : 94 - x), previous.y - y) < 0.00001,
-					`${id} retain current position on restart ${scene.action.actionNumber}:${playerId}`,
+					Math.hypot(previous.x - target.x, previous.y - target.y) < 0.00001 ||
+						(scene.shotPoint && scene.liveSeconds > 3 && !scene.formation.backcourt &&
+							Math.hypot(exit.x - target.x, exit.y - target.y) < 0.00001),
+					`${id} retain current position or nearest lane exit on restart ${scene.action.actionNumber}:${playerId}`,
 				);
 			}
 		}

@@ -440,6 +440,15 @@ Offensive Wartepositionen im Halbfeld liegen außerhalb der Zone. Bei längerer 
 auch spätere Innenschützen zunächst außerhalb; ihre eigentliche Anspiel-/Abschlussposition bleibt
 erhalten. Kurze Zuspiele in die Zone, Abschlüsse und direkte zweite Chancen bleiben möglich.
 Spieler, die nach einem Rebound innen stehen, können sich auf kurzem Weg aus der Zone lösen.
+Auch bei übernommenen Positionen in einem fortgesetzten Aufbau wird eine Innenposition durch
+den nächstgelegenen Wartepunkt außerhalb ersetzt. Dafür muss keine zusätzliche Wartephase übrig
+sein. Begrenzte Positionskorrekturen werden an ihrem tatsächlich verwendeten Endpunkt beurteilt;
+ein freier, weiter entfernter Zielpunkt allein genügt nicht. Die Erhaltungsprüfung erlaubt bei
+übernommenen Positionen genau dieses kurze Freimachen, keine beliebige Neuaufstellung.
+Zwischenstationen des längeren Live-Aufbaus liegen ebenfalls außerhalb der Zone. Innen stehende
+Mitspieler lösen sich zunächst nach außen, während der Rebounder den gesicherten Ball behält.
+Für einen vorbereitenden Lauf zum nächsten Abschluss wird die vom aktuellen Standort nähere
+Außenseite gewählt; die eigentliche Anspiel- und Abschlussposition bleibt erhalten.
 
 `checkReplay()` meldet `offensiveLaneStays` als Prüfkandidaten, nicht als Fehler oder Pfiffe:
 In den bereits vorhandenen Abtastungen alle 0,2 Replay-Sekunden wird ab bekannter Ballkontrolle
