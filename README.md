@@ -64,11 +64,6 @@ Pressing Play at the end restarts the replay.
 4. In the Hoops Replay link, replace the number after `?game=` with that Game ID:
    [https://tehes.github.io/hoops-replay/?game=0022600002](https://tehes.github.io/hoops-replay/?game=0022600002)
 
-The replay detects the league from the Game ID: IDs starting with `10` use WNBA feeds;
-other IDs use NBA feeds. For example, `?game=1042600304` loads the WNBA game above.
-No additional league parameter, download, or command-line import is needed.
-If your link already contains a `game` value, replace it rather than adding a second one.
-
 ### Jump to an Action
 
 Add `&action=ACTION_NUMBER` to a game link to open the replay paused at that event, for example:
@@ -111,106 +106,6 @@ next shooter can move toward the receiving position during the preceding action.
 - **Overtime:** Five-minute overtime periods and quarter controls are implemented and covered by
   synthetic tests. The archived MIN–CLE overtime game also passes data and replay validation;
   its overtime playback has not yet been visually verified.
-
----
-
-## For Developers
-
-Built with vanilla HTML, CSS, and JavaScript modules. No dependencies, frameworks, or build step.
-Deno is used for the optional import and verification tools; the frontend runs in the browser.
-Read [PROJECT.md](PROJECT.md) for product decisions, the data contract and implementation limits,
-and [AGENTS.md](AGENTS.md) for repository working rules.
-
-### Run Locally
-
-Serve the project root over HTTP and open [http://127.0.0.1:5500](http://127.0.0.1:5500).
-Use this exact host and port for loading games by ID: the backend's CORS policy does not treat
-`localhost` or other ports as equivalent. Opening the page directly as a file is not supported.
-
-For changes to a specific sequence, use action links in the local preview to reproduce and inspect
-the relevant situation. For example, `?action=95` and `?action=566` select two movement examples in
-the bundled DEN–OKC game. Scrub back before the event to watch the buildup, then check playback,
-pause and repeated seeking. Use `?game=GAME_ID&action=ACTION_NUMBER` for another game.
-Include the relevant local action links when presenting a change so its behavior can be reviewed directly.
-
-### Project Structure
-
-```text
-├── index.html               # Court, scoreboard, and playback controls
-├── css/style.css            # Base styles and replay layout
-├── js/
-│   ├── app.js               # Application entry point, rendering, and playback
-│   ├── replay-engine.js     # Scenes, lineups, possession, and movement planning
-│   ├── replay-motion.js     # Planned routes, holds, reaction timing, and crossing reservations
-│   ├── replay-shots.js      # Shot profiles and ball trajectories
-│   ├── replay-teams.js      # NBA/WNBA team names, color palettes, and logos
-│   ├── replay-colors.js     # Color similarity, contrast, and jersey selection
-│   ├── replay-leagues.js    # League detection, quarter lengths, and three-point geometry
-│   ├── replay-data.js       # Feed loading and normalization
-│   └── replay-validation.js # Shared replay checks
-├── data/                    # Reference snapshots and archived raw feeds
-├── scripts/                 # Deno import and verification tools
-├── img/                     # Demo image and local team logos
-└── icons/                   # Application icon
-```
-
-All runtime paths are relative, including under a GitHub Pages repository path.
-Umami page-view tracking is limited to `tehes.github.io`; localhost previews are excluded.
-
-### Import a Regression Fixture
-
-The optional importer archives a completed game for repeatable local checks. Replace `GAME_ID`
-with its ten-digit NBA or WNBA ID; the importer detects the league automatically:
-
-```sh
-deno run --allow-net=nba-spielplan.tehes.deno.net --allow-read --allow-write=data scripts/import-game.js GAME_ID
-```
-
-It saves the raw feeds under `data/raw/` and writes a playable `data/replay-GAME_ID.json` only after
-validation succeeds. Existing files are preserved unless `--overwrite` is explicitly passed.
-Loading `?game=GAME_ID` still requests backend data, even when a local fixture exists.
-Raw feeds are saved before validation, so a failed import can leave raw archives without a playable snapshot.
-
-### Reference Games
-
-Six playable snapshots are included for repeatable regression checks:
-
-| Game ID | League | Matchup | Final score (away–home) |
-| --- | --- | --- | --- |
-| `0022600007` | NBA | DEN at OKC | 84–96 |
-| `0022600008` | NBA | NYK at BOS | 103–107 |
-| `0022600094` | NBA | ATL at CHA | 128–81 |
-| `0022600105` | NBA | BKN at CLE | 121–125 |
-| `0022600120` | NBA | MIN at CLE (OT) | 125–127 |
-| `1042600304` | WNBA | GSV at ATL | 67–62 |
-
-Only DEN–OKC is selected locally by default. Explicit `?game=` links request the backend.
-MIN–CLE preserves the original Q2 6:11 feed conflict: Dosunmu's substitution precedes his
-recorded steal in the raw data. A dedicated regression checks the corrected replay order.
-Files under `data/raw/` also include unsupported or inconsistent cases; their presence does not mean
-that a game passed validation.
-
-### Development Checks
-
-```sh
-deno fmt --check js/ scripts/ css/style.css index.html
-deno check js/*.js scripts/*.js
-deno lint js/ scripts/
-deno test --allow-read=data scripts/replay-data_test.js
-deno test scripts/replay-colors_test.js
-deno test scripts/replay-motion_test.js
-deno run --allow-read=data scripts/audit-replays.js
-git diff --check
-```
-
-The audit discovers all local replay snapshots and checks scores, lineups, ball ownership, coordinates,
-interpolation, and shot behavior. Raw archives are excluded.
-The regression tests also cover simultaneous buildup, travel speed, early shooter positioning,
-passes, rebounds, substitutions, synthetic overtime cases, and WNBA feed routing, team metadata,
-ten-minute quarters, and three-point geometry.
-
-For a browser check, load a game, play and pause, scrub across halftime, and seek to the final score.
-Check the controls and court on both mobile and desktop widths.
 
 ---
 
