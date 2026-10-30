@@ -335,7 +335,19 @@ Die aktuelle Engine bündelt mehrere Verantwortlichkeiten des Zielbilds; die zus
   Step-back, Fadeaway und Turnaround. Unbekannte Kombinationen können generisch dargestellt werden.
 - Rebounds verwenden `shotActionNumber`; nur bei fehlender/null Referenz ist der unmittelbar
   vorausgehende Wurf ein Fallback. Ungültige explizite Referenzen werden nicht ersetzt.
-  Kontinuierliche persönliche Rebounds reagieren spät im Ballflug und erhalten eine freie Fangphase.
+  Ein freier Offensivrebounder kann während der Vorbereitung eine erreichbare Position 8–12 Fuß
+  vom Korb anlaufen. Gerade Wege durch gehaltene Angreiferplätze und belegte Abschluss-/Empfangsorte
+  sowie Ziele in der Passlinie werden verworfen; bestehende Innenpositionen dürfen gehalten werden.
+  Schütze, Assistent, Ballhalter und vorausgeplanter Folgeempfänger behalten ihre Aufgaben.
+  Es gibt keinen erzwungenen Platztausch. Der Aufbau berücksichtigt den nötigen Lauf mit höchstens
+  8 Fuß pro Replay-Sekunde; der laufende Rebounder wird nicht zusätzlich als Passoption verwendet.
+  Dies folgt dem Positionierungs-/Kontinuitätsprinzip des Northstars, modelliert aber kein belegtes Box-out.
+  Erst ab sichtbarem Korb-/Blockausgang führt der Fangweg zum schematischen Abprallort. Seine
+  Geschwindigkeit bleibt mit durchgängiger Beschleunigung/Bremsung auf 14 Fuß pro Replay-Sekunde
+  begrenzt; bei nötigen längeren Wegen verlängert sich die freie Ballphase, nicht der Wurfflug.
+  Das gilt auch, wenn keine freie Vorbereitungsroute vorhanden ist oder der Rebounder am Wurf
+  beteiligt war. Dadurch können Aufbau und Abprallphase länger dauern. Die aufgezeichneten
+  Ereignisse und Spieluhranker bleiben erhalten; vollständige Kollisionsfreiheit ist nicht zugesichert.
   Blocks dürfen diese Verbindung erhalten; Fouls, Timeouts und Wechsel unterbrechen den Vorlauf.
   Team-Rebounds erfinden keinen individuellen Fänger.
 - Steals erhalten einen Zugang zum Ball beziehungsweise zu einer plausiblen Passlinie; Besitz
@@ -596,6 +608,10 @@ Dauerhaft wichtige Gegenbeispiele und Grenzen:
 - MIN–CLE bewahrt im Rohfeed Dosunmus zeitgleichen Steal 385/386 und Auswechslung 254/253 in der
   widersprechenden Quellordnung. Die Regression prüft die begrenzte kausale Replay-Korrektur.
   Das echte OT-Spiel ist als Datensatz geprüft, seine Overtime nicht visuell vollständig abgenommen.
+- CLE–ATL `0022600144`: Der Ausschnitt in `data/scenarios/cle-atl-second-chance.json` enthält den
+  Spielbeginn bis Rebound 57. Aktion 56 sichert Alexander-Walkers Vorbereitung ohne den früheren
+  Platztausch mit McCollum, gespiegelt und mit verkürztem Spieluhrabstand. Der Ausschnitt ist kein
+  zusätzlicher Vollspiel-Snapshot; die Team-Endstände stammen weiterhin aus dem vollständigen Spiel.
 - Burton/Canada in `1042600305`: Treffer/Foul 450/451 bei Q4 6:27, Fehlfreiwurf 453 und
   Hillmon-Rebound 454 bei 6:25. Der gezielte Test sichert den And-one-Kontakt ohne zweiten Angriff;
   dieses Spiel ist kein zusätzlicher gebündelter Vollspiel-Snapshot.

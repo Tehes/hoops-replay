@@ -146,7 +146,7 @@ function planRoutes(scene, index) {
 	return routes;
 }
 
-export function movePlayers(scene, index, fraction, players) {
+function moveRoutes(scene, index, fraction, players) {
 	const from = scene.frames[index];
 	const to = scene.frames[index + 1] ?? from;
 	const duration = to.time - from.time;
@@ -178,4 +178,33 @@ export function movePlayers(scene, index, fraction, players) {
 		...player,
 		...routePoint(intervals.get(index)[i], routeProgress(intervals.get(index)[i], fraction, duration)),
 	}));
+}
+
+export function movePlayers(scene, index, fraction, players) {
+	players = moveRoutes(scene, index, fraction, players);
+	const from = scene.frames[index];
+	const to = scene.frames[index + 1] ?? from;
+	const time = from.time + (to.time - from.time) * fraction;
+	// Preserve a single speed profile across setup/catch snapshots, including the final hold.
+	for (const move of [scene.reboundMove, scene.reboundRun]) {
+		if (!move || move.startAt === null) {
+			continue;
+		}
+		const end = move === scene.reboundMove ? scene.releaseAt : move.startAt + move.duration;
+		if (time < move.startAt || time > end) {
+			continue;
+		}
+		const u = Math.max(0, Math.min(1, (time - move.startAt) / move.duration));
+		const progress = u * u * (3 - 2 * u);
+		players = players.map((player) =>
+			player.id === move.id
+				? {
+					...player,
+					x: move.from.x + (move.x - move.from.x) * progress,
+					y: move.from.y + (move.y - move.from.y) * progress,
+				}
+				: player
+		);
+	}
+	return players;
 }

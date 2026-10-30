@@ -888,6 +888,165 @@ Deno.test("explicit rebound links and missing-field fallback preserve all refere
 	}
 });
 
+Deno.test("second chances keep off-ball positions instead of swapping the next rebounder with a teammate", async () => {
+	let checked = 0;
+	for (const id of ["0022600007", "0022600008", "0022600094", "0022600105", "0022600120", "1042600304"]) {
+		const replay = compileReplay(await readData(`replay-${id}.json`));
+		for (const scene of replay.scenes) {
+			if (
+				scene.attackContext?.origin !== "second-chance" ||
+				scene.spacingDestinations ||
+				scene.preparationAt === undefined
+			) {
+				continue;
+			}
+			const first = scene.frames[0];
+			const excluded = new Set([
+				scene.action.personId,
+				first.ball.owner,
+				scene.continuationMove?.playerId,
+			]);
+			for (const playerId of scene.lineups[scene.attackTeam]) {
+				if (excluded.has(playerId)) {
+					continue;
+				}
+				const from = first.players.find((player) => player.id === playerId);
+				for (
+					const frame of scene.frames.filter((frame) => frame.time <= scene.preparationAt)
+				) {
+					const to = frame.players.find((player) => player.id === playerId);
+					assert(
+						Math.hypot(to.x - from.x, to.y - from.y) <= 6.1,
+						`${id} action ${scene.action.actionNumber}: unrelated off-ball player crossed the court before preparation`,
+					);
+				}
+				checked++;
+			}
+		}
+	}
+	assert(checked > 0, "no second-chance off-ball positions checked");
+});
+
+Deno.test("CLE-ATL action 56 prepares the rebounder without exchanging McCollum's position or matchups", async () => {
+	const source = await readData("scenarios/cle-atl-second-chance.json");
+	for (const mirrored of [false, true]) {
+		for (const quick of [false, true]) {
+			const data = structuredClone(source);
+			for (const action of data.actions) {
+				if (mirrored && action.isFieldGoal) {
+					action.x = 100 - action.x;
+					action.side = action.side === "left" ? "right" : "left";
+				}
+				if (quick && [56, 57].includes(action.actionNumber)) {
+					action.clock = "PT07M28.00S";
+				}
+			}
+			const original = JSON.stringify(data);
+			const replay = compileReplay(data);
+			const scene = replay.scenes.find((scene) => scene.action.actionNumber === 56);
+			const move = scene.reboundMove;
+			assert(move?.id === 1629638, "Alexander-Walker has no planned route to rebounding position");
+			assert(
+				Math.hypot(move.x - scene.hoop.x, move.y - scene.hoop.y) <= 12.001,
+				"rebounder was left too far from the basket",
+			);
+			assert(
+				scene.preparationAt + scene.preparationWait < scene.releaseAt,
+				"rebound setup leaked into the shot flight",
+			);
+			const start = getReplayFrame(replay, scene.start + move.startAt);
+			const end = getReplayFrame(replay, scene.start + move.startAt + move.duration);
+			const mcCollum = (frame) => frame.players.find((player) => player.id === 203468);
+			assert(
+				Math.hypot(mcCollum(end).x - mcCollum(start).x, mcCollum(end).y - mcCollum(start).y) <= 6.1,
+				"McCollum was forced across the court to exchange positions",
+			);
+			let previous = start.players.find((player) => player.id === move.id);
+			for (let step = 1; step <= 100; step++) {
+				const at = scene.start + move.startAt + move.duration * step / 100;
+				const frame = getReplayFrame(replay, at);
+				const player = frame.players.find((player) => player.id === move.id);
+				assert(
+					Math.hypot(player.x - previous.x, player.y - previous.y) <= 8.01 * move.duration / 100,
+					"rebounding setup exceeded its travel speed",
+				);
+				assert(
+					Math.hypot(player.x - mcCollum(frame).x, player.y - mcCollum(frame).y) >= 4.9,
+					"rebounder ran through McCollum",
+				);
+				assert(frame.ball.owner !== move.id, "rebounder received an invented preparation pass");
+				previous = player;
+			}
+			for (let step = 0; step <= 20; step++) {
+				const time = move.startAt + move.duration +
+					(scene.releaseAt - move.startAt - move.duration) * step / 20;
+				const player = getReplayFrame(replay, scene.start + time).players.find((player) =>
+					player.id === move.id
+				);
+				assert(
+					Math.hypot(player.x - move.x, player.y - move.y) < 0.01,
+					"rebounder drifted after reaching position",
+				);
+			}
+			const at = scene.start + move.startAt + move.duration / 2;
+			const middle = getReplayFrame(replay, at);
+			getReplayFrame(replay, replay.duration);
+			assert(JSON.stringify(middle) === JSON.stringify(getReplayFrame(replay, at)), "seeking changed the setup");
+			assert(JSON.stringify(data) === original, "planning mutated source events");
+		}
+	}
+});
+
+Deno.test("personal rebound catches wait for the outcome and respect travel speed, including blocks and shooters", async () => {
+	let setups = 0;
+	let catches = 0;
+	let shooters = 0;
+	let blocked = 0;
+	for (const id of ["0022600007", "0022600008", "0022600094", "0022600105", "0022600120", "1042600304"]) {
+		const replay = compileReplay(await readData(`replay-${id}.json`));
+		for (const scene of replay.scenes) {
+			if (scene.reboundMove) {
+				const setup = scene.reboundMove;
+				let previous = getReplayFrame(replay, scene.start + setup.startAt)
+					.players.find((player) => player.id === setup.id);
+				for (let step = 1; step <= 100; step++) {
+					const frame = getReplayFrame(replay, scene.start + setup.startAt + setup.duration * step / 100);
+					const player = frame.players.find((player) => player.id === setup.id);
+					assert(Math.hypot(player.x - previous.x, player.y - previous.y) <= 8.02 * setup.duration / 100,
+						"off-ball setup exceeded its speed limit");
+					for (const other of frame.players.filter((other) =>
+						other.id !== setup.id && scene.lineups[scene.attackTeam].includes(other.id))) {
+						assert(Math.hypot(player.x - other.x, player.y - other.y) >= 3,
+							"setup conflicted with another attacker's preparation");
+					}
+					previous = player;
+				}
+				setups++;
+			}
+			const move = scene.reboundRun;
+			if (!move) {
+				continue;
+			}
+			assert(move.startAt >= scene.eventAt - 0.001, "catch route anticipated the shot outcome");
+			const sample = (time) => getReplayFrame(replay, scene.start + time).players.find((p) => p.id === move.id);
+			let previous = sample(move.startAt);
+			for (let step = 1; step <= 100; step++) {
+				const player = sample(move.startAt + move.duration * step / 100);
+				assert(
+					Math.hypot(player.x - previous.x, player.y - previous.y) <= 14.02 * move.duration / 100,
+					`${id} action ${scene.action.actionNumber}: rebound catch was rushed`,
+				);
+				previous = player;
+			}
+			assert(Math.hypot(previous.x - move.x, previous.y - move.y) < 0.02, "catch missed its endpoint");
+			catches++;
+			shooters += Number(move.id === scene.action.personId);
+			blocked += Number(Boolean(scene.action.blockPersonId));
+		}
+	}
+	assert(setups > 0 && catches > 100 && shooters > 0 && blocked > 0, "rebound scenarios were not exercised");
+});
+
 Deno.test("an intervening standalone block retains the approach, free ball and continuous seeking", async () => {
 	const data = await readData("replay-0022600007.json");
 	const baseline = compileReplay(data);

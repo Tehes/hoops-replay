@@ -288,25 +288,22 @@ export function checkReplay(data, replay = compileReplay(data)) {
 				);
 			}
 		}
-		if (scene.reboundRotation) {
-			const rotation = scene.reboundRotation;
+		if (scene.reboundMove) {
+			const move = scene.reboundMove;
 			check(
-				teamFor.get(rotation.rebounderId) === scene.attackTeam &&
-					teamFor.get(rotation.partnerId) === scene.attackTeam,
-				`${id} no defensive rebound swap ${scene.action.actionNumber}`,
+				scene.lineups[scene.attackTeam].includes(move.id) && move.startAt >= scene.preparationAt &&
+					move.startAt + move.duration <= scene.releaseAt &&
+					Math.hypot(move.x - scene.hoop.x, move.y - scene.hoop.y) <= 12.001 &&
+					1.5 * Math.hypot(move.x - move.from.x, move.y - move.from.y) / move.duration <= 8.001,
+				`${id} reachable offensive rebound position ${scene.action.actionNumber}`,
 			);
-			const from = scene.frames.find((frame) => frame.time === rotation.start);
-			const to = scene.frames.find((frame) => frame.time === rotation.end);
-			const before = from.players.find((player) => player.id === rotation.rebounderId);
-			const after = to.players.find((player) => player.id === rotation.rebounderId);
+		}
+		if (scene.reboundRun) {
+			const move = scene.reboundRun;
 			check(
-				Math.hypot(after.x - scene.hoop.x, after.y - scene.hoop.y) <
-					Math.hypot(before.x - scene.hoop.x, before.y - scene.hoop.y),
-				`${id} rebounder rotates toward paint ${scene.action.actionNumber}`,
-			);
-			check(
-				rotation.end <= scene.releaseAt && from.ball.owner === to.ball.owner,
-				`${id} off-ball rotation before shot ${scene.action.actionNumber}`,
+				move.startAt >= scene.eventAt - 0.001 &&
+					1.5 * Math.hypot(move.x - move.from.x, move.y - move.from.y) / move.duration <= 14.001,
+				`${id} reachable catch after shot outcome ${scene.action.actionNumber}`,
 			);
 		}
 		if (scene.reboundShotIndex !== undefined) {

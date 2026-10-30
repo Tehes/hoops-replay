@@ -1138,11 +1138,13 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 
 function preparationPosition(state, scene, id, time) {
 	const arrival = scene.arrivalMove?.id === id ? scene.arrivalMove : null;
-	const move = arrival ?? scene.spacingMoves?.find((move) => move.id === id && move.duration);
+	const move = arrival ?? (scene.reboundMove?.id === id ? scene.reboundMove : null) ??
+		scene.spacingMoves?.find((move) => move.id === id && move.duration);
 	if (!move) {
 		return state.positions[id];
 	}
-	const fraction = Math.max(0, Math.min(1, (time - move.startAt) / move.duration));
+	const progress = Math.max(0, Math.min(1, (time - move.startAt) / move.duration));
+	const fraction = move === scene.reboundMove ? progress * progress * (3 - 2 * progress) : progress;
 	return { x: move.from.x + (move.x - move.from.x) * fraction, y: move.from.y + (move.y - move.from.y) * fraction };
 }
 
@@ -1150,7 +1152,7 @@ function relocatePasser(state, scene, id, receiver, time, remaining) {
 	const moves = scene.spacingMoves;
 	if (!["2pt", "3pt"].includes(scene.kind) || moves.length >= 2 || remaining < 1 ||
 		[scene.action.personId, scene.action.assistPersonId, scene.formation.interiorId,
-			scene.continuationMove?.playerId].includes(id) || moves.some((move) => move.id === id)) {
+			scene.continuationMove?.playerId, scene.reboundMove?.id].includes(id) || moves.some((move) => move.id === id)) {
 		return;
 	}
 	const direction = scene.hoop?.x < 47 ? -1 : 1;
@@ -1211,6 +1213,9 @@ function circulateBall(state, scene, duration, record) {
 	const moving = new Set();
 	if (scene.continuationMove) {
 		moving.add(scene.continuationMove.playerId);
+	}
+	if (scene.reboundMove) {
+		moving.add(scene.reboundMove.id);
 	}
 	const receivers = state.lineups[scene.attackTeam].filter((id) => !moving.has(id));
 	const finish = ["2pt", "3pt"].includes(scene.kind)
@@ -1469,8 +1474,20 @@ function pacePreparation(state, scene, time, finishDuration, record, direction) 
 			delete scene.stagedEntry;
 		}
 	}
+	if (scene.reboundMove) {
+		scene.reboundMove.startAt = time;
+		scene.preparationWait = Math.max(scene.preparationWait, scene.reboundMove.duration + 0.15);
+	}
 	scene.preparationAt = time;
 	const spacingMoves = scene.spacingMoves ?? [];
+	// A staged receiving entry may already have completed a small spacing adjustment.
+	for (let i = spacingMoves.length - 1; i >= 0; i--) {
+		const move = spacingMoves[i];
+		const position = state.positions[move.id];
+		if (Math.hypot(move.x - position.x, move.y - position.y) < 0.1) {
+			spacingMoves.splice(i, 1);
+		}
+	}
 	if (scene.preparationWait >= 3) {
 		spacingMoves.forEach((move, index) => {
 			move.startAt = time + index / spacingMoves.length * scene.preparationWait * 0.25;
@@ -1542,57 +1559,77 @@ function pacePreparation(state, scene, time, finishDuration, record, direction) 
 	}
 }
 
-function prepareReboundFormation(state, scene, rebounderId, hoop, record, data) {
+function planReboundSetup(state, scene, rebounderId, continuation, direction) {
+	// Establish rebounding position without anticipating the future bounce location.
 	if (
-		[scene.action.personId, scene.action.assistPersonId, scene.action.blockPersonId, state.ball.owner].includes(
-			rebounderId,
-		)
-	) {
-		return;
-	}
-	const team = data.teams.find((item) => state.lineups[item.id].includes(rebounderId));
-	if (team.id !== scene.attackTeam) {
-		return;
-	}
-	const candidates = state.lineups[team.id].filter((id) =>
-		![scene.action.personId, scene.action.assistPersonId, scene.action.blockPersonId, state.ball.owner].includes(id)
-	);
-	const closest = candidates.sort((a, b) =>
-		Math.hypot(state.positions[a].x - hoop.x, state.positions[a].y - hoop.y) -
-		Math.hypot(state.positions[b].x - hoop.x, state.positions[b].y - hoop.y)
-	)[0];
-	if (
-		closest === rebounderId ||
-		Math.hypot(state.positions[closest].x - hoop.x, state.positions[closest].y - hoop.y) >=
-			Math.hypot(state.positions[rebounderId].x - hoop.x, state.positions[rebounderId].y - hoop.y) - 0.01
+		!rebounderId || scene.formation.backcourt || scene.kind === "heave" ||
+		scene.shotStyle.tip || scene.shotStyle.putback ||
+		[scene.action.personId, scene.action.assistPersonId, state.ball.owner, continuation?.playerId]
+			.includes(rebounderId) ||
+		!state.lineups[scene.attackTeam].includes(rebounderId)
 	) {
 		return;
 	}
 	const from = { ...state.positions[rebounderId] };
-	const inside = { ...state.positions[closest] };
-	const start = scene.frames.at(-1).time;
-	// Rotate two off-ball roles during the buildup, without revealing the later catch point.
-	for (const fraction of [0.5, 1]) {
-		Object.assign(state.positions[rebounderId], {
-			x: from.x + (inside.x - from.x) * fraction,
-			y: from.y + (inside.y - from.y) * fraction,
-		});
-		Object.assign(state.positions[closest], {
-			x: inside.x + (from.x - inside.x) * fraction,
-			y: inside.y + (from.y - inside.y) * fraction,
-		});
-		for (const [defender, attacker] of Object.entries(state.matchups)) {
-			if (attacker === rebounderId || attacker === closest) {
-				const target = state.positions[attacker];
-				Object.assign(state.positions[defender], {
-					x: Math.max(1, Math.min(93, target.x + (hoop.x > 47 ? 3.6 : -3.6))),
-					y: target.y + (25 - target.y) * 0.09,
-				});
-			}
-		}
-		record(0.5);
+	const hoop = scene.hoop;
+	if (Math.hypot(from.x - hoop.x, from.y - hoop.y) <= 12) {
+		return;
 	}
-	scene.reboundRotation = { rebounderId, partnerId: closest, start, end: scene.frames.at(-1).time };
+	const occupied = state.lineups[scene.attackTeam].filter((id) => id !== rebounderId)
+		.map((id) => state.positions[id]);
+	occupied.push(scene.shotPoint, scene.shotEntry ?? scene.shotPoint);
+	const passer = state.positions[scene.action.assistPersonId ?? state.ball.owner];
+	const lane = [passer, scene.shotEntry ?? scene.shotPoint];
+	if (continuation) {
+		occupied.push(continuation.target);
+	}
+	const candidates = [];
+	for (const radius of [8, 10, 12]) {
+		for (let angle = -Math.PI / 2; angle <= Math.PI / 2; angle += Math.PI / 12) {
+			const target = { x: hoop.x - direction * Math.cos(angle) * radius, y: hoop.y + Math.sin(angle) * radius };
+			const dx = target.x - from.x;
+			const dy = target.y - from.y;
+			const length = Math.hypot(dx, dy);
+			const laneX = lane[1].x - lane[0].x;
+			const laneY = lane[1].y - lane[0].y;
+			const along = Math.max(
+				0,
+				Math.min(
+					1,
+					((target.x - lane[0].x) * laneX +
+						(target.y - lane[0].y) * laneY) / (laneX ** 2 + laneY ** 2 || 1),
+				),
+			);
+			if (Math.hypot(target.x - lane[0].x - laneX * along, target.y - lane[0].y - laneY * along) < 5) {
+				continue;
+			}
+			// Reject routes through held spots and finish/receiving positions; never displace their occupants.
+			if (
+				occupied.some((point) => {
+					const u = Math.max(
+						0,
+						Math.min(1, ((point.x - from.x) * dx + (point.y - from.y) * dy) / length ** 2),
+					);
+					const clearance = Math.min(5, Math.hypot(from.x - point.x, from.y - point.y));
+					return Math.hypot(from.x + dx * u - point.x, from.y + dy * u - point.y) < clearance - 0.01;
+				})
+			) {
+				continue;
+			}
+			candidates.push({ target, length, cost: length + radius * 0.4 });
+		}
+	}
+	const best = candidates.sort((a, b) => a.cost - b.cost)[0];
+	if (best) {
+		scene.reboundMove = {
+			id: rebounderId,
+			from,
+			x: best.target.x,
+			y: best.target.y,
+			duration: Math.max(0.8, best.length * 1.5 / 8),
+			startAt: null,
+		};
+	}
 }
 
 function prepareRebound(replay, scene, index, state) {
@@ -1601,15 +1638,14 @@ function prepareRebound(replay, scene, index, state) {
 	if (!id || !scene.reboundContinuous) {
 		return;
 	}
-	const reactionAt = previous.action.personId === id
-		? previous.eventAt
-		: previous.releaseAt + (previous.eventAt - previous.releaseAt) * 0.75;
+	const reactionAt = previous.eventAt;
 	const startFrame = previous.frames.find((frame) => frame.time >= reactionAt);
 	const start = startFrame.time;
 	const end = previous.frames.at(-1).time;
 	const origin = startFrame.players.find((player) => player.id === id);
 	const target = { x: state.ball.x, y: state.ball.y };
-	// React late in the shot flight instead of anticipating the result at release.
+	// The rim/block outcome starts the catch route; the buildup only established general position.
+	previous.reboundRun = { id, from: { ...origin }, x: target.x, y: target.y, startAt: start, duration: end - start };
 	for (const frame of previous.frames) {
 		if (frame.time <= start) {
 			continue;
@@ -1787,6 +1823,10 @@ function compileScene(replay, scene, index, state, data) {
 				}
 			}
 		}
+		if (scene.reboundMove && scene.reboundMove.startAt !== null && scene.releaseAt === undefined) {
+			Object.assign(state.positions[scene.reboundMove.id],
+				preparationPosition(state, scene, scene.reboundMove.id, time + delay));
+		}
 		const continuation = scene.continuationMove;
 		if (continuation) {
 			const fraction = Math.max(0, Math.min(1, (time + delay - continuation.startAt) / continuation.duration));
@@ -1852,9 +1892,7 @@ function compileScene(replay, scene, index, state, data) {
 		}
 		const continuation = planContinuation(replay, scene, state.lineups[offense], direction);
 		prepareAttack(state, scene, offense, direction, matchups, recordMovement, data, replay, index);
-		if (namedRebound && scene.kind !== "heave" && !scene.formation.backcourt) {
-			prepareReboundFormation(state, scene, namedRebound, hoop, recordMovement, data);
-		}
+		planReboundSetup(state, scene, namedRebound, continuation, direction);
 		if (scene.kind !== "heave" && !scene.shotStyle.tip && !scene.shotStyle.putback) {
 			const lineup = state.lineups[offense];
 			const points = lineup.map((id) => {
@@ -1867,7 +1905,7 @@ function compileScene(replay, scene, index, state, data) {
 			lineup.forEach((id, slot) => {
 				if (
 					id === action.personId || id === action.assistPersonId || id === state.ball.owner ||
-					id === continuation?.playerId || slot === scene.formation.interiorSlot
+					id === continuation?.playerId || id === scene.reboundMove?.id || slot === scene.formation.interiorSlot
 				) {
 					return;
 				}
@@ -1949,7 +1987,10 @@ function compileScene(replay, scene, index, state, data) {
 				owner: null,
 			};
 			if (namedRebound) {
-				flyBall(state, record, { ...reboundPoint, z: 3.1 }, 1.8, 0.5);
+				const player = state.positions[namedRebound];
+				const travel = Math.hypot(player.x - reboundPoint.x, player.y - reboundPoint.y);
+				// Keep the loose-ball window long enough for a bounded-speed catch after the outcome.
+				flyBall(state, record, { ...reboundPoint, z: 3.1 }, 1.8, Math.max(0.5, travel * 1.5 / 14 - 0.31));
 			} else {
 				state.ball = reboundPoint;
 			}
@@ -2044,7 +2085,9 @@ function compileScene(replay, scene, index, state, data) {
 		} else if (!made) {
 			const reboundPoint = { x: state.ball.x - direction * 3, y: 28, z: 3.1 };
 			if (namedRebound) {
-				flyBall(state, record, reboundPoint, 1.8, 0.5);
+				const player = state.positions[namedRebound];
+				const travel = Math.hypot(player.x - reboundPoint.x, player.y - reboundPoint.y);
+				flyBall(state, record, reboundPoint, 1.8, Math.max(0.5, travel * 1.5 / 14 - 0.66));
 			} else {
 				state.ball.x = reboundPoint.x;
 				state.ball.y = reboundPoint.y;
