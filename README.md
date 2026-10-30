@@ -4,9 +4,10 @@
 
 Watch completed NBA and WNBA games play out as little jerseys move around a basketball court. Hoops Replay
 uses real play-by-play events and available shot coordinates to create a schematic replay of the game.
+Playback condenses the game, so even at 1× it does not run in real time.
 
-**This is a very early prototype.** Expect bugs, odd movements, and games that cannot be loaded yet.
-The player movements are schematic estimates, not a reconstruction from tracking data.
+**Hoops Replay is under active development.** Game compatibility depends on the available play-by-play
+and boxscore data. Player movements are schematic estimates, not a reconstruction from tracking data.
 
 ---
 
@@ -25,18 +26,10 @@ Without a Game ID in the URL, the app opens the bundled DEN–OKC example.
 - **NBA and WNBA:** League detection from the Game ID, with league-specific team names, colors, logos,
   quarter lengths (NBA: 12 minutes; WNBA: 10 minutes), and three-point lines.
 - **Full-court replay:** Follow both teams as numbered jerseys on a court with the home team's logo and colors.
-- **Coordinated movement:** Players follow planned straight runs or simple curves between meaningful positions.
-  Open spots are held, with at most two congestion-clearing off-ball adjustments during preparation.
-  Perimeter relocations follow the arc; deliberate cuts brake at their turns. Routes anticipate crossings
-  with one planned detour or a delayed start instead of repeated sideways corrections. Defenders react later.
-  The PG carries the ball forward while all four teammates fill their spots ahead of him,
-  including the interior player; defenders retreat before matching up.
-  Ball handlers can probe one open lane and then hold while reading the defense.
-- **Possession choreography:** Buildup accounts for live possession changes, interruptions and second chances.
-  Where time and spacing allow, receivers approach their finishing spots later rather than waiting there throughout.
-  Connecting passes can meet moving receivers; passers can relocate to reopen a useful passing option.
-  Defenders shade toward the ball, help against penetration and recover to their assigned player.
-  Feasible receiving routes and pass sequences are compared deterministically by continuity, spacing and passing lanes.
+- **Coordinated movement:** Players spread out, cut and move into position while defenders react to the ball
+  and their matchups.
+- **Possession choreography:** Schematic passes and dribble routes connect recorded events, with buildup
+  that adapts to possession changes, interruptions and second chances.
 - **Play-by-play display:** See the score, game clock, player photos, and original event descriptions.
 - **Different shot animations:** Dunks, layups, jump shots, and other finishes have different movements and ball flights.
 - **Shot markers:** Made shots appear as green dots; misses appear as red crosses. Markers fade with replay time.
@@ -130,8 +123,9 @@ and [AGENTS.md](AGENTS.md) for repository working rules.
 
 ### Run Locally
 
-Use the project's existing local preview and open the replay in the browser.
-The page needs to be served over HTTP rather than opened directly as a file.
+Serve the project root over HTTP and open [http://127.0.0.1:5500](http://127.0.0.1:5500).
+Use this exact host and port for loading games by ID: the backend's CORS policy does not treat
+`localhost` or other ports as equivalent. Opening the page directly as a file is not supported.
 
 For changes to a specific sequence, use action links in the local preview to reproduce and inspect
 the relevant situation. For example, `?action=95` and `?action=566` select two movement examples in
