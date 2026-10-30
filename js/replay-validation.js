@@ -205,8 +205,9 @@ export function checkReplay(data, replay = compileReplay(data)) {
 		}
 		if (style.fadeaway && !scene.action.blockPersonId) {
 			const direction = scene.hoop.x > 47 ? 1 : -1;
+			const landing = scene.frames.find((frame) => Math.abs(frame.time - scene.eventAt) < 0.00001);
 			check(
-				(end.players.find((p) => p.id === shooter).x - scene.shotPoint.x) * direction < -1,
+				(landing.players.find((p) => p.id === shooter).x - scene.shotPoint.x) * direction < -1,
 				`${tag} fadeaway landing`,
 			);
 		}

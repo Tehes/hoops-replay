@@ -40,8 +40,8 @@ dass sie bereits umgesetzt oder geprüft ist.
    Zielbild und Implementierungsstand dürfen auseinanderliegen; dieser Abstand muss sichtbar bleiben.
 8. Arbeitsplanung und Prioritäten stehen im jeweiligen Auftrag oder Chat. Erkenntnisse aus
    akzeptierten oder verworfenen Experimenten sollen in einem eigenen knappen Learning-Dokument
-   festgehalten werden, sobald ein solcher Iterationsprozess eingerichtet ist. Es ersetzt weder
-   dieses Konzept noch die Git-Historie; ein solches Dokument ist bisher nicht vorhanden.
+   festgehalten werden. [Heuristik-Learnings](scripts/docs/heuristic-learnings.md) enthält diese
+   Ergebnisse und ihre Grenzen; es ersetzt weder dieses Konzept noch die Git-Historie.
 
 ## Produktziel
 
@@ -95,6 +95,28 @@ Jede größere Heuristik soll Prinzip, konkrete Quelle beziehungsweise Abschnitt
 und passende Tests nachvollziehbar machen. Coaching-Literatur begründet plausible Ergänzungen;
 sie beweist keinen tatsächlich gespielten Ablauf. Trainingsübungen und ihre vereinfachten
 Spielregeln werden nicht ungeprüft als NBA-/WNBA-Regeln übernommen.
+
+### Fachlicher Abgleich: Ballvortrag und Halbfeldaufbau
+
+Diese erste Zuordnung ist keine vollständige Regelmatrix. Sie trennt Vorschriften von Coaching-Prinzipien
+und dokumentiert nur den jeweils benannten Teil der Umsetzung.
+
+| Anforderung / Prinzip | Konkrete Grundlage | Stand und Grenze |
+| --- | --- | --- |
+| Einwurf von außerhalb; Ball vor eigenem Betreten abgeben | NBA Rule 10, Section III; WNBA 2026 Rule 10, Section III | Einwerfer und Übergabe sind vorhanden; Frist und alle Bedingungen werden nicht systematisch geprüft |
+| Kein ergänztes Rückspiel nach kontrolliertem Vorfeldbesitz | NBA Rule 10, Section IX; WNBA 2026 Rule 10, Section IX | Der neue Outlet-Zweig gilt nur für eigene-Hälfte-Rebounds und bleibt bis zum Fang dort; kein allgemeiner Besitz-/Rückspielautomat |
+| Begrenzte Zeit in der eigenen Hälfte | NBA Rule 10, Section VIII; WNBA 2026 Rule 10, Section VIII | Ereignisuhren sind Anker; eine vollständige Acht-Sekunden-Prüfung fehlt |
+| Seitlicher Outlet und bewegter Fang | WABC Level 1, Team 2.3.1, „Basic Fast Break – Starting the Break“ | Bei ununterbrochenen Defensivrebound-Aufbauten ohne Zeitdruck werden seitliche Empfangspunkte und ein Fang in Bewegung geplant; keine Rekonstruktion des tatsächlichen Passes |
+| Mitspieler laufen früh in breite Bahnen | WABC Level 1, Team 2.3.2, „Basic Fast Break – Running Wide Lanes“ | Bestehende Vorlaufphasen und breite Flügelbahnen sind vorhanden; die Bahnwahl und Pass-voraus-Entscheidung sind noch kein vollständig quellenbasiertes Modell |
+| Raum für Ball und nächste Aktion schaffen | WABC Level 1, Team 2.1.1, „Basic Floor Spacing – Pass and Cut / Give and Go“ | Bestehende Abstands-/Korridorplanung ist vorhanden; die Trainingsformation wird nicht pauschal als tatsächlich gespieltes Set übernommen |
+| Aufenthalte in der Zone regelabhängig begrenzen | NBA Rule 10, Sections VI–VII; WNBA 2026 Rule 10, Sections VI–VII | Offensive und defensive Drei-Sekunden-Bedingungen sind weiterhin offen |
+
+Quellen: [NBA Rule 10](https://official.nba.com/rule-no-10-violations-and-penalties/),
+[WNBA-Regelwerk 2026](https://cdn.wnba.com/sites/4/2026/05/2026-WNBA-Official-Rule-Book.pdf),
+[WABC Level 1 Coaches Manual](https://assets.fiba.basketball/image/upload/documents-corporate-wabc-coaching-level-manuals-level-1-eng.pdf).
+Die angeführten WABC-Prinzipien begründen schematische Entscheidungen, keine zusätzlichen Ereignisse
+oder aus dem Training übernommene NBA-/WNBA-Regeln. Drucksituationen, vollständige Fußarbeit und
+sämtliche Fortsetzungsfälle sind damit nicht abgedeckt.
 
 ## Architektur im Zielbild
 
@@ -343,6 +365,15 @@ Die aktuelle Engine bündelt mehrere Verantwortlichkeiten des Zielbilds; die zus
   der Spieler im ersten Lineup-Slot, keine aus dem Feed bestätigte Ballführerrolle. Alle vier
   Mitspieler laufen beim normalen Vortrag voraus auf ihre Ziele; es gibt keinen festen Big-Man-Trailer.
   Belegte Außenaktionen gehen vor einer schematischen Innenrolle.
+  Nach einem ununterbrochenen Defensivrebound in der eigenen Hälfte kann ein anderer Ballführer
+  einen seitlichen Outlet erhalten: nahe der verlängerten Freiwurflinie, bei weiterem Rebound weiter
+  vorn, weiterhin in der eigenen Hälfte. Die Auswahl prüft drei Empfangspunkte zur näheren Seitenlinie,
+  etwas zur Grundlinie und etwas zur Mitte gegen Mitspielerabstände und die aktuelle schematische
+  Defense im Passkorridor. Der Empfänger startet zwei Fuß hinter dem Fangpunkt und fängt im Vorlaufen.
+  Ist kein Punkt geeignet, bleibt der bisherige Aufbau erhalten. `scene.outletPlan` beschreibt nur die
+  ergänzte Verbindung, keinen belegten Assist oder zusätzlichen PbP-Pass.
+  Bereits selbst ballführender PG, kurze Transitionen, Unterbrechungen, Steals, Einwürfe und
+  Backcourt-Abschlüsse erhalten keinen solchen neuen Outlet. Der PG bleibt eine schematische Slot-Rolle.
 - Spätere Empfangswege, bewegte Fänge, kurze Passgeber-Relokationen und passende Folgeempfänger
   werden teilweise vorausgeplant. Passfolgen werden deterministisch verglichen. Ohne geeignete
   Verbindung bleibt eine kurze Dribbelsondierung mit Haltephase möglich; höchstens zwei freie
@@ -618,7 +649,9 @@ Details der OKLab-Schwellen und Auswahlreihenfolge sind in `replay-colors.js` un
 Der gemeinsame Replay-Audit läuft mit Serverdaten über
 [scripts/audit-replays.js](scripts/audit-replays.js). Er prüft unter anderem End- und Zwischenstände,
 Repräsentation der Ereignisse, aktive Aufstellungen, Ballbesitzer, endliche Koordinaten,
-Wurf-/Reboundverhalten und interpolierte Zustände. Formationserhalt nach Offensivrebound wird
+Wurf-/Reboundverhalten und interpolierte Zustände. Die Fadeaway-Landung wird am Wurfende
+(`eventAt`) bewertet, bevor ein eigener Rebound-Lauf die Position verändern kann.
+Formationserhalt nach Offensivrebound wird
 nur bei einer ununterbrochenen Live-Fortsetzung des verknüpften Wurfs mit vorhandener Formation
 verlangt. Ein als `deadball` erfasster Team-Rebound nach einer Strafe erfordert diesen Erhalt nicht.
 Nach Flagrant-Freiwürfen ist der anschließende Einwurf zulässig; Grundlage ist für die WNBA

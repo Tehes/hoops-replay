@@ -1003,6 +1003,41 @@ function advanceFormation(state, scene, offense, direction, targets, record, dur
 	scene.transitionRuns.push(run);
 }
 
+function planOutlet(state, scene, origin, carrier, receiver, direction, data) {
+	if (
+		carrier === receiver || scene.attackContext.origin !== "rebound-outlet" ||
+		scene.attackContext.interrupted || scene.attackContext.quick || scene.formation.backcourt ||
+		(origin.x - 47) * direction >= 0
+	) {
+		return null;
+	}
+	// WABC Level 1, Team 2.3.1: offer a sideline outlet, adjusting toward the baseline or middle under pressure.
+	const depth = Math.max(19, Math.min(43, (direction === 1 ? origin.x : 94 - origin.x) + 6));
+	const x = direction === 1 ? depth : 94 - depth;
+	const y = origin.y < 25 ? 8 : 42;
+	const teammates = state.lineups[scene.attackTeam].filter((id) => id !== carrier && id !== receiver);
+	const opponents = state.lineups[otherTeam(data, scene.attackTeam)];
+	return [{ x, y }, { x: x - direction * 4, y }, { x, y: y < 25 ? 14 : 36 }].find((point) => {
+		if (teammates.some((id) => Math.hypot(state.positions[id].x - point.x, state.positions[id].y - point.y) < 4)) {
+			return false;
+		}
+		const dx = point.x - origin.x;
+		const dy = point.y - origin.y;
+		return opponents.every((id) => {
+			const position = state.positions[id];
+			const fraction = Math.max(
+				0,
+				Math.min(
+					1,
+					((position.x - origin.x - 1) * dx + (position.y - origin.y - 0.8) * dy) / (dx * dx + dy * dy),
+				),
+			);
+			return Math.hypot(position.x - origin.x - 1 - dx * fraction, position.y - origin.y - 0.8 - dy * fraction) >=
+				3;
+		});
+	}) ?? null;
+}
+
 function prepareAttack(state, scene, offense, direction, matchups, record, data, replay, index) {
 	const lineup = state.lineups[offense];
 	const pg = lineup[0];
@@ -1107,18 +1142,34 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 			state.positions[id].y = origins[id].y + (targets[id].y - origins[id].y) * fraction;
 		}
 		Object.assign(state.positions[carrier], origin);
+		const outlet = planOutlet(state, scene, origin, carrier, pg, direction, data);
 		if (carrier !== pg) {
-			Object.assign(state.positions[pg], {
+			Object.assign(state.positions[pg], outlet ? { x: outlet.x - direction * 2, y: outlet.y } : {
 				x: direction === 1
 					? Math.max(12, Math.min(state.formation.backcourt ? 44 : 82, origin.x + 6))
 					: Math.max(state.formation.backcourt ? 50 : 12, Math.min(82, origin.x - 6)),
 				y: 25,
 			});
 		}
+		if (outlet) {
+			state.ball.dribble = false;
+		}
 		record(0.3);
 		if (carrier !== pg) {
+			if (outlet) {
+				const from = { ...state.positions[pg] };
+				scene.outletPlan = { from: carrier, to: pg, point: outlet, releaseAt: scene.frames.at(-1).time };
+				flyBall(state, record, { x: outlet.x + 1, y: outlet.y + 0.8, z: 0.5 }, 0.6,
+					Math.max(0.4, Math.hypot(outlet.x - origin.x, outlet.y - origin.y) / 45), 0, (progress) => {
+						state.positions[pg].x = from.x + (outlet.x - from.x) * progress;
+					});
+			}
 			state.ball.owner = pg;
-			record(0.4);
+			state.ball.dribble = true;
+			record(outlet ? 0.01 : 0.4);
+			if (outlet) {
+				scene.outletPlan.catchAt = scene.frames.at(-1).time;
+			}
 		}
 		advanceFormation(state, scene, offense, direction, targets, record, 1.1 * advanceScale);
 	} else {
