@@ -2,11 +2,10 @@ import { loadReplayData, normalizeGame } from "../js/replay-data.js";
 import { attackDirection, clockSeconds, compileReplay, getReplayFrame } from "../js/replay-engine.js";
 import { checkReplay } from "../js/replay-validation.js";
 import { getTeamColors, getTeamLogo, getTeamName } from "../js/replay-teams.js";
-
-const DATA = new URL("../data/", import.meta.url);
+import { loadFeed, loadGame } from "./replay-source.js";
 
 Deno.test("recorded BKN-CLE flagrant penalties lead to a free-throw-line sideline inbound", async () => {
-	const data = await readData("replay-0022600105.json");
+	const data = await loadGame("0022600105");
 	const replay = compileReplay(data);
 	const penalties = replay.scenes.filter((scene) =>
 		scene.kind === "freethrow" && scene.action.descriptor === "flagrant"
@@ -37,7 +36,7 @@ Deno.test("Flagrant 1 free throws retain possession and restart at the free-thro
 	for (const period of [1, 3]) {
 		for (const made of [true, false]) {
 			for (const flagrant of [true, false]) {
-				const data = await readData("replay-0022600007.json");
+				const data = await loadGame("0022600007");
 				const [away, home] = data.teams;
 				const shooter = home.players.find((player) => player.starter);
 				const defender = away.players.find((player) => player.starter);
@@ -125,14 +124,10 @@ function assert(value, message) {
 	}
 }
 
-async function readData(file) {
-	return JSON.parse(await Deno.readTextFile(new URL(file, DATA)));
-}
-
 Deno.test("a sideline restart releases the previous foul matchup before a new shooting foul", async () => {
 	for (const period of [1, 3]) {
 		for (const offenseIndex of [0, 1]) {
-			const data = await readData("replay-0022600007.json");
+			const data = await loadGame("0022600007");
 			const offense = data.teams[offenseIndex];
 			const defense = data.teams[1 - offenseIndex];
 			const attackers = offense.players.filter((player) => player.starter);
@@ -207,7 +202,7 @@ Deno.test("a sideline restart releases the previous foul matchup before a new sh
 });
 
 Deno.test("a live off-ball foul after a basket follows an inbound and advances only as far as its clock gap allows", async () => {
-	const source = await readData("replay-0022600007.json");
+	const source = await loadGame("0022600007");
 	for (const period of [1, 3]) {
 		for (const scoringIndex of [0, 1]) {
 			for (const includePossession of [false, true]) {
@@ -267,7 +262,7 @@ Deno.test("recorded ordinary fouls after baskets start the next attack while sam
 	let restarts = 0;
 	let andOnes = 0;
 	for (const id of ["0022600007", "0022600008", "0022600094", "0022600105", "1042600304"]) {
-		const data = await readData(`replay-${id}.json`);
+		const data = await loadGame(id);
 		const replay = compileReplay(data);
 		for (let i = 1; i < replay.scenes.length; i++) {
 			const scene = replay.scenes[i];
@@ -297,7 +292,7 @@ Deno.test("recorded ordinary fouls after baskets start the next attack while sam
 });
 
 Deno.test("Burton's Q4 6:27 and-one leads to the missed free throw and Hillmon's 6:25 rebound without another attack", async () => {
-	const data = await readData("replay-1042600304.json");
+	const data = await loadGame("1042600304");
 	data.gameId = "1042600305";
 	data.teams.sort((a, b) => a.id - b.id);
 	for (const team of data.teams) {
@@ -377,9 +372,9 @@ Deno.test("Burton's Q4 6:27 and-one leads to the missed free throw and Hillmon's
 });
 
 Deno.test("default uses the local example; an explicit ID always loads both backend feeds", async () => {
-	const example = await readData("replay-0022600007.json");
-	const boxscore = await readData("raw/boxscore-0022600094.json");
-	const playByPlay = await readData("raw/playbyplay-0022600094.json");
+	const example = await loadGame("0022600007");
+	const boxscore = await loadFeed("boxscore/0022600094");
+	const playByPlay = await loadFeed("playbyplay/0022600094");
 	const originalFetch = globalThis.fetch;
 	const requests = [];
 	globalThis.fetch = (url) => {
@@ -408,8 +403,8 @@ Deno.test("default uses the local example; an explicit ID always loads both back
 });
 
 Deno.test("WNBA feeds use their league, teams, season and ten-minute quarters", async () => {
-	const boxscore = await readData("raw/boxscore-1042600304.json");
-	const playByPlay = await readData("raw/playbyplay-1042600304.json");
+	const boxscore = await loadFeed("boxscore/1042600304?league=wnba");
+	const playByPlay = await loadFeed("playbyplay/1042600304?league=wnba");
 	const original = JSON.stringify([boxscore, playByPlay]);
 	const originalFetch = globalThis.fetch;
 	const requests = [];
@@ -452,8 +447,8 @@ Deno.test("WNBA feeds use their league, teams, season and ten-minute quarters", 
 });
 
 Deno.test("shot geometry is checked consistently across positions and basket sides", async () => {
-	const boxscore = await readData("raw/boxscore-0022600094.json");
-	const playByPlay = await readData("raw/playbyplay-0022600094.json");
+	const boxscore = await loadFeed("boxscore/0022600094");
+	const playByPlay = await loadFeed("playbyplay/0022600094");
 	const shot = playByPlay.game.actions.find((action) => action.isFieldGoal);
 	for (const side of ["left", "right"]) {
 		for (const [x, y] of [[8, 5], [20, 50], [30, 90], [75, 40]]) {
@@ -489,8 +484,8 @@ Deno.test("shot geometry is checked consistently across positions and basket sid
 });
 
 Deno.test("normalization rejects unfinished games and mismatched feed IDs", async () => {
-	const boxscore = await readData("raw/boxscore-0022600094.json");
-	const playByPlay = await readData("raw/playbyplay-0022600094.json");
+	const boxscore = await loadFeed("boxscore/0022600094");
+	const playByPlay = await loadFeed("playbyplay/0022600094");
 	for (const variant of ["unfinished", "wrong ID"]) {
 		const changed = structuredClone(boxscore);
 		if (variant === "unfinished") {
@@ -525,14 +520,14 @@ Deno.test("HTTP failures remain errors and never load a substitute game", async 
 });
 
 Deno.test("known inconsistent HOU-SAS feeds still fail replay validation", async () => {
-	const boxscore = await readData("raw/boxscore-0022600009.json");
-	const playByPlay = await readData("raw/playbyplay-0022600009.json");
+	const boxscore = await loadFeed("boxscore/0022600009");
+	const playByPlay = await loadFeed("playbyplay/0022600009");
 	const report = checkReplay(normalizeGame("0022600009", boxscore, playByPlay));
 	assert(report.errors.length > 0, "inconsistent feeds were silently accepted");
 });
 
 Deno.test("unlisted people in technical fouls remain team events without changing court state", async () => {
-	const data = await readData("replay-0022600007.json");
+	const data = await loadGame("0022600007");
 	const previous = data.actions.find((action) => action.actionType === "rebound" && action.personId);
 	const action = {
 		actionNumber: 10000,
@@ -585,8 +580,8 @@ Deno.test("unlisted people in technical fouls remain team events without changin
 });
 
 Deno.test("synthetic overtime boundaries use five-minute clocks and OT labels, including multiple OT", async () => {
-	for (const file of ["replay-0022600007.json", "replay-1042600304.json"]) {
-		const data = await readData(file);
+	for (const file of ["0022600007", "1042600304"]) {
+		const data = await loadGame(file);
 		const end = data.actions.find((action) => action.actionType === "game");
 		data.actions = data.actions.filter((action) => action.actionType !== "game");
 		let orderNumber = Math.max(...data.actions.map((action) => action.orderNumber));
@@ -620,7 +615,7 @@ Deno.test("synthetic overtime boundaries use five-minute clocks and OT labels, i
 });
 
 Deno.test("formation lookahead stops before an offensive substitution introduces the later shooter", async () => {
-	const data = await readData("replay-0022600007.json");
+	const data = await loadGame("0022600007");
 	const [away, home] = data.teams;
 	const victim = home.players.find((player) => player.starter);
 	const outgoing = home.players.filter((player) => player.starter).at(-1);
@@ -674,8 +669,8 @@ Deno.test("formation lookahead stops before an offensive substitution introduces
 });
 
 Deno.test("recorded MIN-CLE same-clock steal stays before Dosunmu's substitution", async () => {
-	const data = await readData("replay-0022600120.json");
-	const raw = await readData("raw/playbyplay-0022600120.json");
+	const data = await loadGame("0022600120");
+	const raw = await loadFeed("playbyplay/0022600120");
 	const original = JSON.stringify(data);
 	const sourceSubstitution = raw.game.actions.find((action) => action.actionNumber === 254);
 	const sourceTurnover = raw.game.actions.find((action) => action.actionNumber === 385);
@@ -697,7 +692,7 @@ Deno.test("recorded MIN-CLE same-clock steal stays before Dosunmu's substitution
 });
 
 Deno.test("same-clock steals precede an outgoing player's substitution and retain linked events", async () => {
-	const data = await readData("replay-0022600007.json");
+	const data = await loadGame("0022600007");
 	const [away, home] = data.teams;
 	const outgoing = away.players.find((player) => player.starter);
 	const incoming = away.players.find((player) => !player.starter);
@@ -776,7 +771,7 @@ Deno.test("same-clock steals precede an outgoing player's substitution and retai
 });
 
 Deno.test("same-clock substitution chains display only the final lineup while preserving all actions", async () => {
-	const data = await readData("replay-0022600007.json");
+	const data = await loadGame("0022600007");
 	const [away, home] = data.teams;
 	const returning = home.players.filter((player) => player.starter).at(-1);
 	const temporary = home.players.find((player) => !player.starter);
@@ -835,7 +830,7 @@ Deno.test("same-clock substitution chains display only the final lineup while pr
 });
 
 Deno.test("recorded shot sides determine baskets for both teams before and after halftime", async () => {
-	const data = await readData("replay-0022600007.json");
+	const data = await loadGame("0022600007");
 	for (const action of data.actions) {
 		if (action.isFieldGoal) {
 			action.x = 100 - action.x;
@@ -866,7 +861,7 @@ Deno.test("recorded shot sides determine baskets for both teams before and after
 
 Deno.test("explicit rebound links and missing-field fallback preserve all reference choreography", async () => {
 	for (const id of ["0022600007", "0022600008", "0022600094"]) {
-		const data = await readData(`replay-${id}.json`);
+		const data = await loadGame(id);
 		const explicit = compileReplay(structuredClone(data));
 		for (const action of data.actions) {
 			delete action.shotActionNumber;
@@ -891,7 +886,7 @@ Deno.test("explicit rebound links and missing-field fallback preserve all refere
 Deno.test("second chances keep off-ball positions instead of swapping the next rebounder with a teammate", async () => {
 	let checked = 0;
 	for (const id of ["0022600007", "0022600008", "0022600094", "0022600105", "0022600120", "1042600304"]) {
-		const replay = compileReplay(await readData(`replay-${id}.json`));
+		const replay = compileReplay(await loadGame(id));
 		for (const scene of replay.scenes) {
 			if (
 				scene.attackContext?.origin !== "second-chance" ||
@@ -928,7 +923,10 @@ Deno.test("second chances keep off-ball positions instead of swapping the next r
 });
 
 Deno.test("CLE-ATL action 56 prepares the rebounder without exchanging McCollum's position or matchups", async () => {
-	const source = await readData("scenarios/cle-atl-second-chance.json");
+	const source = await loadGame("0022600144");
+	const end = source.actions.findIndex((action) => action.actionNumber === 57);
+	assert(end >= 0, "server feed no longer contains the scenario endpoint");
+	source.actions = source.actions.slice(0, end + 1);
 	for (const mirrored of [false, true]) {
 		for (const quick of [false, true]) {
 			const data = structuredClone(source);
@@ -1003,7 +1001,7 @@ Deno.test("personal rebound catches wait for the outcome and respect travel spee
 	let shooters = 0;
 	let blocked = 0;
 	for (const id of ["0022600007", "0022600008", "0022600094", "0022600105", "0022600120", "1042600304"]) {
-		const replay = compileReplay(await readData(`replay-${id}.json`));
+		const replay = compileReplay(await loadGame(id));
 		for (const scene of replay.scenes) {
 			if (scene.reboundMove) {
 				const setup = scene.reboundMove;
@@ -1048,7 +1046,7 @@ Deno.test("personal rebound catches wait for the outcome and respect travel spee
 });
 
 Deno.test("an intervening standalone block retains the approach, free ball and continuous seeking", async () => {
-	const data = await readData("replay-0022600007.json");
+	const data = await loadGame("0022600007");
 	const baseline = compileReplay(data);
 	const original = baseline.scenes.find((scene) =>
 		scene.reboundApproach &&
@@ -1082,7 +1080,7 @@ Deno.test("an intervening standalone block retains the approach, free ball and c
 
 Deno.test("interruptions retain the shot link without rewriting timeout, foul or substitution choreography", async () => {
 	for (const kind of ["timeout", "foul", "substitution"]) {
-		const data = await readData("replay-0022600007.json");
+		const data = await loadGame("0022600007");
 		const baseline = compileReplay(data);
 		const original = baseline.scenes.find((scene) => scene.reboundApproach);
 		const shot = baseline.scenes[original.reboundShotIndex];
@@ -1147,7 +1145,7 @@ Deno.test("interruptions retain the shot link without rewriting timeout, foul or
 
 Deno.test("invalid explicit references never fall back to an unrelated adjacent shot", async () => {
 	for (const reference of ["unknown", "future", "made", "earlier miss"]) {
-		const data = await readData("replay-0022600007.json");
+		const data = await loadGame("0022600007");
 		const baseline = compileReplay(data);
 		const original = baseline.scenes.find((scene, index) => scene.reboundApproach && index > 30);
 		const action = data.actions.find((action) => action.actionNumber === original.action.actionNumber);
@@ -1168,8 +1166,8 @@ Deno.test("invalid explicit references never fall back to an unrelated adjacent 
 });
 
 Deno.test("timeouts and period breaks clear the court, preserve bench substitutions and return the current lineup", async () => {
-	for (const file of ["replay-0022600007.json", "replay-0022600008.json", "replay-0022600094.json"]) {
-		const data = await readData(file);
+	for (const file of ["0022600007", "0022600008", "0022600094"]) {
+		const data = await loadGame(file);
 		const replay = compileReplay(data);
 		let waiting = false;
 		let benchSwaps = 0;
@@ -1221,13 +1219,13 @@ Deno.test("timeouts and period breaks clear the court, preserve bench substituti
 Deno.test("shooting fouls respect two-point and three-point territory in both directions", async () => {
 	for (
 		const file of [
-			"replay-0022600007.json",
-			"replay-0022600008.json",
-			"replay-0022600094.json",
-			"replay-1042600304.json",
+			"0022600007",
+			"0022600008",
+			"0022600094",
+			"1042600304",
 		]
 	) {
-		const data = await readData(file);
+		const data = await loadGame(file);
 		for (const reverse of [false, true]) {
 			const changed = structuredClone(data);
 			if (reverse) {
@@ -1281,7 +1279,7 @@ Deno.test("shooting fouls respect two-point and three-point territory in both di
 });
 
 Deno.test("shooting foul territory can use the following free-throw sequence without qualifiers", async () => {
-	const data = await readData("replay-0022600094.json");
+	const data = await loadGame("0022600094");
 	for (const action of data.actions) {
 		if (action.actionType === "foul" && action.descriptor === "shooting") {
 			delete action.qualifiers;
@@ -1302,7 +1300,7 @@ Deno.test("shooting foul territory can use the following free-throw sequence wit
 Deno.test("shooting foul positioning respects the straight corner three-point line", async () => {
 	for (const direction of [-1, 1]) {
 		for (const freeThrows of [2, 3]) {
-			const data = await readData("replay-0022600007.json");
+			const data = await loadGame("0022600007");
 			const [away, home] = data.teams;
 			const shooter = home.players.find((player) => player.starter);
 			const defender = away.players.find((player) => player.starter);
@@ -1357,8 +1355,8 @@ Deno.test("shooting foul formations reserve the finish and complete passes and d
 	let passes = 0;
 	let drives = 0;
 	let planned = 0;
-	for (const file of ["replay-0022600007.json", "replay-0022600008.json", "replay-0022600094.json"]) {
-		const data = await readData(file);
+	for (const file of ["0022600007", "0022600008", "0022600094"]) {
+		const data = await loadGame(file);
 		const replay = compileReplay(data);
 		for (const scene of replay.scenes.filter((item) => item.action.descriptor === "shooting")) {
 			const shooterId = scene.action.foulDrawnPersonId;
@@ -1420,7 +1418,7 @@ Deno.test("shooting foul formations reserve the finish and complete passes and d
 });
 
 Deno.test("game-clock gaps pace existing buildup without stretching shots or adding actions", async () => {
-	const source = await readData("replay-0022600007.json");
+	const source = await loadGame("0022600007");
 	const ordered = source.actions.slice().sort((a, b) => a.orderNumber - b.orderNumber);
 	const shotIndex = ordered.findIndex((action) => action.isFieldGoal);
 	const variants = [];
@@ -1459,7 +1457,7 @@ Deno.test("game-clock gaps pace existing buildup without stretching shots or add
 });
 
 Deno.test("stopped clocks and court returns retain animation time without consuming live time", async () => {
-	const data = await readData("replay-0022600007.json");
+	const data = await loadGame("0022600007");
 	const replay = compileReplay(data);
 	let inbounds = 0;
 	let returns = 0;
@@ -1489,7 +1487,7 @@ Deno.test("shot-clock violations prolong the buildup, including a late miss befo
 	let longAttacks = 0;
 	let lateMisses = 0;
 	for (const id of ["0022600008", "0022600094", "0022600105"]) {
-		const data = await readData(`replay-${id}.json`);
+		const data = await loadGame(id);
 		const replay = compileReplay(data);
 		const ordinary = structuredClone(data);
 		for (const action of ordinary.actions) {
@@ -1542,7 +1540,7 @@ Deno.test("shot-clock violations prolong the buildup, including a late miss befo
 });
 
 Deno.test("shot-clock lookahead stops at possession changes and does not invent time at a stopped clock", async () => {
-	const data = await readData("replay-0022600008.json");
+	const data = await loadGame("0022600008");
 	const original = compileReplay(data);
 	const index = original.scenes.findIndex((scene) => scene.action.subType === "shot clock");
 	const violation = original.scenes[index];
@@ -1564,7 +1562,7 @@ Deno.test("long preparations move the ball carrier with their defender and prese
 	let routes = 0;
 	let spacing = 0;
 	for (const id of ["0022600007", "0022600008", "0022600094", "0022600105"]) {
-		const data = await readData(`replay-${id}.json`);
+		const data = await loadGame(id);
 		const replay = compileReplay(data);
 		for (const scene of replay.scenes) {
 			const route = scene.dribbleRoute;
@@ -1632,7 +1630,7 @@ Deno.test("schematic circulation has free pass flights, visible catches and the 
 	let assists = 0;
 	let shotClocks = 0;
 	for (const id of ["0022600007", "0022600008", "0022600094", "0022600105"]) {
-		const data = await readData(`replay-${id}.json`);
+		const data = await loadGame(id);
 		const actions = JSON.stringify(data.actions);
 		const replay = compileReplay(data);
 		assert(JSON.stringify(data.actions) === actions, "circulation changed source events or statistics");
@@ -1698,7 +1696,7 @@ Deno.test("schematic circulation has free pass flights, visible catches and the 
 });
 
 Deno.test("backcourt finishes keep inbound, outlet, circulation and shot approach behind half court", async () => {
-	const source = await readData("replay-0022600007.json");
+	const source = await loadGame("0022600007");
 	for (const period of [1, 3]) {
 		for (const restart of ["baseline", "rebound", "sideline"]) {
 			for (const descriptor of ["runningpullup", "stepback"]) {
@@ -1782,7 +1780,7 @@ Deno.test("bad passes out of bounds narrowly miss an active teammate before cros
 	const directions = new Set();
 	const sidelines = new Set();
 	for (const id of ["0022600007", "0022600008", "0022600094", "0022600105"]) {
-		const data = await readData(`replay-${id}.json`);
+		const data = await loadGame(id);
 		const original = JSON.stringify(data);
 		const replay = compileReplay(data);
 		for (const scene of replay.scenes) {
@@ -1810,7 +1808,7 @@ Deno.test("bad passes out of bounds narrowly miss an active teammate before cros
 				receiver.y + 0.8 - release.ball.y - dy * fraction,
 			);
 			assert(fraction > 0 && fraction < 1, "ball went out before reaching the receiving station");
-			assert(miss >= 2 && miss <= 3, "ball did not narrowly miss the receiving hand");
+			assert(miss >= 2 && miss <= 3, `${id} action ${scene.action.actionNumber}: ball missed the receiving hand by ${miss} feet`);
 			assert(end.ball.x < 0 || end.ball.x > 94 || end.ball.y < 0 || end.ball.y > 50, "pass stayed in bounds");
 			assert(scene.eventAt === plan.outAt, "turnover was displayed before the pass went out");
 			const direction = attackDirection(data, scene.attackTeam, scene.action.period);
@@ -1848,7 +1846,7 @@ Deno.test("bad passes out of bounds narrowly miss an active teammate before cros
 Deno.test("buildup overlaps player travel, bounds speed and positions the shooter before the finish", async () => {
 	let simultaneous = 0;
 	for (const id of ["0022600007", "0022600008", "0022600094", "0022600105"]) {
-		const data = await readData(`replay-${id}.json`);
+		const data = await loadGame(id);
 		const original = JSON.stringify(data);
 		const replay = compileReplay(data);
 		for (const scene of replay.scenes) {
@@ -1915,7 +1913,7 @@ Deno.test("buildup overlaps player travel, bounds speed and positions the shoote
 Deno.test("next receivers move during the preceding shot without anticipating its rebound", async () => {
 	let moves = 0;
 	for (const id of ["0022600007", "0022600008", "0022600094", "0022600105"]) {
-		const data = await readData(`replay-${id}.json`);
+		const data = await loadGame(id);
 		const original = JSON.stringify(data);
 		const replay = compileReplay(data);
 		for (const scene of replay.scenes) {
@@ -1985,7 +1983,7 @@ Deno.test("next receivers move during the preceding shot without anticipating it
 });
 
 Deno.test("receiver lookahead stops at interruptions, lineup changes and possession boundaries", async () => {
-	const source = await readData("replay-0022600007.json");
+	const source = await loadGame("0022600007");
 	for (
 		const boundary of ["timeout", "foul", "turnover", "substitution", "period", "defensive rebound", "made shot"]
 	) {
@@ -2041,7 +2039,7 @@ Deno.test("the PG advances while all off-ball players fill their spots, then def
 	let staggered = 0;
 	let retreats = 0;
 	for (const game of ["0022600007", "1042600304"]) {
-		const data = await readData(`replay-${game}.json`);
+		const data = await loadGame(game);
 		const source = JSON.stringify(data);
 		const replay = compileReplay(data);
 		for (const scene of replay.scenes) {
@@ -2107,7 +2105,7 @@ Deno.test("guards prepare outside and enter the paint during the drive; centers 
 	let drives = 0;
 	let centerThrees = 0;
 	for (const game of ["0022600007", "0022600008", "1042600304"]) {
-		const data = await readData(`replay-${game}.json`);
+		const data = await loadGame(game);
 		const original = JSON.stringify(data);
 		const replay = compileReplay(data);
 		for (const scene of replay.scenes) {
@@ -2164,7 +2162,7 @@ Deno.test("steals have a reachable approach, a visible loose ball and possession
 	let strips = 0;
 	const directions = new Set();
 	for (const game of ["0022600007", "0022600008", "0022600094", "0022600105", "1042600304"]) {
-		const data = await readData(`replay-${game}.json`);
+		const data = await loadGame(game);
 		const source = JSON.stringify(data);
 		const replay = compileReplay(data);
 		for (const scene of replay.scenes) {
@@ -2227,7 +2225,7 @@ Deno.test("preparations probe once then hold, with at most two purposeful spacin
 	let probes = 0;
 	let holds = 0;
 	for (const game of ["0022600007", "0022600008", "0022600094", "0022600105", "1042600304"]) {
-		const data = await readData(`replay-${game}.json`);
+		const data = await loadGame(game);
 		const source = JSON.stringify(data);
 		const replay = compileReplay(data);
 		for (const scene of replay.scenes) {
@@ -2253,7 +2251,7 @@ Deno.test("preparations probe once then hold, with at most two purposeful spacin
 });
 
 Deno.test("possession context needs time and a live opportunity, not a turnover label alone", async () => {
-	const source = await readData("replay-0022600007.json");
+	const source = await loadGame("0022600007");
 	const [away, home] = source.teams;
 	const tip = source.actions.find((action) => action.actionType === "jumpball");
 	const passer = home.players.find((player) => player.starter);
@@ -2285,7 +2283,7 @@ Deno.test("staged receiving routes and moving catches preserve anchors, timing a
 	let unassistedCirculation = 0;
 	let relocations = 0;
 	for (const id of ["0022600007", "0022600008", "0022600094", "0022600105", "1042600304"]) {
-		const data = await readData(`replay-${id}.json`);
+		const data = await loadGame(id);
 		const original = JSON.stringify(data);
 		const replay = compileReplay(data);
 		for (const scene of replay.scenes) {
@@ -2351,7 +2349,7 @@ Deno.test("ball-aware defenders close out after passes without switching assignm
 	let closeouts = 0;
 	let helpers = 0;
 	for (const id of ["0022600007", "0022600008", "1042600304"]) {
-		const replay = compileReplay(await readData(`replay-${id}.json`));
+		const replay = compileReplay(await loadGame(id));
 		for (const scene of replay.scenes) {
 			if (scene.helpDefender) {
 				assert(Object.hasOwn(scene.matchups, scene.helpDefender), "helper has no stable assignment");
@@ -2387,7 +2385,7 @@ Deno.test("ball-aware defenders close out after passes without switching assignm
 Deno.test("unanchored half-court possessions give an available center an interior spot", async () => {
 	let checked = 0;
 	for (const game of ["0022600007", "1042600304"]) {
-		const data = await readData(`replay-${game}.json`);
+		const data = await loadGame(game);
 		const replay = compileReplay(data);
 		const checkedFormations = new Set();
 		for (const scene of replay.scenes) {

@@ -71,8 +71,8 @@ Add `&action=ACTION_NUMBER` to a game link to open the replay paused at that eve
 Press **Play** to continue from there.
 The link starts at the event itself. Scrub back a few seconds before pressing Play to watch its buildup.
 
-The number is the event's `actionNumber` from the NBA or WNBA play-by-play data (also stored in local
-`data/replay-<gameId>.json` snapshots). It is an event ID, not its position in the event list,
+The number is the event's `actionNumber` from the NBA or WNBA play-by-play data.
+It is an event ID, not its position in the event list,
 a quarter, or a replay timestamp. Include `game` when sharing links to identify the correct game.
 For the bundled default game, `?action=17` works without a `game` parameter.
 
@@ -104,8 +104,51 @@ next shooter can move toward the receiving position during the preceding action.
 - **Network access:** Loading a game by ID and displaying NBA or WNBA player photos require a connection.
   There is no Service Worker or offline caching.
 - **Overtime:** Five-minute overtime periods and quarter controls are implemented and covered by
-  synthetic tests. The archived MIN–CLE overtime game also passes data and replay validation;
+  synthetic tests. The MIN–CLE overtime game has also passed data and replay validation;
   its overtime playback has not yet been visually verified.
+
+---
+
+## Development checks
+
+Serve this directory at `http://127.0.0.1:5500` for browser development; the backend permits this
+specific origin. With a Game ID, the app loads both feeds from the server. Only the default demo
+is stored locally; there is no local fallback when a requested game fails.
+
+Run the server batch with Deno:
+
+```sh
+deno run --allow-net=nba-spielplan.tehes.deno.net scripts/audit-replays.js
+```
+
+The default selects up to ten completed games per league, spread across the available NBA and WNBA
+schedules, including preseason and postseason. To change the selection:
+
+```sh
+deno run --allow-net=nba-spielplan.tehes.deno.net scripts/audit-replays.js --league=nba --limit=20
+deno run --allow-net=nba-spielplan.tehes.deno.net scripts/audit-replays.js --league=wnba --limit=0
+deno run --allow-net=nba-spielplan.tehes.deno.net scripts/audit-replays.js 0022600007 1042600304
+```
+
+`--limit=0` selects every completed game. Explicit IDs bypass schedule selection and the limit.
+Games are processed sequentially, with both detail feeds fetched in parallel. Failures are reported
+without replacing or skipping them silently; any failure gives exit code 1.
+
+The JSONL output records the selected IDs, league, source, season, input hash, existing validation
+results and summary. Redirect stdout to keep a report; warnings go to stderr. Game feeds are reused
+in memory within a process and are never written to disk. Input hashes help identify feed changes
+between runs; they do not preserve the data or provide an automatic baseline comparison.
+The current audit does not establish complete rule coverage or visual basketball plausibility.
+
+Existing individual checks can still be run; real-game inputs also come from the server:
+
+```sh
+deno test --allow-net=nba-spielplan.tehes.deno.net scripts/replay-data_test.js
+deno test scripts/replay-motion_test.js scripts/replay-colors_test.js
+```
+
+These checks depend on server availability and current feed contents. No game-data read or write
+permission is needed for development checks.
 
 ---
 

@@ -10,8 +10,8 @@ dass sie bereits umgesetzt oder geprüft ist.
 - Der [Northstar im Kopf von js/replay-engine.js](js/replay-engine.js) beschreibt das dauerhafte
   übergeordnete Ziel. Diese Datei konkretisiert Produkt, Verantwortlichkeiten und Bewertungsverfahren.
 - [AGENTS.md](AGENTS.md) enthält die verbindlichen Arbeitsregeln.
-- [README.md](README.md) beschreibt Nutzung, lokale Ausführung, Import und Prüfkommandos.
-- Code, Regressionstests und archivierte Spieldaten belegen den Implementierungsstand.
+- [README.md](README.md) beschreibt Nutzung, lokale Ausführung und Prüfkommandos.
+- Code, vorhandene Prüfungen und Server-Batchberichte belegen den Implementierungsstand.
   Git hält die Änderungsgeschichte fest.
 
 ### Wie diese Datei gepflegt wird
@@ -215,18 +215,22 @@ Vergleich gegen einen akzeptierten Stand und nachvollziehbares Learning.
 Ein allgemeines Modell für eine gemeinsame Ursache hat Vorrang vor Ausnahmen für einzelne
 Spieler, Spiele oder Szenen.
 
-### Reproduzierbarer Szenenbestand
+### Spielauswahl und Vergleichsdaten
 
-| Testgruppe | Zweck |
-| --- | --- |
-| Archivierte vollständige NBA-/WNBA-Spiele | Reale Vielfalt und Wechselwirkungen abdecken |
-| Gezielte Ereignisfolgen | Seltene oder verschachtelte Situationen isoliert absichern |
-| Systematische Varianten | Angriffsrichtung, Zeitabstände, Aufstellungen und Unterbrechungen variieren |
+Reale NBA-/WNBA-Spiele werden über den Schedule ausgewählt und mit Boxscore und Play-by-Play
+vom bestehenden Backend geladen. Nur die Demo ohne GameID liegt als Spiel-JSON im Repository.
+Ein wachsender lokaler Vollspiel- oder Rohdatenbestand ist nicht Teil des Entwicklungsverfahrens.
 
-Derselbe deterministische Replay muss nicht tausendmal neu berechnet werden. Entscheidend sind
-unterschiedliche Situationen und ihre Abdeckung. Archivierte Quellen ermöglichen faire Vergleiche
-ohne veränderliche Serverantworten. Neue Spiele erweitern den Bestand, ersetzen aber keine Tests
-seltener Regeln. NBA und WNBA werden getrennt ausgewertet, soweit ihre Regeln voneinander abweichen.
+Eine Iteration vergleicht Ausgangsstand und Kandidat auf denselben einmal geladenen Eingaben.
+Serverantworten dürfen dafür im Arbeitsspeicher wiederverwendet werden; die Engine erhält jeweils
+unabhängige Kopien. GameIDs und Datenfingerabdrücke machen die Eingaben im Bericht erkennbar.
+Gleiche IDs allein garantieren bei späteren Abrufen keine gleichen Daten, da Feeds korrigiert werden können.
+Ein Fingerabdruck erkennt Unterschiede, ersetzt aber kein Archiv zur späteren Rekonstruktion.
+
+Breite Spielauswertungen bilden den üblichen Verbesserungsprozess nach dem Poker-Vorbild.
+Gezielte Ereignisfolgen und systematische Varianten können konkrete Regel- oder Planungsfehler
+untersuchen, sind aber keine Voraussetzung für jede Iteration und kein eigener Ausbauauftrag.
+NBA und WNBA werden getrennt gekennzeichnet, soweit ihre Regeln voneinander abweichen.
 
 ### Maßstab für Verbesserungen
 
@@ -245,8 +249,8 @@ Ein einzelner Gesamtscore genügt nicht.
 ### Iterationsprinzip
 
 Eine Iteration benennt Zielursache, Hypothese, betroffenen Hebel und geschützte Vergleichsfälle.
-Gezielte Tests gehen dem breiten Spielvergleich voraus. Der Bericht unterscheidet Datenfehler,
-Regelfehler und Bewegungsauffälligkeiten, nennt die tatsächliche Abdeckung und macht Beispiele
+Der Prüfumfang folgt der Hypothese; breite Spielauswertungen sind der Ausgangspunkt.
+Der Bericht unterscheidet Datenfehler, Regelfehler und Bewegungsauffälligkeiten, nennt die tatsächliche Abdeckung und macht Beispiele
 über Spiel-/Ereignis-ID auffindbar.
 
 Die visuelle Auswahl enthält typische, verbesserte und verschlechterte Fälle sowie feste
@@ -266,13 +270,13 @@ Dieser Abschnitt beschreibt den Codebestand, nicht die vollständige Umsetzung d
 
 | Konzeptbereich | Tatsächlicher Stand | Fehlender Teil des Zielbilds |
 | --- | --- | --- |
-| Daten und Quellen | Gemeinsame Normalisierung, Backend-Laden und lokale Archive vorhanden | Kein Adapter für beliebige andere Feed-Formate |
+| Daten und Quellen | Gemeinsame Normalisierung, Backend-Laden und Schedule-Auswahl für Batchläufe vorhanden; nur Demo lokal | Kein Adapter für beliebige andere Feed-Formate |
 | Ereignisverknüpfung | Blocks/Steals, Auswechslungen, Rebounds und And-one-Zuordnung vorhanden | Keine umfassende Auflösung aller verschachtelten Strafen |
 | Spielregeln | Fallbezogene Fortsetzungen innerhalb der Engine vorhanden | Keine vollständige Regelmatrix und kein separates allgemeines Regelmodell |
 | Zustände und Module | Browserfreie Kompilierung, getrennte Wurf-/Bewegungsmodule vorhanden | Fachlicher Zustand und Animation noch im Compilerzustand vermischt; Zielaufteilung nicht umgesetzt |
 | Choreografie | Kontext, Formationsplanung, Passauswahl und defensive Reaktionen vorhanden | Kein vollständig aus Coaching-Referenzen abgeleitetes Heuristiksystem |
 | Zeitabhängige Regeln | Spieluhrabstände steuern die Vorbereitung | Keine systematische offensive/defensive Drei-Sekunden-Prüfung und keine vollständige Shot-clock-Logik |
-| Regression | Szenentests, sechs archivierte Spiele und gemeinsamer Audit vorhanden | Kein großer Baseline-Batchvergleich mit kontextabhängiger Qualitätsbewertung |
+| Batch-Auswertung | Schedule-basierter Server-Audit und bestehende Einzelprüfungen mit Serverdaten vorhanden | Kein automatischer Baseline-/Kandidatenvergleich mit kontextabhängiger Qualitätsbewertung |
 | Diagnose und Lernen | Einzelne Planungsmetadaten und teilbare Szenen vorhanden | Kein umfassendes Entscheidungsprotokoll, A/B-Verfahren oder separates Learning-Dokument |
 
 Die neue Regelmatrix, zusätzliche Architekturmodule, vollständige Regelprüfung und systematische
@@ -291,10 +295,10 @@ Bestehende Heuristiken und Tests sind eine Grundlage dafür, kein Nachweis volls
 | [js/replay-leagues.js](js/replay-leagues.js) | Ligaerkennung, Viertellänge und Dreiergeometrie |
 | [js/replay-teams.js](js/replay-teams.js) | NBA-/WNBA-Teamdaten, Paletten und lokale Logos |
 | [js/replay-colors.js](js/replay-colors.js) | Farbähnlichkeit, Kontrast und Jersey-Auswahl |
-| [js/replay-validation.js](js/replay-validation.js) | Gemeinsame Prüfung für Browser, Import und Audit |
-| [scripts/import-game.js](scripts/import-game.js) | Optionaler Deno-Import einschließlich Roharchiv |
+| [js/replay-validation.js](js/replay-validation.js) | Gemeinsame Prüfung für Browser und Audit |
+| [scripts/replay-source.js](scripts/replay-source.js) | Serverabruf, Schedule-Auswahl und Wiederverwendung im Arbeitsspeicher für CLI-Aufrufer |
 | [scripts/check-replay.js](scripts/check-replay.js) | Re-Export der gemeinsamen Prüfung für CLI-Aufrufer |
-| [scripts/audit-replays.js](scripts/audit-replays.js) | Entdeckung und Prüfung aller lokalen Replay-Snapshots |
+| [scripts/audit-replays.js](scripts/audit-replays.js) | Auswahl und Auswertung abgeschlossener Server-Spiele mit Fehlerbericht je Verarbeitungsschritt |
 
 `compileReplay(data)` erzeugt Szenen, Keyframes, Marker und Navigationsgrenzen ohne DOM oder Netzwerk.
 `getReplayFrame(replay, time)` liefert den Zustand zu einem beliebigen Zeitpunkt.
@@ -408,27 +412,28 @@ Vorhandene Innenpositionen und Vorbereitungsphasen können deshalb gegen das Zie
 
 ## Datenvertrag und Integration
 
-### Laden und Archivieren
+### Laden und Wiederverwenden
 
 Öffentliche Anwendung: [Hoops Replay](https://tehes.github.io/hoops-replay/).
 Ohne GameID wird der lokale DEN–OKC-Snapshot `0022600007` geladen.
 Jede explizite zehnstellige `?game=GAME_ID` lädt Boxscore und Play-by-Play vom bestehenden Backend
-`https://nba-spielplan.tehes.deno.net`, auch wenn ein lokaler Snapshot vorhanden ist.
+`https://nba-spielplan.tehes.deno.net`. Es gibt keine lokalen Ersatzspiele bei Fehlern.
 IDs mit Präfix `10` verwenden WNBA und den Query `?league=wnba`; andere NBA.
 
 Normalisierung, Kompilierung und gemeinsame Prüfung müssen vor Freigabe des Replays erfolgreich sein.
 Unfertige Spiele, falsche IDs, HTTP-Fehler und inkonsistente Daten ergeben einen Fehler, kein
 stilles Ersatzspiel. Es gibt weder Polling noch automatische Aktualisierung oder lokale Spielspeicherung.
 
-Der optionale Importer archiviert Rohantworten unter `data/raw/` und schreibt einen normalisierten
-`data/replay-GAME_ID.json` erst nach erfolgreicher Prüfung. Bestehende Dateien werden nur mit
-`--overwrite` ersetzt. Ein fehlgeschlagener Import kann Roharchive hinterlassen beziehungsweise
-erneuern, ohne den bisherigen spielbaren Snapshot zu ersetzen.
+Auch Entwicklungs- und Einzelprüfungen laden reale Spiele vom Server. Der frühere Importer und
+seine lokalen Rohdaten, Vollspiel-Snapshots und Szenen-JSONs sind entfernt. Die vorhandenen
+Einzelprüfungen bleiben fachlich unverändert; ein benötigter Szenenausschnitt entsteht aus dem
+Serverfeed. Wiederholte Abrufe derselben Quelle werden innerhalb des Prozesses im Arbeitsspeicher
+wiederverwendet, niemals als Spiel-JSON gespeichert. Kopien schützen die Eingaben vor Szenenänderungen.
 
 Das Backend gehört zu `Tehes/nba-spielplan`; Änderungen daran sind ein eigener Arbeitsbereich.
 Die lokale Vorschau verwendet ausdrücklich `http://127.0.0.1:5500` wegen der Backend-CORS-Freigabe.
 `localhost` oder andere Ports sind kein gleichwertiger Ersatz. Den Origin-Header nicht im
-Browsercode setzen. Ein CLI-Import ersetzt keine Browser-CORS-Freigabe.
+Browsercode setzen. Ein erfolgreicher CLI-Abruf ersetzt keine Browser-CORS-Freigabe.
 Custom-Domain und weitere Spielplan-Integration sind kein eingerichteter Produktbestandteil.
 
 ### API-Endpunkte und Auswahl von Game IDs
@@ -466,47 +471,55 @@ Der Schedule verweist auf `scheduleLeagueV2_<regionCode>.json`; es gibt in diese
 implementierten Saison-, Datums-, Pagination- oder Mehrfach-GameID-Parameter.
 Der verfügbare Saisonstand stammt aus der Upstream-Antwort
 (`leagueSchedule.seasonYear`, ersatzweise `meta.seasonYear`).
-Ein Abruf ist kein beliebiges historisches Saisonarchiv. Für reproduzierbare Auswahl muss deshalb
-auch die verwendete Schedule-Antwort beziehungsweise die daraus gewählte ID-Liste archiviert werden.
+Ein Abruf ist kein beliebiges historisches Saisonarchiv. Der Batchbericht hält deshalb Quelle,
+Saison und ausgewählte IDs fest; je ausgewertetem Spiel kommt ein Datenfingerabdruck hinzu.
 
 Alle drei Routen verlangen bereits serverseitig einen freigegebenen `Origin`; ohne passenden
-Header liefert der Server 403. Für CLI-/Importwerkzeuge ist
+Header liefert der Server 403. Für CLI-Werkzeuge ist
 `Origin: http://127.0.0.1:5500` zu verwenden. Im Browser entsteht der Header aus der tatsächlichen
 Seitenherkunft. Ungültige Liga oder GameID liefern 400; Upstream- und Netzwerkfehler müssen
 auch bei einer Batch-Auswahl ausdrücklich behandelt werden.
 
-### Gewinnung größerer Testbestände
+### Schedule-basierte Batch-Auswertung
 
-Der vorgesehene Weg ist Schedule → abgeschlossene Game IDs → Boxscore und Play-by-Play →
-Normalisierung und Prüfung → archivierter Testbestand.
+[scripts/audit-replays.js](scripts/audit-replays.js) verwendet standardmäßig beide Ligen und
+höchstens zehn abgeschlossene Spiele je Liga. Die Auswahl dedupliziert gültige String-GameIDs,
+sortiert nach Spieldatum und ID und verteilt eine begrenzte Stichprobe gleichmäßig über den
+verfügbaren Zeitraum. Sie umfasst bei mehreren gewählten Spielen den ersten und letzten Eintrag;
+bei nur einem den letzten. Preseason und Postseason bleiben Teil der Auswahl, sofern der Schedule
+sie enthält. Dies ist eine zeitlich gestreute Stichprobe, keine garantierte Abdeckung aller Regeltypen.
 
-1. Schedule je gewünschter Liga laden, HTTP-Status und Antwortstruktur prüfen.
-2. `leagueSchedule.gameDates` über die jeweiligen `games` abflachen.
-   Nur Spiele mit `gameStatus === 3` und gültiger zehnstelliger String-`gameId` auswählen.
-3. IDs je Liga deduplizieren. Auswahl nach Datum, Teams und gewünschter Spielvielfalt festhalten;
-   IDs nicht erraten oder aus fortlaufenden Nummern konstruieren.
-4. Für jede ID beide Detailfeeds mit derselben Liga laden. Abschlussstatus, übereinstimmende IDs
-   und den vollständigen Replay-Audit weiterhin prüfen: Ein Final-Status im Schedule allein
-   garantiert weder verfügbare noch kompatible Detailfeeds.
-5. Rohdaten, normalisierte freigegebene Snapshots sowie Auswahlmanifest mit Liga, Saisonangabe,
-   Schedule-Quelle, Erfassung und ausgewählten IDs für den Vergleich erhalten.
-   Fehlgeschlagene Spiele mit Ursache getrennt erfassen, statt sie stillschweigend zu ersetzen.
+`--league=nba|wnba|all` begrenzt die Ligen, `--limit=N` die Auswahl je Liga; `--limit=0` wählt alle
+abgeschlossenen Spiele. Explizite zehnstellige GameIDs umgehen die Schedule-Auswahl und das Limit.
+Eine explizite Liga muss zu diesen IDs passen. Kommandos stehen in README.md.
 
-Downloads sollen mit begrenzter Parallelität erfolgen und vorhandene Archive wiederverwenden.
-Für einen Baseline-Vergleich bleiben Auswahl und Datenbestand unverändert.
-Der Top-Excitement-Filter des Spielplans ist keine allgemeine Auswahlregel für Replay-Tests;
-er schränkt Spieltypen und Alter für seinen eigenen Anwendungsfall ein.
+Der Ablauf ist Schedule → abgeschlossene GameIDs (`gameStatus === 3`) → Boxscore und Play-by-Play →
+Normalisierung → Kompilierung → vorhandene gemeinsame Prüfung. Spiele werden nacheinander
+verarbeitet; nur die beiden Detailfeeds eines Spiels werden parallel geladen.
 
-Dies beschreibt den Anschluss für größere Testsammlungen. Schedule-basierte GameID-Auswahl,
-Auswahlmanifest und Batch-Downloader sind in Hoops Replay noch nicht implementiert.
-Vorhanden ist der einzelne Import mit vorgegebener GameID.
+Die JSONL-Ausgabe enthält Auswahlquelle, Saison, Anzahl verfügbarer abgeschlossener Spiele,
+ausgewählte IDs, Zeitpunkt, SHA-256-Fingerabdruck der normalisierten Eingaben ohne variable
+Erfassungszeit sowie den vorhandenen Auditbericht je Spiel mit Liga. Fehler in Schedule,
+Datenabruf/Normalisierung, Kompilierung oder Prüfung werden mit Verarbeitungsschritt protokolliert.
+Ein fehlerhaftes Spiel verhindert die Auswertung der übrigen nicht und wird nicht stillschweigend
+ersetzt. Die Zusammenfassung nennt gewählte, erfolgreiche und fehlgeschlagene Spiele; bei Fehlern
+endet der Lauf mit Exitcode 1. Warnungen laufen getrennt über stderr.
+
+Die bestehende Prüfung wird wiederverwendet, ihre Maßstäbe werden hier nicht erweitert.
+Ein bestandener Audit bedeutet weder vollständige Regelkonformität noch visuelle Basketballqualität.
+Ein Fehler bei Daten oder Kompilierung ist zunächst eine Diagnose, kein Beweis für einen Feedfehler.
+
+Ein automatischer Baseline-/Kandidatenvergleich auf denselben Speicher-Eingaben, eine vollständige
+Regelmatrix und literaturgestützte Qualitätsmessung sind noch nicht implementiert. Einzelne
+CLI-Läufe laden erneut vom Server; für spätere Vergleiche müssen Eingabegleichheit und Kriterien
+explizit geprüft werden. Der Top-Excitement-Filter des Spielplans wird nicht verwendet.
 
 ### Normalisiertes Schema
 
 | Feld | Bedeutung |
 | --- | --- |
-| `gameId`, optional `league`, `date`, `arena`, `season` | Partie und Metadaten; Liga bei älteren Snapshots aus der ID ableitbar |
-| `sources` | Quell-URLs und Erfassungsangaben; gegebenenfalls Verweise auf Roharchive/Roster |
+| `gameId`, optional `league`, `date`, `arena`, `season` | Partie und Metadaten; Liga bei der Demo aus der ID ableitbar |
+| `sources` | Quell-URLs und Erfassungsangaben |
 | `teams` | Auswärts zuerst, Heimteam danach; ID, Code, Name, Heimstatus, Endstand und Spieler |
 | `players` | ID, Name, Nummer, Position, Starterstatus und Minuten |
 | `actions` | Übernommene Ereignisfelder einschließlich IDs, Ordnung, Uhr, Typ, Beteiligten und optionaler Orts-/Wurf-/Besitzangaben |
@@ -520,7 +533,7 @@ Wichtige Datenregeln:
 - `actionNumber` ist eine Ereignis-ID, keine verlässlich monotone Reihenfolge.
   `orderNumber` bestimmt die Ausgangsordnung. Niemals allgemein nach Ereignis-ID umsortieren.
 - Zeitgleiche Ereignisse sind nicht automatisch Duplikate. Begrenzte kausale Wechselkorrekturen
-  betreffen den Replay-Plan, nicht die archivierten Originalfelder.
+  betreffen den Replay-Plan, nicht die ursprünglichen Feed-Felder.
 - Der Feed schreibt `jumpBallRecoverdPersonId` tatsächlich so.
 - Feldwürfe brauchen endliche x/y. Nur hinreichend belegte Orte sind Abschlussanker;
   Nullkoordinaten anderer Ereignisarten sind kein Tracking-Nachweis.
@@ -534,8 +547,8 @@ Wichtige Datenregeln:
   besitzen keinen Adapter und dürfen nicht ungeprüft beigemischt werden.
 - Unbekannte Personen sind grundsätzlich ein Fehler. Die eng begrenzte Ausnahme für technische
   Fouls bei bekanntem Team erfindet weder Spieler noch eine Trainerrolle.
-- Die ursprünglichen DEN–OKC-/NYK–BOS-Snapshots besitzen keine vollständigen Roharchive.
-  Herkunft und Archivierungsumfang nicht nachträglich vollständiger darstellen als vorhanden.
+- Die lokale DEN–OKC-Demo besitzt kein vollständiges Roharchiv.
+  Ihre Herkunft nicht nachträglich vollständiger darstellen als vorhanden.
 
 ## Oberfläche und Darstellung
 
@@ -582,41 +595,35 @@ Zwischen Jersey-Flächen beziehungsweise Away und Paint gibt es keine feste Mind
 Die Auswahl bleibt bei Pause, Seeking und Seitenwechsel stabil; Court-Paletten ändern sich nicht.
 Details der OKLab-Schwellen und Auswahlreihenfolge sind in `replay-colors.js` und dessen Tests maßgeblich.
 
-## Regression und bekannte Grenzen
+## Auswertung und bekannte Grenzen
 
-Die vorhandenen Prüfungen laufen über [replay-data_test.js](scripts/replay-data_test.js),
-[replay-motion_test.js](scripts/replay-motion_test.js),
-[replay-colors_test.js](scripts/replay-colors_test.js) und den gemeinsamen Replay-Audit.
-Ausführung und Importkommandos stehen in [README.md](README.md).
+Der gemeinsame Replay-Audit läuft mit Serverdaten über
+[scripts/audit-replays.js](scripts/audit-replays.js). Er prüft unter anderem End- und Zwischenstände,
+Repräsentation der Ereignisse, aktive Aufstellungen, Ballbesitzer, endliche Koordinaten,
+Wurf-/Reboundverhalten und interpolierte Zustände. Die vorhandenen Einzelprüfungen in
+[replay-data_test.js](scripts/replay-data_test.js) laden ihre realen Ausgangsspiele ebenfalls vom
+Server; [replay-motion_test.js](scripts/replay-motion_test.js) und
+[replay-colors_test.js](scripts/replay-colors_test.js) benötigen keine Spieldateien.
+Ausführung steht in [README.md](README.md). Es werden keine neuen festen Einzeltests als
+Voraussetzung des Iterationsverfahrens eingeführt.
 
-| Snapshot | Liga | Matchup | Endstand auswärts–heim |
-| --- | --- | --- | --- |
-| `0022600007` | NBA | DEN–OKC | 84–96 |
-| `0022600008` | NBA | NYK–BOS | 103–107 |
-| `0022600094` | NBA | ATL–CHA | 128–81 |
-| `0022600105` | NBA | BKN–CLE | 121–125 |
-| `0022600120` | NBA | MIN–CLE, OT | 125–127 |
-| `1042600304` | WNBA | GSV–ATL | 67–62 |
-
-Der Audit entdeckt spielbare Snapshots automatisch; Roharchive zählen nicht als freigegebene Spiele.
-Er prüft unter anderem End- und Zwischenstände, Repräsentation der Ereignisse, aktive Aufstellungen,
-Ballbesitzer, endliche Koordinaten, Wurf-/Reboundverhalten und interpolierte Zustände.
-Szenentests sichern zusätzliche Fallgrenzen, Determinismus und unveränderte Quellen.
-Dies ist keine vollständige Regel- oder visuelle Qualitätsabnahme.
+Die lokale Demo ist DEN–OKC `0022600007` mit dem Endstand 84–96 (auswärts–heim).
+Alle anderen realen Vergleichsfälle hängen vom aktuellen Serverfeed ab. Es gibt keine automatische
+Übernahme früherer Prüfergebnisse auf nachträglich korrigierte Daten.
 
 Dauerhaft wichtige Gegenbeispiele und Grenzen:
 
-- MIN–CLE bewahrt im Rohfeed Dosunmus zeitgleichen Steal 385/386 und Auswechslung 254/253 in der
-  widersprechenden Quellordnung. Die Regression prüft die begrenzte kausale Replay-Korrektur.
-  Das echte OT-Spiel ist als Datensatz geprüft, seine Overtime nicht visuell vollständig abgenommen.
-- CLE–ATL `0022600144`: Der Ausschnitt in `data/scenarios/cle-atl-second-chance.json` enthält den
-  Spielbeginn bis Rebound 57. Aktion 56 sichert Alexander-Walkers Vorbereitung ohne den früheren
-  Platztausch mit McCollum, gespiegelt und mit verkürztem Spieluhrabstand. Der Ausschnitt ist kein
-  zusätzlicher Vollspiel-Snapshot; die Team-Endstände stammen weiterhin aus dem vollständigen Spiel.
+- MIN–CLE `0022600120`: Dosunmus zeitgleicher Steal 385/386 und Auswechslung 254/253 sind
+  Gegenbeispiele zur reinen Quellordnung. Die bestehende Einzelprüfung untersucht die begrenzte
+  kausale Replay-Korrektur am Serverfeed; dessen unveränderter Fortbestand ist nicht garantiert.
+  Die Overtime dieses Spiels ist nicht visuell vollständig abgenommen.
+- CLE–ATL `0022600144`: Die bestehende Einzelprüfung schneidet den Serverfeed bis Rebound 57
+  zu. Aktion 56 untersucht Alexander-Walkers Vorbereitung ohne den früheren Platztausch mit McCollum,
+  gespiegelt und mit verkürztem Spieluhrabstand. Die Team-Endstände stammen aus dem vollständigen Spiel.
 - Burton/Canada in `1042600305`: Treffer/Foul 450/451 bei Q4 6:27, Fehlfreiwurf 453 und
   Hillmon-Rebound 454 bei 6:25. Der gezielte Test sichert den And-one-Kontakt ohne zweiten Angriff;
-  dieses Spiel ist kein zusätzlicher gebündelter Vollspiel-Snapshot.
-- HOU–SAS `0022600009` ist ein archivierter inkonsistenter Rohdatenfall ohne spielbaren Snapshot.
+  die Ereignisfolge ist im Testcode definiert, ihre Ausgangsaufstellung kommt vom Server.
+- HOU–SAS `0022600009` ist ein bekannter inkonsistenter Feedfall, dessen aktuelle Serverdaten geprüft werden.
   Endstand allein genügt nicht. Widersprechende Zeiten/Zwischenstände dürfen nicht durch allgemeines
   Umsortieren oder Abschalten von Prüfungen verdeckt werden.
 - Andere seltene Ereignisse, neue Descriptor-Schreibweisen, fehlende Koordinaten, unbekannte Personen
