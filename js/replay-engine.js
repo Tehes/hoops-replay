@@ -2071,7 +2071,10 @@ function compileScene(replay, scene, index, state, data) {
 		record(0.7);
 	} else if (scene.kind === "foul" || scene.kind === "turnover" || scene.kind === "steal") {
 		const offensive = scene.kind === "foul" && action.subType === "offensive";
-		const onBall = scene.kind === "turnover" || offensive ||
+		// An unspecified personal foul is schematically on-ball, not evidence of an off-ball contact.
+		const personalOnBall = scene.kind === "foul" && action.subType === "personal" &&
+			!action.descriptor && Boolean(state.positions[action.foulDrawnPersonId]);
+		const onBall = scene.kind === "turnover" || offensive || personalOnBall ||
 			["shooting", "take", "transition take"].includes(action.descriptor);
 		if (onBall || liveFoul) {
 			if (liveFoul && (state.restart || state.possession !== offense || state.needsAdvance)) {
@@ -2085,6 +2088,12 @@ function compileScene(replay, scene, index, state, data) {
 			if (scene.kind === "foul" && action.descriptor === "shooting") {
 				prepareShootingFoul(state, scene, replay, index, hoop, direction, record);
 			} else {
+				if (personalOnBall && state.ball.owner !== action.foulDrawnPersonId) {
+					const receiver = state.positions[action.foulDrawnPersonId];
+					releaseBall(state);
+					record(0.01);
+					flyBall(state, record, { x: receiver.x + 1, y: receiver.y + 0.8, z: 0.5 }, 0.6, 0.45);
+				}
 				state.ball.owner = (scene.kind === "foul" && !offensive ? action.foulDrawnPersonId : action.personId) ||
 					state.ball.owner || state.lineups[offense][0];
 				record(0.4);

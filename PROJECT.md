@@ -350,7 +350,8 @@ Die aktuelle Engine bündelt mehrere Verantwortlichkeiten des Zielbilds; die zus
 | Fall | Aktuelle Behandlung |
 | --- | --- |
 | Treffer und folgendes gewöhnliches Live-Foul | Gegnerischer Grundlinieneinwurf vor dem neuen Aufbau; dessen Fortschritt hängt vom Spieluhrabstand ab |
-| Foul abseits des Balls | Kein pauschaler Balltransfer an den Gefoulten; nicht jedes Foul wird als On-ball-Aktion interpretiert |
+| Persönliches Foul ohne Descriptor | Schematisch am Ball; der Gefoulte erhält den Ball vor dem Kontakt gegebenenfalls durch einen ergänzten Pass. Keine Aussage über den tatsächlichen Ballbesitzer |
+| Persönliches Foul mit `off-the-ball` | Kein pauschaler Balltransfer an den Gefoulten; Loose-ball- und technische Fouls behalten ihre Sonderbehandlung |
 | Wurffoul | Zwei-/Dreipunktbereich aus Qualifiers oder folgender regulärer Freiwurfserie; schematische Annahme vor dem Kontakt |
 | And-one | Gleiche Periode/Uhr, passender Schütze und gegnerisches Wurffoul verknüpfen Treffer und Kontakt; kein zweiter Aufbau oder Gegner-Einwurf |
 | Reguläre Freiwürfe | Zwischenwurf und letzter Wurf unterschieden; nach letztem Fehlwurf kann ein Live-Rebound folgen |

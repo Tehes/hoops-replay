@@ -179,6 +179,13 @@ Deno.test("a sideline restart releases the previous foul matchup before a new sh
 			const first = replay.scenes.find((scene) => scene.action.actionNumber === 19);
 			const second = replay.scenes.find((scene) => scene.action.actionNumber === 22);
 			assert(first.matchups[defender.id] === attackers[1].id, "first foul lost its matchup");
+			const firstContact = getReplayFrame(replay, first.start + first.eventAt);
+			assert(firstContact.ball.owner === attackers[1].id,
+				"unspecified personal foul was incorrectly assumed to be off-ball");
+			const catchIndex = first.frames.findIndex((frame) => frame.ball.owner === attackers[1].id);
+			assert(catchIndex > 0 && first.frames[catchIndex - 1].ball.owner === null &&
+				first.frames[catchIndex - 1].ball.z > 0,
+				"schematic foul recipient received the ball without a pass");
 			assert(second.matchups[defender.id] === attackers[2].id, "previous foul locked the next matchup");
 			assert(new Set(Object.values(second.matchups)).size === 5, "restart duplicated a matchup");
 			const approach = getReplayFrame(replay, second.start + second.foulApproachAt);
@@ -219,7 +226,7 @@ Deno.test("a live off-ball foul after a basket follows an inbound and advances o
 						{ ...tip, clock: "PT12M00S", jumpBallRecoverdPersonId: shooter.id },
 						{ actionType: "2pt", subType: "Jump Shot", teamId: scoring.id, personId: shooter.id,
 							clock: "PT08M00S", isFieldGoal: 1, shotResult: "Made", x: 80, y: 50, side: "right" },
-						{ actionType: "foul", subType: "personal", teamId: scoring.id, personId: actor.id,
+						{ actionType: "foul", subType: "personal", descriptor: "off-the-ball", teamId: scoring.id, personId: actor.id,
 							foulDrawnPersonId: victim.id, clock: `PT07M${60 - seconds}S`,
 							...(includePossession ? { possession: receiving.id } : {}) },
 					].map((action, i) => ({ ...common, ...action, period, actionNumber: i + 1, orderNumber: i + 1 }));
