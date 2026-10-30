@@ -129,6 +129,76 @@ async function readData(file) {
 	return JSON.parse(await Deno.readTextFile(new URL(file, DATA)));
 }
 
+Deno.test("a sideline restart releases the previous foul matchup before a new shooting foul", async () => {
+	for (const period of [1, 3]) {
+		for (const offenseIndex of [0, 1]) {
+			const data = await readData("replay-0022600007.json");
+			const offense = data.teams[offenseIndex];
+			const defense = data.teams[1 - offenseIndex];
+			const attackers = offense.players.filter((player) => player.starter);
+			const defender = defense.players.find((player) => player.starter);
+			const tip = data.actions.find((action) => action.actionType === "jumpball");
+			const common = { period, scoreAway: "0", scoreHome: "0" };
+			data.actions = [
+				{
+					...tip,
+					...common,
+					clock: "PT12M00.00S",
+					teamId: offense.id,
+					jumpBallRecoverdPersonId: attackers[0].id,
+				},
+				{
+					...common,
+					actionNumber: 19,
+					orderNumber: 190000,
+					clock: "PT10M19.00S",
+					actionType: "foul",
+					subType: "personal",
+					teamId: defense.id,
+					personId: defender.id,
+					foulDrawnPersonId: attackers[1].id,
+					possession: offense.id,
+				},
+				{
+					...common,
+					actionNumber: 22,
+					orderNumber: 220000,
+					clock: "PT10M03.00S",
+					actionType: "foul",
+					subType: "personal",
+					descriptor: "shooting",
+					teamId: defense.id,
+					personId: defender.id,
+					foulDrawnPersonId: attackers[2].id,
+					possession: offense.id,
+					qualifiers: ["2freethrow"],
+				},
+			];
+			const original = JSON.stringify(data);
+			const replay = compileReplay(data);
+			const first = replay.scenes.find((scene) => scene.action.actionNumber === 19);
+			const second = replay.scenes.find((scene) => scene.action.actionNumber === 22);
+			assert(first.matchups[defender.id] === attackers[1].id, "first foul lost its matchup");
+			assert(second.matchups[defender.id] === attackers[2].id, "previous foul locked the next matchup");
+			assert(new Set(Object.values(second.matchups)).size === 5, "restart duplicated a matchup");
+			const approach = getReplayFrame(replay, second.start + second.foulApproachAt);
+			const actor = approach.players.find((player) => player.id === defender.id);
+			const victim = approach.players.find((player) => player.id === attackers[2].id);
+			assert(
+				Math.hypot(actor.x - victim.x, actor.y - victim.y) < 6,
+				"fouler crossed the court only at contact instead of guarding the shooter beforehand",
+			);
+			getReplayFrame(replay, 0);
+			assert(
+				JSON.stringify(approach) ===
+					JSON.stringify(getReplayFrame(replay, second.start + second.foulApproachAt)),
+				"seeking changed the foul buildup",
+			);
+			assert(JSON.stringify(data) === original, "matchup planning changed source events");
+		}
+	}
+});
+
 Deno.test("a live off-ball foul after a basket follows an inbound and advances only as far as its clock gap allows", async () => {
 	const source = await readData("replay-0022600007.json");
 	for (const period of [1, 3]) {

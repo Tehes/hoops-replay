@@ -1018,7 +1018,8 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 	scene.attackTeam = offense;
 	scene.attackContext = planAttackContext(replay, index, offense, state);
 	const newAttack = !state.formation || state.formation.offense !== offense ||
-		state.formation.period !== scene.action.period || state.needsAdvance || restart === "baseline";
+		state.formation.period !== scene.action.period || state.needsAdvance || restart === "baseline" ||
+		restart === "foul";
 	if (newAttack) {
 		state.formation = planFormation(replay, index, offense, direction, lineup, state);
 		const plan = planMatchups(replay.scenes, index, offense, state, data);
@@ -2187,7 +2188,7 @@ function compileScene(replay, scene, index, state, data) {
 			replay.attacks.push(scene.start + time);
 		} else if (scene.kind === "foul") {
 			releaseBall(state);
-			state.restart = "sideline";
+			state.restart = "foul";
 		}
 		landPlayers(state);
 		record(0.7);

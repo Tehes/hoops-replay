@@ -316,6 +316,8 @@ Die aktuelle Engine bündelt mehrere Verantwortlichkeiten des Zielbilds; die zus
   Die Vorausplanung endet vor einem offensiven Wechsel; feste Five-out-/Horns-Schablonen werden nicht
   als reale Sets behauptet. `FALLBACK_SPACING` hilft beim ersten Aufbau.
 - Bekannte Foul-, Block- und Steal-Kontakte priorisieren Matchups. Übrige Paare bleiben im Angriff stabil.
+  Bei einem Seiteneinwurf nach einem Foul werden Formation und Matchups neu geplant, damit frühere Foulkontakte
+  nicht die Zuordnung beim nächsten Angriff nach der Unterbrechung festlegen.
   Die Defense reagiert zusätzlich auf Ball und Korb, hilft und schließt nach Pässen zum Empfänger auf.
 - `attackContext` unterscheidet Einwurf, Outlet, Steal, zweite Chance und Fortsetzung. Der PG ist
   der Spieler im ersten Lineup-Slot, keine aus dem Feed bestätigte Ballführerrolle. Alle vier
