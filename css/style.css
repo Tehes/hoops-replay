@@ -44,8 +44,8 @@ RESET
 *::before,
 *::after {
 	box-sizing: border-box;
-	/* disable double tap to zoom. only use in mobile-pwa */
-	/* touch-action: manipulation; */
+	/* Prevent double-tap zoom while preserving scrolling and pinch zoom. */
+	touch-action: manipulation;
 }
 
 /*
