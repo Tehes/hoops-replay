@@ -109,7 +109,7 @@ und dokumentiert nur den jeweils benannten Teil der Umsetzung.
 | Seitlicher Outlet und bewegter Fang | WABC Level 1, Team 2.3.1, „Basic Fast Break – Starting the Break“ | Bei ununterbrochenen Defensivrebound-Aufbauten ohne Zeitdruck werden seitliche Empfangspunkte und ein Fang in Bewegung geplant; keine Rekonstruktion des tatsächlichen Passes |
 | Mitspieler laufen früh in breite Bahnen | WABC Level 1, Team 2.3.2, „Basic Fast Break – Running Wide Lanes“ | Bestehende Vorlaufphasen und breite Flügelbahnen sind vorhanden; die Bahnwahl und Pass-voraus-Entscheidung sind noch kein vollständig quellenbasiertes Modell |
 | Raum für Ball und nächste Aktion schaffen | WABC Level 1, Team 2.1.1, „Basic Floor Spacing – Pass and Cut / Give and Go“ | Bestehende Abstands-/Korridorplanung ist vorhanden; die Trainingsformation wird nicht pauschal als tatsächlich gespieltes Set übernommen |
-| Aufenthalte in der Zone regelabhängig begrenzen | NBA Rule 10, Sections VI–VII; WNBA 2026 Rule 10, Sections VI–VII | Offensive und defensive Drei-Sekunden-Bedingungen sind weiterhin offen |
+| Aufenthalte in der Zone regelabhängig begrenzen | NBA Rule 10, Sections VI–VII; WNBA 2026 Rule 10, Sections VI–VII | Offensive Wartepositionen außerhalb der Zone; Diagnose der offensiven Wurfvorbereitung. Vollständige Ausnahmen und defensive Bedingungen offen |
 
 Quellen: [NBA Rule 10](https://official.nba.com/rule-no-10-violations-and-penalties/),
 [WNBA-Regelwerk 2026](https://cdn.wnba.com/sites/4/2026/05/2026-WNBA-Official-Rule-Book.pdf),
@@ -297,7 +297,7 @@ Dieser Abschnitt beschreibt den Codebestand, nicht die vollständige Umsetzung d
 | Spielregeln | Fallbezogene Fortsetzungen innerhalb der Engine vorhanden | Keine vollständige Regelmatrix und kein separates allgemeines Regelmodell |
 | Zustände und Module | Browserfreie Kompilierung, getrennte Wurf-/Bewegungsmodule vorhanden | Fachlicher Zustand und Animation noch im Compilerzustand vermischt; Zielaufteilung nicht umgesetzt |
 | Choreografie | Kontext, Formationsplanung, Passauswahl und defensive Reaktionen vorhanden | Kein vollständig aus Coaching-Referenzen abgeleitetes Heuristiksystem |
-| Zeitabhängige Regeln | Spieluhrabstände steuern die Vorbereitung | Keine systematische offensive/defensive Drei-Sekunden-Prüfung und keine vollständige Shot-clock-Logik |
+| Zeitabhängige Regeln | Spieluhrabstände steuern die Vorbereitung; offensive Zonenaufenthalte im Aufbau werden diagnostiziert | Keine vollständige offensive/defensive Drei-Sekunden-Prüfung oder Shot-clock-Logik |
 | Batch-Auswertung | Schedule-basierter Server-Audit und bestehende Einzelprüfungen mit Serverdaten vorhanden | Kein automatischer Baseline-/Kandidatenvergleich mit kontextabhängiger Qualitätsbewertung |
 | Diagnose und Lernen | Einzelne Planungsmetadaten und teilbare Szenen vorhanden | Kein umfassendes Entscheidungsprotokoll, A/B-Verfahren oder separates Learning-Dokument |
 
@@ -315,6 +315,7 @@ Bestehende Heuristiken und Tests sind eine Grundlage dafür, kein Nachweis volls
 | [js/replay-motion.js](js/replay-motion.js) | Verbindende Routen, Halten, Reaktionszeiten und Kreuzungsreservierungen |
 | [js/replay-shots.js](js/replay-shots.js) | Wurfprofile, Abschlussbewegungen und Ballflug |
 | [js/replay-leagues.js](js/replay-leagues.js) | Ligaerkennung, Viertellänge und Dreiergeometrie |
+| [js/replay-rules.js](js/replay-rules.js) | Offensive Zonengeometrie und nahe Wartepositionen außerhalb |
 | [js/replay-teams.js](js/replay-teams.js) | NBA-/WNBA-Teamdaten, Paletten und lokale Logos |
 | [js/replay-colors.js](js/replay-colors.js) | Farbähnlichkeit, Kontrast und Jersey-Auswahl |
 | [js/replay-validation.js](js/replay-validation.js) | Gemeinsame Prüfung für Browser und Audit |
@@ -325,7 +326,8 @@ Bestehende Heuristiken und Tests sind eine Grundlage dafür, kein Nachweis volls
 `compileReplay(data)` erzeugt Szenen, Keyframes, Marker und Navigationsgrenzen ohne DOM oder Netzwerk.
 `getReplayFrame(replay, time)` liefert den Zustand zu einem beliebigen Zeitpunkt.
 Die aktuelle Engine bündelt mehrere Verantwortlichkeiten des Zielbilds; die zusätzlichen Dateien
-`replay-events.js`, `replay-rules.js` und `replay-planner.js` existieren noch nicht.
+`replay-events.js` und `replay-planner.js` existieren noch nicht. `replay-rules.js` enthält bislang
+nur Zonengeometrie, keinen allgemeinen Regelzustand.
 
 ### Aktuelle Ereignis- und Bewegungsbehandlung
 
@@ -434,8 +436,20 @@ Eine Challenge-Darstellung allein modelliert noch nicht die Folgen einer geände
 
 Der Shot-clock-Rückblick verlängert die Vorbereitung vor einem aufgezeichneten Verstoß.
 Er berechnet keine durchgängige Restuhr mit allen 24-/14-Sekunden-Resets.
-Zonenaufenthalte werden nicht systematisch nach den Drei-Sekunden-Regeln geprüft oder verhindert.
-Vorhandene Innenpositionen und Vorbereitungsphasen können deshalb gegen das Zielbild verstoßen.
+Offensive Wartepositionen im Halbfeld liegen außerhalb der Zone. Bei längerer Vorbereitung warten
+auch spätere Innenschützen zunächst außerhalb; ihre eigentliche Anspiel-/Abschlussposition bleibt
+erhalten. Kurze Zuspiele in die Zone, Abschlüsse und direkte zweite Chancen bleiben möglich.
+Spieler, die nach einem Rebound innen stehen, können sich auf kurzem Weg aus der Zone lösen.
+
+`checkReplay()` meldet `offensiveLaneStays` als Prüfkandidaten, nicht als Fehler oder Pfiffe:
+In den bereits vorhandenen Abtastungen alle 0,2 Replay-Sekunden wird ab bekannter Ballkontrolle
+im Vorfeld die abgebildete Spielzeit je Angreifer innerhalb der Zone summiert. Die Diagnose gilt
+nur innerhalb einer Wurfszene vor deren Abschlussbewegung; Tip-ins, Putbacks und Backcourt-Szenen
+sind ausgenommen. Sie läuft nicht über Szenengrenzen und erfasst keine vollständige Regelkonformität.
+Körpermittelpunkte ersetzen keine Füße; unmittelbares Verlassen, Schussbewegungen und gegnerische
+Ballberührungen sind nicht vollständig als Regelausnahmen modelliert. Deshalb bleiben auch
+Bewegungsfälle über drei Sekunden sichtbar und müssen beurteilt werden. Defensive drei Sekunden
+werden weiterhin nicht geprüft. Grundlage: NBA/WNBA Rule 10, Section VI.
 
 ### Zeit und Geometrie
 

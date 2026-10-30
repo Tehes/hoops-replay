@@ -3,6 +3,7 @@ import { attackDirection, clockSeconds, compileReplay, getReplayFrame } from "..
 import { checkReplay } from "../js/replay-validation.js";
 import { getTeamColors, getTeamLogo, getTeamName } from "../js/replay-teams.js";
 import { loadFeed, loadGame } from "./replay-source.js";
+import { getLaneWaitingPoint, isInOffensiveLane } from "../js/replay-rules.js";
 
 Deno.test("recorded BKN-CLE flagrant penalties lead to a free-throw-line sideline inbound", async () => {
 	const data = await loadGame("0022600105");
@@ -886,7 +887,8 @@ Deno.test("explicit rebound links and missing-field fallback preserve all refere
 Deno.test("second chances keep off-ball positions instead of swapping the next rebounder with a teammate", async () => {
 	let checked = 0;
 	for (const id of ["0022600007", "0022600008", "0022600094", "0022600105", "0022600120", "1042600304"]) {
-		const replay = compileReplay(await loadGame(id));
+		const data = await loadGame(id);
+		const replay = compileReplay(data);
 		for (const scene of replay.scenes) {
 			if (
 				scene.attackContext?.origin !== "second-chance" ||
@@ -906,12 +908,20 @@ Deno.test("second chances keep off-ball positions instead of swapping the next r
 					continue;
 				}
 				const from = first.players.find((player) => player.id === playerId);
+				const direction = attackDirection(data, scene.attackTeam, scene.action.period);
+				const exit = scene.laneExits?.find((move) => move.id === playerId && move.startAt === 0);
+				const target = getLaneWaitingPoint(from, direction);
 				for (
 					const frame of scene.frames.filter((frame) => frame.time <= scene.preparationAt)
 				) {
 					const to = frame.players.find((player) => player.id === playerId);
 					assert(
-						Math.hypot(to.x - from.x, to.y - from.y) <= 6.1,
+						Math.hypot(to.x - from.x, to.y - from.y) <= 6.1 ||
+							(exit && isInOffensiveLane(from, direction) && !isInOffensiveLane(exit, direction) &&
+								Math.hypot(exit.x - target.x, exit.y - target.y) < 0.001 &&
+								Math.abs(Math.hypot(to.x - from.x, to.y - from.y) +
+									Math.hypot(to.x - target.x, to.y - target.y) -
+									Math.hypot(target.x - from.x, target.y - from.y)) < 0.001),
 						`${id} action ${scene.action.actionNumber}: unrelated off-ball player crossed the court before preparation`,
 					);
 				}
@@ -1015,7 +1025,7 @@ Deno.test("personal rebound catches wait for the outcome and respect travel spee
 					for (const other of frame.players.filter((other) =>
 						other.id !== setup.id && scene.lineups[scene.attackTeam].includes(other.id))) {
 						assert(Math.hypot(player.x - other.x, player.y - other.y) >= 3,
-							"setup conflicted with another attacker's preparation");
+							`${id}:${scene.action.actionNumber} setup ${setup.id} conflicted with ${other.id} at step ${step}`);
 					}
 					previous = player;
 				}
@@ -1881,13 +1891,14 @@ Deno.test("buildup overlaps player travel, bounds speed and positions the shoote
 				const ready = scene.frames.find((frame) => frame.time === scene.preparationAt);
 				const shooter = ready.players.find((player) => player.id === scene.action.personId);
 				assert(
-					Math.hypot(shooter.x - (scene.stagedEntry ?? scene.shotEntry).x,
-						shooter.y - (scene.stagedEntry ?? scene.shotEntry).y) < 0.00001,
+					Math.hypot(shooter.x - (scene.stagedEntry ?? scene.waitingEntry ?? scene.shotEntry).x,
+						shooter.y - (scene.stagedEntry ?? scene.waitingEntry ?? scene.shotEntry).y) < 0.00001,
 					"shooter did not reach the planned preparation position",
 				);
 				const finish = scene.frames.find((frame) => frame.time === scene.approachAt)
 					.players.find((player) => player.id === scene.action.personId);
-				assert(!scene.arrivalMove || Math.hypot(finish.x - scene.shotEntry.x, finish.y - scene.shotEntry.y) < 0.00001,
+				const target = scene.waitingEntry ?? scene.shotEntry;
+				assert(!scene.arrivalMove || Math.hypot(finish.x - target.x, finish.y - target.y) < 0.00001,
 					"shooter did not finish the staged approach before the shot animation");
 			}
 		}
@@ -2301,7 +2312,8 @@ Deno.test("staged receiving routes and moving catches preserve anchors, timing a
 				const first = at(scene.preparationAt);
 				const last = at(scene.approachAt);
 				assert(Math.hypot(first.x - last.x, first.y - last.y) >= 3, "staged route had no meaningful approach");
-				assert(Math.hypot(last.x - scene.shotEntry.x, last.y - scene.shotEntry.y) < 0.001,
+				const target = scene.waitingEntry ?? scene.shotEntry;
+				assert(Math.hypot(last.x - target.x, last.y - target.y) < 0.001,
 					"receiving route missed its finish anchor");
 				const frames = scene.frames.filter((f) => f.time >= scene.preparationAt && f.time <= scene.approachAt);
 				for (let i = 1; i < frames.length; i++) {

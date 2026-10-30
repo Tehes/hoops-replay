@@ -1,5 +1,6 @@
 import { attackDirection, compileReplay, getReplayFrame } from "./replay-engine.js";
 import { getLeague } from "./replay-leagues.js";
+import { isInOffensiveLane } from "./replay-rules.js";
 
 export function checkReplay(data, replay = compileReplay(data)) {
 	const id = data.gameId;
@@ -212,6 +213,11 @@ export function checkReplay(data, replay = compileReplay(data)) {
 			);
 		}
 	}
+	const offensiveLaneStays = [];
+	let laneScene = null;
+	let laneClock = null;
+	let frontcourtControl = false;
+	const laneCounts = new Map();
 	for (let t = 0; t < replay.duration; t += 0.2) {
 		const frame = getReplayFrame(replay, t);
 		check(
@@ -223,6 +229,42 @@ export function checkReplay(data, replay = compileReplay(data)) {
 			frame.players.every((p) => [p.x, p.y, p.angle, p.jump].every(Number.isFinite)),
 			`${id} interpolation at ${t}`,
 		);
+		const scene = frame.scene;
+		if (scene !== laneScene) {
+			laneScene = scene;
+			laneClock = null;
+			frontcourtControl = false;
+			laneCounts.clear();
+		}
+		const local = t - scene.start;
+		if (
+			!scene.shotStyle || scene.shotStyle.tip || scene.shotStyle.putback || scene.formation?.backcourt ||
+			local < (scene.liveAt ?? 0) || scene.approachAt === undefined || local >= scene.approachAt
+		) {
+			continue;
+		}
+		const direction = scene.hoop.x > 47 ? 1 : -1;
+		const attackers = scene.lineups[scene.attackTeam];
+		const owner = frame.players.find((player) => player.id === frame.ball.owner);
+		if (owner) {
+			frontcourtControl = attackers.includes(owner.id) && (owner.x - 47) * direction > 0 &&
+				(frame.ball.x - 47) * direction > 0;
+		}
+		const elapsed = laneClock === null ? 0 : Math.max(0, laneClock - frame.clock);
+		laneClock = frame.clock;
+		for (const player of frame.players.filter((player) => attackers.includes(player.id))) {
+			const count = laneCounts.get(player.id) ?? { seconds: 0, report: null };
+			count.seconds = frontcourtControl && isInOffensiveLane(player, direction) ? count.seconds + elapsed : 0;
+			// Review candidates, not whistles: feet, imminent exits and deflections are not modeled.
+			if (count.seconds > 3) {
+				if (!count.report) {
+					count.report = { action: scene.action.actionNumber, player: player.id, seconds: count.seconds };
+					offensiveLaneStays.push(count.report);
+				}
+				count.report.seconds = Math.max(count.report.seconds, count.seconds);
+			}
+			laneCounts.set(player.id, count);
+		}
 	}
 	check(represented.size === data.actions.length, `${id} all actions represented`);
 	check(JSON.stringify(replay.finalScore) === JSON.stringify(data.teams.map((t) => t.score)), `${id} final score`);
@@ -380,6 +422,7 @@ export function checkReplay(data, replay = compileReplay(data)) {
 		frames,
 		profiles: [...profiles.keys()],
 		formations: formationCounts,
+		offensiveLaneStays,
 		errors,
 	};
 }

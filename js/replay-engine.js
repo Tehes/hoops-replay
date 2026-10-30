@@ -84,6 +84,7 @@
 import { animateShot, flyBall, getDriveStart, getShotEntry, getShotStyle, landPlayers } from "./replay-shots.js";
 import { movePlayers } from "./replay-motion.js";
 import { getLeague } from "./replay-leagues.js";
+import { getLaneWaitingPoint, isInOffensiveLane } from "./replay-rules.js";
 
 const SLOT_ORDER = ["PG", "SG", "SF", "PF", "C"];
 const FALLBACK_SPACING = [[62, 25], [70, 10], [73, 40], [79, 17], [83, 31]];
@@ -422,6 +423,9 @@ function planMatchups(scenes, index, offense, state, data) {
 // Search open court space while retaining the previous side and a short route there.
 function findOpenSpace(origin, occupied, lane = null, interior = false, guard = false, backcourt = false) {
 	const score = ([x, y]) => {
+		if (!backcourt && isInOffensiveLane({ x, y }, 1)) {
+			return Infinity;
+		}
 		let cost = Math.hypot(x - origin[0], y - origin[1]) ** 2 * 0.045;
 		for (const [otherX, otherY] of occupied) {
 			cost += Math.max(0, 13 - Math.hypot(x - otherX, y - otherY)) ** 2 * 4;
@@ -482,7 +486,7 @@ function planContinuation(replay, scene, lineup, direction) {
 	}
 	const hoop = { x: direction === 1 ? 88.75 : 5.25, y: 25 };
 	const shot = { x: next.action.x * 0.94, y: next.action.y * 0.5 };
-	const target = getShotEntry({ action: next.action, shotStyle: nextStyle }, shot, hoop, direction);
+	const target = getLaneWaitingPoint(getShotEntry({ action: next.action, shotStyle: nextStyle }, shot, hoop, direction), direction);
 	if ((target.x - 47) * direction < 7 || (scene.action.x * 0.94 - 47) * direction < 0) {
 		return null;
 	}
@@ -717,6 +721,14 @@ function planFormation(replay, index, offense, direction, lineup, state) {
 			);
 		}
 	}
+	if (!backcourt) {
+		for (const slot of priority) {
+			const [x, y] = slots[slot];
+			if (isInOffensiveLane({ x, y }, 1) && !(foulPlan && slot === shooterSlot)) {
+				slots[slot] = findOpenSpace([x, y], slots.filter((_, other) => other !== slot), lane, slot === interiorSlot);
+			}
+		}
+	}
 	const formation = {
 		id: replay.formations.length,
 		offense,
@@ -844,7 +856,7 @@ function planReceivingEntry(state, scene, direction) {
 	const slot = lineup.indexOf(scene.action.personId);
 	const [x, y] = scene.formation.origins[slot];
 	const origin = { x: direction === 1 ? x : 94 - x, y };
-	const entry = scene.shotEntry;
+	const entry = scene.waitingEntry ?? scene.shotEntry;
 	const hoop = scene.hoop;
 	const radius = Math.hypot(entry.x - hoop.x, entry.y - hoop.y);
 	const angle = Math.atan2(entry.y - hoop.y, entry.x - hoop.x);
@@ -857,7 +869,8 @@ function planReceivingEntry(state, scene, direction) {
 	const score = (point) => {
 		const approach = Math.hypot(entry.x - point.x, entry.y - point.y);
 		if (point.x < 2 || point.x > 92 || point.y < 3 || point.y > 47 ||
-			(point.x - 47) * direction < 7 || approach > 8 || (approach > 0 && approach < 3)) {
+			(point.x - 47) * direction < 7 || approach > 8 || (approach > 0 && approach < 3) ||
+			isInOffensiveLane(point, direction)) {
 			return Infinity;
 		}
 		return Math.hypot(point.x - origin.x, point.y - origin.y) + approach * 0.25 +
@@ -1068,10 +1081,18 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 	scene.matchupPlanId = state.formation.id;
 	scene.formation = state.formation;
 	planReceivingEntry(state, scene, direction);
-	const entry = scene.stagedEntry ?? scene.shotEntry;
+	const entry = scene.stagedEntry ?? scene.waitingEntry ?? scene.shotEntry;
 	if (!restart && !changed && !state.needsAdvance && carrier) {
 		if (scene.shotEntry) {
 			Object.assign(state.positions[scene.action.personId], entry);
+		}
+		if (scene.liveSeconds > 3 && !scene.immediateReboundFinish) {
+			scene.laneExits = lineup.filter((id) => isInOffensiveLane(state.positions[id], direction)).map((id) => {
+				const from = { ...state.positions[id] };
+				const target = getLaneWaitingPoint(from, direction);
+				Object.assign(state.positions[id], target);
+				return { id, from, ...target, startAt: null };
+			});
 		}
 		for (const [defender, attacker] of Object.entries(matchups)) {
 			const target = state.positions[attacker];
@@ -1080,7 +1101,12 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 				y: target.y + (25 - target.y) * 0.09,
 			});
 		}
+		const startAt = scene.frames.at(-1).time;
 		record(0.01);
+		for (const move of scene.laneExits ?? []) {
+			move.startAt = startAt;
+			move.duration = scene.frames.at(-1).time - startAt;
+		}
 		return;
 	}
 	const destinations = newAttack ? state.formation.slots : lineup.map((id) => {
@@ -1190,12 +1216,14 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 function preparationPosition(state, scene, id, time) {
 	const arrival = scene.arrivalMove?.id === id ? scene.arrivalMove : null;
 	const move = arrival ?? (scene.reboundMove?.id === id ? scene.reboundMove : null) ??
+		scene.laneExits?.find((move) => move.id === id && time <= move.startAt + move.duration) ??
 		scene.spacingMoves?.find((move) => move.id === id && move.duration);
 	if (!move) {
 		return state.positions[id];
 	}
 	const progress = Math.max(0, Math.min(1, (time - move.startAt) / move.duration));
-	const fraction = move === scene.reboundMove ? progress * progress * (3 - 2 * progress) : progress;
+	const fraction = move === scene.reboundMove || scene.laneExits?.includes(move)
+		? progress * progress * (3 - 2 * progress) : progress;
 	return { x: move.from.x + (move.x - move.from.x) * fraction, y: move.from.y + (move.y - move.from.y) * fraction };
 }
 
@@ -1222,6 +1250,9 @@ function relocatePasser(state, scene, id, receiver, time, remaining) {
 		["PG", "SG", "G", "G-F"].includes(position), scene.formation.backcourt);
 	const defenders = Object.keys(scene.matchups).map((id) => local(state.positions[id]));
 	const score = ([px, py]) => {
+		if (!scene.formation.backcourt && isInOffensiveLane({ x: px, y: py }, 1)) {
+			return Infinity;
+		}
 		if (px < (scene.formation.backcourt ? 2 : 54) || px > (scene.formation.backcourt ? 45 : 92) || py < 3 || py > 47) {
 			return Infinity;
 		}
@@ -1519,14 +1550,15 @@ function pacePreparation(state, scene, time, finishDuration, record, direction) 
 	scene.preparationWait = Math.max(0, budget - elapsed - finishDuration);
 	if (scene.stagedEntry) {
 		const player = state.positions[scene.action.personId];
-		const distance = Math.hypot(scene.shotEntry.x - player.x, scene.shotEntry.y - player.y);
+		const target = scene.waitingEntry ?? scene.shotEntry;
+		const distance = Math.hypot(target.x - player.x, target.y - player.y);
 		const duration = Math.max(0.8, distance / 5);
 		if (scene.preparationWait >= duration + 0.5) {
 			scene.arrivalMove = { id: scene.action.personId, from: { ...player },
-				x: scene.shotEntry.x, y: scene.shotEntry.y, duration,
+				x: target.x, y: target.y, duration,
 				startAt: time + scene.preparationWait - duration - 0.15 };
 		} else {
-			Object.assign(player, scene.shotEntry);
+			Object.assign(player, target);
 			record(duration, true);
 			time += duration;
 			scene.preparationWait = Math.max(0, scene.preparationWait - duration);
@@ -1538,6 +1570,18 @@ function pacePreparation(state, scene, time, finishDuration, record, direction) 
 		scene.preparationWait = Math.max(scene.preparationWait, scene.reboundMove.duration + 0.15);
 	}
 	scene.preparationAt = time;
+	if (scene.shotPoint && scene.preparationWait > 0.5) {
+		scene.laneExits ??= [];
+		scene.laneExits.push(...state.lineups[scene.attackTeam].filter((id) =>
+			id !== scene.arrivalMove?.id && id !== scene.reboundMove?.id && id !== scene.continuationMove?.playerId &&
+			isInOffensiveLane(state.positions[id], direction)
+		).map((id) => {
+			const from = { ...state.positions[id] };
+			const target = getLaneWaitingPoint(from, direction);
+			return { id, from, ...target, startAt: time,
+				duration: Math.max(0.3, Math.hypot(target.x - from.x, target.y - from.y) * 1.5 / 8) };
+		}));
+	}
 	const spacingMoves = scene.spacingMoves ?? [];
 	// A staged receiving entry may already have completed a small spacing adjustment.
 	for (let i = spacingMoves.length - 1; i >= 0; i--) {
@@ -1596,6 +1640,7 @@ function pacePreparation(state, scene, time, finishDuration, record, direction) 
 			y: Math.max(3, Math.min(47, origin.y + side * 4 * scale)),
 		})).find((point) =>
 			Math.hypot(point.x - carrier.x, point.y - carrier.y) >= 1 &&
+			!isInOffensiveLane(point, direction) &&
 			occupied.every((other) =>
 				[0.25, 0.5, 0.75, 1].every((fraction) =>
 					Math.hypot(
@@ -1637,6 +1682,14 @@ function planReboundSetup(state, scene, rebounderId, continuation, direction) {
 	const occupied = state.lineups[scene.attackTeam].filter((id) => id !== rebounderId)
 		.map((id) => state.positions[id]);
 	occupied.push(scene.shotPoint, scene.shotEntry ?? scene.shotPoint);
+	if (scene.waitingEntry) {
+		occupied.push(scene.waitingEntry);
+	}
+	for (const point of [...occupied]) {
+		if (isInOffensiveLane(point, direction)) {
+			occupied.push(getLaneWaitingPoint(point, direction));
+		}
+	}
 	const passer = state.positions[scene.action.assistPersonId ?? state.ball.owner];
 	const lane = [passer, scene.shotEntry ?? scene.shotPoint];
 	if (continuation) {
@@ -1646,6 +1699,9 @@ function planReboundSetup(state, scene, rebounderId, continuation, direction) {
 	for (const radius of [8, 10, 12]) {
 		for (let angle = -Math.PI / 2; angle <= Math.PI / 2; angle += Math.PI / 12) {
 			const target = { x: hoop.x - direction * Math.cos(angle) * radius, y: hoop.y + Math.sin(angle) * radius };
+			if (isInOffensiveLane(target, direction)) {
+				continue;
+			}
 			const dx = target.x - from.x;
 			const dy = target.y - from.y;
 			const length = Math.hypot(dx, dy);
@@ -1934,6 +1990,14 @@ function compileScene(replay, scene, index, state, data) {
 			Object.assign(state.positions[scene.reboundMove.id],
 				preparationPosition(state, scene, scene.reboundMove.id, time + delay));
 		}
+		if (scene.releaseAt === undefined) {
+			for (const move of scene.laneExits ?? []) {
+				if (move.startAt !== null && time < move.startAt + move.duration &&
+					(move.id !== action.personId || scene.approachAt === undefined)) {
+					Object.assign(state.positions[move.id], preparationPosition(state, scene, move.id, time + delay));
+				}
+			}
+		}
 		const continuation = scene.continuationMove;
 		if (continuation) {
 			const fraction = Math.max(0, Math.min(1, (time + delay - continuation.startAt) / continuation.duration));
@@ -1996,6 +2060,9 @@ function compileScene(replay, scene, index, state, data) {
 		scene.driveStart = getDriveStart(scene, shot, hoop, direction);
 		if (scene.kind !== "heave" && !scene.shotStyle.tip && !scene.shotStyle.putback) {
 			scene.shotEntry = getShotEntry(scene, shot, hoop, direction);
+			if (scene.liveSeconds > 3 && !scene.immediateReboundFinish) {
+				scene.waitingEntry = getLaneWaitingPoint(scene.shotEntry, direction);
+			}
 		}
 		const continuation = planContinuation(replay, scene, state.lineups[offense], direction);
 		prepareAttack(state, scene, offense, direction, matchups, recordMovement, data, replay, index);

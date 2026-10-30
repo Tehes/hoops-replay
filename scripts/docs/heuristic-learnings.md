@@ -31,3 +31,28 @@ Reale Spiele kommen vom Server; IDs bezeichnen Vergleichsfälle, keine unveränd
 jedoch die Endposition der Szene. Eine Abschlussprüfung muss die Landung am Wurfende beurteilen,
 nicht erst nach der Folgebewegung. Dieser Messfehler wurde vor dem Outlet-Vergleich korrigiert;
 die Bewegungsheuristik wurde dafür nicht geändert.
+
+## Offensive Zone: Warten und Anspielen unterscheiden
+
+- **Ursache:** Innenpositionen und spätere Abschlusspositionen wurden bereits während des langen
+  Aufbaus besetzt. Die komprimierte Replay-Dauer verdeckte Aufenthalte über drei Spielsekunden.
+- **Grundlage:** [NBA Rule 10, Section VI](https://official.nba.com/rule-no-10-violations-and-penalties/)
+  und [WNBA 2026 Rule 10, Section VI](https://cdn.wnba.com/sites/4/2026/05/2026-WNBA-Official-Rule-Book.pdf).
+  Kurzes Anspielen in der Zone ist zulässig; Schussbewegungen und unmittelbares Verlassen brauchen
+  eine eigene Beurteilung. Ein späterer Abschluss erlaubt kein beliebig langes vorheriges Warten.
+- **Hebel:** Warte-, Passfolge- und Rebound-Vorbereitungsziele außerhalb der Zone wählen. Spätere
+  Innenschützen warten bei längeren Angriffen außerhalb und gehen erst zur Abschlussbewegung hinein.
+  Bestehende Innenpositionen nach zweiten Chancen dürfen sich direkt zum nächsten Rand lösen.
+- **Geschützt:** Aufgezeichnete Wurfkoordinaten, Akteure, Uhren und Ergebnisse, kurze Innenzuspiele,
+  direkte Abschlüsse und Tip-ins/Putbacks. Keine neuen Pfiffe oder Statistikereignisse.
+- **Evidenz und Entscheidung:** Im Vergleich derselben einmal geladenen 20 Server-Spiele wurden
+  lange Aufenthalte in der Vorbereitung deutlich seltener; die Quelldaten blieben unverändert.
+  Der abschließende Standardbatch besteht die gemeinsame Prüfung. Die vorhandenen Einzelprüfungen
+  bestehen ebenfalls; Wartepositions-Anker und direktes Freimachen werden dabei ausdrücklich
+  von Abschlussankern und gewöhnlichen kleinen Positionskorrekturen unterschieden.
+  Chrome MCP auf `127.0.0.1:5500`: `0022600007`, Aktion 45, zeigt den Weg von außen zum Innenzuspiel.
+  Als begrenzte Verbesserung beibehalten, verbleibende Diagnosekandidaten weiter beurteilen.
+- **Grenze:** Die unabhängige Diagnose meldet Aufenthalte im offensiven Aufbau in Spielsekunden.
+  Ihre Prüfkandidaten sind keine bewiesenen Regelverstöße: Sie kennt Körperpositionen statt Füßen,
+  noch keine vollständigen Ausnahmen und keine Kontinuität über Szenengrenzen. Ein Zonenverbot
+  oder bloßes Verkürzen der Replay-Dauer wäre fachlich falsch.
