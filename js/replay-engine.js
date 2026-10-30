@@ -1411,11 +1411,16 @@ function animateOutOfBoundsPass(state, scene, direction, record) {
 		const dx = receiver.x + 1 - origin.x;
 		const dy = receiver.y + 0.8 - origin.y;
 		const distance = Math.hypot(dx, dy);
+		if (distance <= 2.8) {
+			continue;
+		}
+		// Offset the aim point so the pass line, not just its endpoint, clears the hand by 2.8 feet.
+		const lateral = 2.8 * distance / Math.sqrt(distance ** 2 - 2.8 ** 2);
 		for (const side of [-1, 1]) {
 			// Miss the receiving hand laterally, then continue along the same pass line.
 			const near = {
-				x: receiver.x + 1 - dy / distance * side * 2.8,
-				y: receiver.y + 0.8 + dx / distance * side * 2.8,
+				x: receiver.x + 1 - dy / distance * side * lateral,
+				y: receiver.y + 0.8 + dx / distance * side * lateral,
 			};
 			const vx = near.x - origin.x;
 			const vy = near.y - origin.y;
@@ -1423,6 +1428,9 @@ function animateOutOfBoundsPass(state, scene, direction, record) {
 				vx > 0 ? (95 - origin.x) / vx : vx < 0 ? (-1 - origin.x) / vx : Infinity,
 				vy > 0 ? (51 - origin.y) / vy : vy < 0 ? (-1 - origin.y) / vy : Infinity,
 			);
+			if (scale <= distance ** 2 / (vx ** 2 + vy ** 2)) {
+				continue;
+			}
 			const target = { x: origin.x + vx * scale, y: origin.y + vy * scale, z: 0 };
 			const length = Math.hypot(vx, vy) * scale;
 			let cost = distance + (length - distance) * 0.8 + Math.max(0, distance - 32) * 3;
@@ -1782,6 +1790,54 @@ function returnToCourt(state, record) {
 	}
 	state.breakPositions = null;
 	record(2);
+}
+
+function planJumpBall(action, state, data) {
+	const winnerTeam = action.jumpBallWonPersonId
+		? state.players.find((player) => player.id === action.jumpBallWonPersonId).teamId
+		: action.jumpBallLostPersonId
+		? otherTeam(data, state.players.find((player) => player.id === action.jumpBallLostPersonId).teamId)
+		: action.teamId;
+	const centerFor = (teamId) =>
+		state.lineups[teamId].find((id) =>
+			state.players.find((player) => player.id === id).position.split("-").includes("C")
+		) ?? state.lineups[teamId][4];
+	const winnerId = action.jumpBallWonPersonId ?? centerFor(winnerTeam);
+	const loserId = action.jumpBallLostPersonId ?? centerFor(otherTeam(data, winnerTeam));
+	const start = action.descriptor === "startperiod" ||
+		((action.period === 1 || action.period > 4) &&
+			clockSeconds(action.clock) === (action.period > 4 ? 300 : getLeague(data.gameId).periodSeconds));
+	const local = !start && !["doubleviolation", "lodgedball", "challenge"].includes(action.descriptor);
+	const recordedPosition = Number.isFinite(action.x) && Number.isFinite(action.y);
+	const holder = state.positions[state.ball.owner];
+	const originX = recordedPosition ? action.x * 0.94 : holder ? holder.x + 1 : state.ball.x;
+	const center = {
+		x: local
+			? [19, 47, 75].reduce((closest, x) => Math.abs(x - originX) < Math.abs(closest - originX) ? x : closest)
+			: 47,
+		y: 25,
+	};
+	const receiverId = action.jumpBallRecoverdPersonId ?? state.lineups[action.teamId]
+		.filter((id) => id !== winnerId && id !== loserId)
+		.reduce((closest, id) =>
+			Math.hypot(state.positions[id].x - center.x, state.positions[id].y - center.y) <
+					Math.hypot(state.positions[closest].x - center.x, state.positions[closest].y - center.y)
+				? id
+				: closest
+		);
+	return {
+		winnerId,
+		loserId,
+		receiverId,
+		center,
+		direction: attackDirection(data, winnerTeam, action.period),
+		winnerSource: action.jumpBallWonPersonId ? "recorded" : "schematic",
+		loserSource: action.jumpBallLostPersonId ? "recorded" : "schematic",
+		receiverSource: action.jumpBallRecoverdPersonId ? "recorded" : "schematic",
+		positionSource: local
+			? recordedPosition ? "recorded-nearest-circle" : "schematic-nearest-circle"
+			: "center-circle",
+	};
 }
 
 function compileScene(replay, scene, index, state, data) {
@@ -2303,21 +2359,48 @@ function compileScene(replay, scene, index, state, data) {
 		}
 		record(0.7);
 	} else if (scene.kind === "jumpball") {
-		const center = action.descriptor === "heldball"
-			? { x: Math.max(6, Math.min(88, state.ball.x)), y: Math.max(6, Math.min(44, state.ball.y)) }
-			: { x: 47, y: 25 };
-		Object.assign(state.positions[action.jumpBallWonPersonId], { x: center.x - 2, y: center.y });
-		Object.assign(state.positions[action.jumpBallLostPersonId], { x: center.x + 2, y: center.y });
-		state.ball = { ...center, z: 5, owner: null };
-		record(0.6);
+		const plan = planJumpBall(action, state, data);
+		scene.jumpBallPlan = plan;
+		const { center, winnerId, loserId, receiverId } = plan;
+		for (const [slot, id] of Object.values(state.lineups).flat().entries()) {
+			const player = state.positions[id];
+			if (id === winnerId || id === loserId) {
+				Object.assign(player, { x: center.x + (id === winnerId ? 2 : -2) * plan.direction, y: center.y });
+			} else {
+				const distance = Math.hypot(player.x - center.x, player.y - center.y);
+				if (distance < 7.5) {
+					const angle = distance > 0 ? Math.atan2(player.y - center.y, player.x - center.x) : slot * Math.PI / 4;
+					Object.assign(player, { x: center.x + Math.cos(angle) * 7.5, y: center.y + Math.sin(angle) * 7.5 });
+				}
+			}
+		}
+		state.ball = { ...center, z: 0, owner: null };
+		recordMovement(0.4);
+		plan.tossAt = time;
+		flyBall(state, record, { ...center, z: 4.2 }, 0.2, 0.5);
+		state.positions[winnerId].jump = 1;
+		state.positions[loserId].jump = 0.8;
+		record(0.12);
+		plan.tipAt = time;
+		scene.liveAt = time;
 		addMarker(replay, scene, time, "jumpball", center);
-		state.ball.z = 1;
-		record(0.4);
-		scene.eventAt = time;
-		state.ball.owner = action.jumpBallRecoverdPersonId;
+		// A named jumper may recover only after the tip has touched the floor or another player.
+		if (receiverId === winnerId || receiverId === loserId) {
+			flyBall(state, record, { x: center.x + plan.direction * 3, y: center.y, z: 0 }, 0.2, 0.35);
+		}
+		const receiver = state.positions[receiverId];
+		flyBall(state, record, { x: receiver.x + 1, y: receiver.y + 0.8, z: 0.5 }, 0.5,
+			Math.max(0.4, Math.hypot(receiver.x - center.x, receiver.y - center.y) / 35), 0, (progress) => {
+				state.positions[winnerId].jump = 1 - progress;
+				state.positions[loserId].jump = 0.8 * (1 - progress);
+			});
+		state.ball.owner = receiverId;
 		state.possession = action.teamId;
 		state.restart = null;
 		state.needsAdvance = true;
+		record(0.01);
+		scene.eventAt = time;
+		plan.catchAt = time;
 		replay.attacks.push(scene.start);
 		record(0.5);
 	} else {
@@ -2410,11 +2493,14 @@ export function compileReplay(data) {
 		});
 	}
 	const tip = data.actions.find((action) => action.actionType === "jumpball");
-	Object.assign(state.positions[tip.jumpBallWonPersonId], { x: 45, y: 25 });
-	Object.assign(state.positions[tip.jumpBallLostPersonId], { x: 49, y: 25 });
-	for (const id of Object.values(lineups).flat()) {
-		if (id !== tip.jumpBallWonPersonId && id !== tip.jumpBallLostPersonId && state.positions[id].y === 25) {
-			state.positions[id].y = 37;
+	if (tip) {
+		const plan = planJumpBall(tip, state, data);
+		Object.assign(state.positions[plan.winnerId], { x: 47 + plan.direction * 2, y: 25 });
+		Object.assign(state.positions[plan.loserId], { x: 47 - plan.direction * 2, y: 25 });
+		for (const id of Object.values(lineups).flat()) {
+			if (id !== plan.winnerId && id !== plan.loserId && state.positions[id].y === 25) {
+				state.positions[id].y = 37;
+			}
 		}
 	}
 	const replay = {

@@ -314,6 +314,22 @@ Die aktuelle Engine bündelt mehrere Verantwortlichkeiten des Zielbilds; die zus
   Übrige Spielereignisse und Wechselgruppen behalten ihre relative Reihenfolge.
   Widersprüchliche Abhängigkeiten lassen die ursprüngliche Gruppe unverändert; es wird nicht über
   Uhr- oder Periodengrenzen umgeordnet. Originalfelder und Rohdaten bleiben erhalten.
+- Sprungbälle verwenden genannte Springer und Fänger. Fehlende Springer werden aus der aktiven
+  Aufstellung ergänzt: bevorzugt Spieler mit C-Position, andernfalls der aktuelle C-Slot.
+  Fehlt nur ein Springer, bestimmt der genannte Gegner die Teamzuordnung. Ein fehlender Fänger
+  wird als nächstgelegener aktiver Nicht-Springer des belegten Gewinnerteams ergänzt.
+  Ergänzungen stehen mit Herkunft in `scene.jumpBallPlan`; Originalereignisse und Statistiken
+  bleiben unverändert. Eröffnung, Overtime, `doubleviolation`, `lodgedball` und `challenge`
+  verwenden den Mittelkreis. Andere Ereignisse verwenden den zum verfügbaren Ort nächstgelegenen
+  Kreis (x 19, 47 oder 75, y 25); ohne Feed-Koordinaten dient die vorherige schematische Ballposition.
+  Bei unbekanntem Descriptor ist diese Kreiswahl eine Annahme, keine rekonstruierte Entscheidung.
+  Beide Springer stellen sich auf, die übrigen Spieler bleiben vor dem Tipp außerhalb des Kreises.
+  Hochwurf, Sprung, Tipp und Fang werden animiert; Aufbauzeit vor dem Tipp verbraucht keine
+  zusätzliche Spielzeit. Ein als Fänger genannter Springer erhält vorher einen schematischen
+  Bodenkontakt des Balls. Das Ergebnis bleibt beim im Feed belegten Team.
+  Grundlage: Rule 6, Sections V–VII in [NBA Rules](https://official.nba.com/rule-no-6-putting-ball-in-play-live-dead-ball/)
+  und [WNBA 2026](https://cdn.wnba.com/sites/4/2026/05/2026-WNBA-Official-Rule-Book.pdf#page=35).
+  Die Zuordnung unbekannter Ereignistypen und alle Sonderfolgen sind damit nicht vollständig modelliert.
 - Wechselketten verändern zuerst die Slots; animiert wird nur der Unterschied zwischen ursprünglicher
   und endgültiger Aufstellung. Eingewechselte Spieler übernehmen Position und Matchup ihres Vorgängers.
 - Formationen entstehen aus bisherigen Positionen und dem nächsten belegten Wurf oder Wurffoul.
@@ -356,7 +372,9 @@ Die aktuelle Engine bündelt mehrere Verantwortlichkeiten des Zielbilds; die zus
   Team-Rebounds erfinden keinen individuellen Fänger.
 - Steals erhalten einen Zugang zum Ball beziehungsweise zu einer plausiblen Passlinie; Besitz
   wechselt beim Fang. Fehlpässe ins Aus fliegen knapp an einem aktiven Mitspieler vorbei über
-  die Außenlinie. Empfänger, Passweg und Abprallorte sind schematisch.
+  die Außenlinie. Der Abstand zur Empfangshand wird an der Fluggeraden berechnet;
+  zu nahe Empfänger und Flugrichtungen, die vor der Empfangsstation ins Aus führen, scheiden aus.
+  Empfänger, Passweg und Abprallorte sind schematisch.
 - Timeouts einschließlich Challenges und Periodenenden führen beide Teams schematisch an den
   Rand. Wechsel während der Unterbrechung bleiben erhalten; die aktuelle Aufstellung kehrt vor
   der nächsten Spielaktion zurück. Nach Spielende bleiben die Teams außerhalb.
@@ -600,7 +618,12 @@ Details der OKLab-Schwellen und Auswahlreihenfolge sind in `replay-colors.js` un
 Der gemeinsame Replay-Audit läuft mit Serverdaten über
 [scripts/audit-replays.js](scripts/audit-replays.js). Er prüft unter anderem End- und Zwischenstände,
 Repräsentation der Ereignisse, aktive Aufstellungen, Ballbesitzer, endliche Koordinaten,
-Wurf-/Reboundverhalten und interpolierte Zustände. Die vorhandenen Einzelprüfungen in
+Wurf-/Reboundverhalten und interpolierte Zustände. Formationserhalt nach Offensivrebound wird
+nur bei einer ununterbrochenen Live-Fortsetzung des verknüpften Wurfs mit vorhandener Formation
+verlangt. Ein als `deadball` erfasster Team-Rebound nach einer Strafe erfordert diesen Erhalt nicht.
+Nach Flagrant-Freiwürfen ist der anschließende Einwurf zulässig; Grundlage ist für die WNBA
+[Rule 12B, Section IV des Regelwerks 2026](https://cdn.wnba.com/sites/4/2026/05/2026-WNBA-Official-Rule-Book.pdf#page=60).
+Die vorhandenen Einzelprüfungen in
 [replay-data_test.js](scripts/replay-data_test.js) laden ihre realen Ausgangsspiele ebenfalls vom
 Server; [replay-motion_test.js](scripts/replay-motion_test.js) und
 [replay-colors_test.js](scripts/replay-colors_test.js) benötigen keine Spieldateien.

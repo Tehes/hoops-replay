@@ -275,11 +275,14 @@ export function checkReplay(data, replay = compileReplay(data)) {
 		if (scene.formation) {
 			check(scene.formation.offense === scene.attackTeam, `${id} formation offense ${scene.action.actionNumber}`);
 		}
-		if (scene.kind === "rebound" && scene.action.subType === "offensive") {
-			const previous = replay.scenes.slice(0, index).findLast((item) => item.formation);
+		if (
+			scene.kind === "rebound" && scene.action.subType === "offensive" && scene.reboundContinuous &&
+			!scene.action.qualifiers?.includes("deadball")
+		) {
+			const previous = replay.scenes[scene.reboundShotIndex];
 			const next = replay.scenes[index + 1];
 			if (
-				previous?.formation.offense === scene.action.teamId && next?.formation &&
+				previous?.formation?.offense === scene.action.teamId && next?.formation &&
 				next.action.period === scene.action.period
 			) {
 				check(
