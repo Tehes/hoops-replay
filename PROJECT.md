@@ -560,6 +560,7 @@ Wichtige Datenregeln:
   lassen den Start bei null; die URL wird während der Wiedergabe nicht fortgeschrieben.
 - Der Fußtext erklärt belegte Eckpunkte, schematische Ergänzungen und verdichtete Zeit.
   Uniformen, Formationen und Laufwege werden nicht als gemessene Originale ausgegeben.
+- Darunter verlinken lokale GitHub- und Threads-Icons ohne sichtbaren Text die Profile von Tehes.
 - Runtime-Pfade bleiben relativ und GitHub-Pages-kompatibel. Es gibt keinen aktiven Service Worker
   oder Offline-Cache. Umami erfasst bestehende Seitenaufrufe auf `tehes.github.io`, keine neuen Events.
 
