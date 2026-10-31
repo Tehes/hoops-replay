@@ -1264,12 +1264,32 @@ function relocatePasser(state, scene, id, receiver, time, remaining) {
 	const target = findOpenSpace([x, y], occupied, lane, false,
 		["PG", "SG", "G", "G-F"].includes(position), scene.formation.backcourt);
 	const defenders = Object.keys(scene.matchups).map((id) => local(state.positions[id]));
+	const routeSamples = [0.25, 0.5, 0.75, 1].map((fraction) => ({
+		fraction,
+		teammates: state.lineups[scene.attackTeam].filter((other) => other !== id).map((other) => ({
+			point: local(preparationPosition(state, scene, other, time + remaining * fraction)),
+			clearance: Math.min(3, Math.hypot(origin.x - state.positions[other].x, origin.y - state.positions[other].y)),
+		})),
+	}));
 	const score = ([px, py]) => {
 		if (!scene.formation.backcourt && isInOffensiveLane({ x: px, y: py }, 1)) {
 			return Infinity;
 		}
 		if (px < (scene.formation.backcourt ? 2 : 54) || px > (scene.formation.backcourt ? 45 : 92) || py < 3 || py > 47) {
 			return Infinity;
+		}
+		for (const route of routeSamples) {
+			const ax = x + (px - x) * route.fraction;
+			const ay = y + (py - y) * route.fraction;
+			if (
+				(!scene.formation.backcourt && isInOffensiveLane({ x: ax, y: ay }, 1)) ||
+				route.teammates.some(({ point, clearance }) =>
+					Math.hypot(ax - point[0], ay - point[1]) < clearance - 0.01) ||
+				defenders.some(([ox, oy]) =>
+					Math.hypot(ax - ox, ay - oy) < Math.min(2, Math.hypot(x - ox, y - oy)) - 0.01)
+			) {
+				return Infinity;
+			}
 		}
 		let cost = Math.hypot(px - x, py - y) * 0.2;
 		for (const [ox, oy] of occupied) {
@@ -1289,7 +1309,8 @@ function relocatePasser(state, scene, id, receiver, time, remaining) {
 		}
 		return cost;
 	};
-	const options = [target, [x, y - 5], [x, y + 5], [x - 4, y - 3], [x - 4, y + 3]].map(([px, py]) => {
+	const options = [target, [x, y - 5], [x, y + 5], [x - 4, y - 3], [x - 4, y + 3],
+		[x + 4, y - 3], [x + 4, y + 3]].map(([px, py]) => {
 		const fraction = Math.min(1, 6 / (Math.hypot(px - x, py - y) || 1),
 			remaining * 4 / (Math.hypot(px - x, py - y) || 1));
 		return [x + (px - x) * fraction, y + (py - y) * fraction];

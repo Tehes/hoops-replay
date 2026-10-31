@@ -123,3 +123,29 @@ Körpermittelpunkte, keine Füße. Ein laufender Spieler erhält keine pauschale
   geschützte Innenzuspiel `0022600007`:45. Die verbleibende Auslaufmeldung ist fachlich beurteilt;
   defensive drei Sekunden und eine vollständige Fuß-/Regelausnahmen-Erkennung bleiben außerhalb
   dieser Iteration.
+
+## Kurzer diagonaler Freilauf nach einem Pass
+
+- **Grundlage:** [WABC Level 1](https://assets.fiba.basketball/image/upload/documents-corporate-wabc-coaching-level-manuals-level-1-eng.pdf),
+  Team 2.1.1, „Basic Floor Spacing – Pass and Cut / Give and Go“: Nach einem Pass auf Mitspieler und
+  Verteidiger reagieren und eine neue Anspielmöglichkeit schaffen. Die Trainingsformation wird
+  nicht als tatsächlich gespieltes NBA-/WNBA-Set übernommen.
+- **Befund und Hebel:** Die lokalen Optionen der Passgeber-Relokation waren überwiegend seitlich
+  oder rückwärts gerichtet. Zwei kurze diagonale Vorwärtsoptionen ergänzen die vorhandene Auswahl.
+  Sie werden nur gewählt, wenn ihre bestehende Spacing-/Passlinienbewertung das Halten verbessert.
+  Vier Zwischenpunkte prüfen den Weg gegen geplante Mitspielerpositionen, aktuelle Verteidiger und
+  die Zone. Vorhandene enge Ausgangsabstände dürfen dabei nicht weiter unterschritten werden.
+- **Geschützt:** Aufgezeichnete Beteiligte, Abschlussorte, Uhren und Ergebnisse; maximal sechs Fuß
+  Relokation im vorhandenen Zeitfenster. Schütze, Assistent, Innenrolle, Rebound-Vorbereitung und
+  vorausgeplanter Folgeempfänger werden weiterhin nicht zusätzlich versetzt. Keine neuen PbP-Pässe,
+  Assists oder Rückpässe; ruhige freie Stationen bleiben möglich.
+- **Vergleich:** Auf denselben einmal geladenen 20 Server-Spielen bleiben die zwölf bisherigen
+  Passgeber-Relokationen unverändert. Hinzu kommt ein diagonaler Vorwärtsweg in `1022600147`,
+  Aktion 44, Lexi Held: von (68, 45) nach (72, 42), fünf Fuß Weg in rund 2,48 Replay-Sekunden. Die abgetastete
+  Bewegung hält über elf Fuß Abstand zu Mitspielern und über vier Fuß zu Verteidigern. Keine
+  zusätzlichen Zonenmeldungen oder Validierungsfehler; die vorhandenen Einzelprüfungen bestehen.
+  Chrome MCP bestätigt den Freilauf nach der Ballabgabe und unverändertes Seeking an dieser Aktion.
+- **Entscheidung und Grenze:** Als kleine Erweiterung beibehalten. Ein zusätzlicher Fall im Batch
+  belegt noch keine breit verbesserte Angriffschoreografie. Es handelt sich um einen kurzen
+  Freilauf, keinen vollständigen Pass-and-Cut-/Give-and-Go-Ablauf. Statische Verteidigerpositionen,
+  vier Planungsstichproben und ergänzende Abtastung ersetzen keine durchgängige Kollisionsprüfung.

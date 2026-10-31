@@ -108,7 +108,7 @@ und dokumentiert nur den jeweils benannten Teil der Umsetzung.
 | Begrenzte Zeit in der eigenen Hälfte | NBA Rule 10, Section VIII; WNBA 2026 Rule 10, Section VIII | Ereignisuhren sind Anker; eine vollständige Acht-Sekunden-Prüfung fehlt |
 | Seitlicher Outlet und bewegter Fang | WABC Level 1, Team 2.3.1, „Basic Fast Break – Starting the Break“ | Bei ununterbrochenen Defensivrebound-Aufbauten ohne Zeitdruck werden seitliche Empfangspunkte und ein Fang in Bewegung geplant; keine Rekonstruktion des tatsächlichen Passes |
 | Mitspieler laufen früh in breite Bahnen | WABC Level 1, Team 2.3.2, „Basic Fast Break – Running Wide Lanes“ | Bestehende Vorlaufphasen und breite Flügelbahnen sind vorhanden; die Bahnwahl und Pass-voraus-Entscheidung sind noch kein vollständig quellenbasiertes Modell |
-| Raum für Ball und nächste Aktion schaffen | WABC Level 1, Team 2.1.1, „Basic Floor Spacing – Pass and Cut / Give and Go“ | Bestehende Abstands-/Korridorplanung ist vorhanden; die Trainingsformation wird nicht pauschal als tatsächlich gespieltes Set übernommen |
+| Raum für Ball und nächste Aktion schaffen | WABC Level 1, Team 2.1.1, „Basic Floor Spacing – Pass and Cut / Give and Go“ | Kurze Passgeber-Freiläufe vergleichen auch diagonale Vorwärtsoptionen mit Laufwegprüfung; kein vollständiges Pass-and-Cut-/Give-and-Go-Modell und keine Übernahme der Trainingsformation als tatsächlich gespieltes Set |
 | Aufenthalte in der Zone regelabhängig begrenzen | NBA Rule 10, Sections VI–VII; WNBA 2026 Rule 10, Sections VI–VII | Offensive Wartepositionen außerhalb der Zone; Diagnose der offensiven Wurfvorbereitung. Vollständige Ausnahmen und defensive Bedingungen offen |
 
 Quellen: [NBA Rule 10](https://official.nba.com/rule-no-10-violations-and-penalties/),
@@ -380,6 +380,12 @@ nur Zonengeometrie, keinen allgemeinen Regelzustand.
   werden teilweise vorausgeplant. Passfolgen werden deterministisch verglichen. Ohne geeignete
   Verbindung bleibt eine kurze Dribbelsondierung mit Haltephase möglich; höchstens zwei freie
   Angreifer korrigieren ihr Spacing in der Vorbereitung.
+  Nach einem schematischen Pass kann ein freier Passgeber auch kurz diagonal Richtung Korb
+  freilaufen. Die Auswahl behält die bestehende Grenze von sechs Fuß und das verfügbare Zeitfenster
+  bei. Vier Zwischenpunkte prüfen geplante Mitspielerpositionen, aktuelle Verteidiger und die Zone;
+  eine bereits freie Station darf halten. Diese begrenzte Relokation erzeugt keinen zusätzlichen
+  Rückpass und ist kein vollständiger Korb-Cut. Verteidiger werden dafür nicht vorausberechnet;
+  die Stichproben garantieren keine durchgehende Kollisionsfreiheit der dargestellten Routen.
 - Routen werden aus Szenenankern geplant: Gerade, Perimeterbogen oder ein einfacher Ausweichbogen.
   Ein späterer Start kann Kreuzungen entzerren. Wege bleiben beim Seeking unverändert; ruhende
   Spieler werden nicht durch nachträgliche Abstoßung verschoben.
