@@ -58,6 +58,7 @@ const actionDisplay = document.querySelector(".action-display");
 const actionPhoto = document.querySelector("#action-photo");
 const actionPlayer = document.querySelector("#action-player");
 const actionDescription = document.querySelector("#action-description");
+const jerseyKey = document.querySelector(".jersey-key");
 
 /* --------------------------------------------------------------------------------------------------
 Court and player drawing
@@ -225,6 +226,25 @@ function resizeCourt() {
 	render();
 }
 
+function drawJersey(context, colors) {
+	context.beginPath();
+	context.moveTo(-0.6, -2.2);
+	context.lineTo(-1.25, -2.05);
+	context.quadraticCurveTo(-0.95, -0.8, -1.45, -0.3);
+	context.lineTo(-1.4, 2.2);
+	context.lineTo(1.4, 2.2);
+	context.lineTo(1.45, -0.3);
+	context.quadraticCurveTo(0.95, -0.8, 1.25, -2.05);
+	context.lineTo(0.6, -2.2);
+	context.bezierCurveTo(0.6, -1.25, -0.6, -1.25, -0.6, -2.2);
+	context.closePath();
+	context.fillStyle = colors.shirt;
+	context.fill();
+	context.lineWidth = 0.16;
+	context.strokeStyle = colors.trim;
+	context.stroke();
+}
+
 function drawPlayer(position) {
 	const player = playerById.get(position.id);
 	const colors = jerseyByTeamId.get(player.teamId);
@@ -239,22 +259,7 @@ function drawPlayer(position) {
 	ctx.fill();
 	ctx.translate(0, -position.jump * 0.65);
 	ctx.rotate(position.angle);
-	ctx.beginPath();
-	ctx.moveTo(-0.6, -2.2);
-	ctx.lineTo(-1.25, -2.05);
-	ctx.quadraticCurveTo(-0.95, -0.8, -1.45, -0.3);
-	ctx.lineTo(-1.4, 2.2);
-	ctx.lineTo(1.4, 2.2);
-	ctx.lineTo(1.45, -0.3);
-	ctx.quadraticCurveTo(0.95, -0.8, 1.25, -2.05);
-	ctx.lineTo(0.6, -2.2);
-	ctx.bezierCurveTo(0.6, -1.25, -0.6, -1.25, -0.6, -2.2);
-	ctx.closePath();
-	ctx.fillStyle = colors.shirt;
-	ctx.fill();
-	ctx.lineWidth = 0.16;
-	ctx.strokeStyle = colors.trim;
-	ctx.stroke();
+	drawJersey(ctx, colors);
 	ctx.fillStyle = colors.ink;
 	ctx.font = "800 1.65px system-ui";
 	ctx.textAlign = "center";
@@ -728,7 +733,15 @@ async function init() {
 			element.querySelector("img").src = getTeamLogo(team);
 			element.querySelector("img").alt = team.name;
 			element.querySelector("img").hidden = false;
+			const label = jerseyKey.children[index];
+			label.querySelector("span").textContent = team.code;
+			const jersey = label.querySelector("canvas");
+			const context = jersey.getContext("2d");
+			context.translate(jersey.width / 2, jersey.height / 2);
+			context.scale(12, 12);
+			drawJersey(context, jerseyByTeamId.get(team.id));
 		}
+		jerseyKey.hidden = false;
 		document.title = `Hoops Replay · ${game.teams[0].code} @ ${game.teams[1].code}`;
 		actionPhoto.addEventListener("error", () => {
 			if (/^https:\/\/cdn\.(nba|wnba)\.com\/headshots\//.test(actionPhoto.getAttribute("src") || "")) {

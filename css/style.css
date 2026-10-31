@@ -255,6 +255,30 @@ input:focus-visible {
 	line-height: 1.35;
 	overflow-wrap: anywhere;
 }
+.jersey-key {
+	display: flex;
+	flex-shrink: 0;
+	gap: 14px;
+	margin-left: auto;
+}
+.jersey-key[hidden] {
+	display: none;
+}
+.jersey-key > div {
+	display: grid;
+	justify-items: center;
+	gap: 4px;
+}
+.jersey-key canvas {
+	width: 24px;
+	height: 32px;
+}
+.jersey-key span {
+	color: var(--muted-color);
+	font-size: 10px;
+	font-weight: 750;
+	letter-spacing: 0.08em;
+}
 
 .scoreboard {
 	display: flex;
@@ -467,6 +491,16 @@ input:focus-visible {
 	}
 	.action-copy p {
 		font-size: 12px;
+	}
+	.jersey-key {
+		gap: 8px;
+	}
+	.jersey-key canvas {
+		width: 18px;
+		height: 24px;
+	}
+	.jersey-key span {
+		font-size: 9px;
 	}
 	body {
 		padding: 16px 4px;
