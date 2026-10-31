@@ -255,14 +255,22 @@ input:focus-visible {
 	line-height: 1.35;
 	overflow-wrap: anywhere;
 }
+.idle-display {
+	display: flex;
+	align-items: center;
+	gap: inherit;
+	width: 100%;
+	min-width: 0;
+}
+.idle-display[hidden],
+.action-copy[hidden] {
+	display: none;
+}
 .jersey-key {
 	display: flex;
 	flex-shrink: 0;
 	gap: 14px;
 	margin-left: auto;
-}
-.jersey-key[hidden] {
-	display: none;
 }
 .jersey-key > div {
 	display: grid;

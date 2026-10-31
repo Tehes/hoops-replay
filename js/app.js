@@ -56,8 +56,11 @@ const awayTeamEl = document.querySelector(".team.away");
 const homeTeamEl = document.querySelector(".team.home");
 const actionDisplay = document.querySelector(".action-display");
 const actionPhoto = document.querySelector("#action-photo");
+const actionCopy = document.querySelector(".action-display > .action-copy");
 const actionPlayer = document.querySelector("#action-player");
 const actionDescription = document.querySelector("#action-description");
+const idleDisplay = document.querySelector(".idle-display");
+const idleDescription = document.querySelector("#idle-description");
 const jerseyKey = document.querySelector(".jersey-key");
 
 /* --------------------------------------------------------------------------------------------------
@@ -520,23 +523,14 @@ function renderAction(frame) {
 		return;
 	}
 	displayedAction = active;
-	jerseyKey.hidden = active !== null;
+	idleDisplay.hidden = active !== null;
+	actionCopy.hidden = active === null;
 	const action = active?.action;
 	const player = action && playerById.get(action.personId);
 	const team = action && teamById.get(player?.teamId || action.teamId);
 	actionDisplay.style.setProperty("--event-color", team ? getTeamColors(team).trim : "var(--accent-color)");
-	actionPlayer.textContent = active?.label || player?.name || (team ? getTeamName(team) : "HOOPS REPLAY");
-	if (action) {
-		actionDescription.textContent = action.description;
-	} else {
-		const date = new Date(game.date).toLocaleDateString("en-GB", {
-			day: "2-digit",
-			month: "short",
-			year: "numeric",
-			timeZone: "America/New_York",
-		}).toUpperCase();
-		actionDescription.textContent = `${game.teams[0].code} @ ${game.teams[1].code} · ${date}`;
-	}
+	actionPlayer.textContent = active?.label || player?.name || (team ? getTeamName(team) : "");
+	actionDescription.textContent = action?.description || "";
 	actionPhoto.hidden = !team;
 	actionPhoto.alt = player?.name || team?.name || "";
 	if (team) {
@@ -742,6 +736,13 @@ async function init() {
 			context.scale(12, 12);
 			drawJersey(context, jerseyByTeamId.get(team.id));
 		}
+		const date = new Date(game.date).toLocaleDateString("en-GB", {
+			day: "2-digit",
+			month: "short",
+			year: "numeric",
+			timeZone: "America/New_York",
+		}).toUpperCase();
+		idleDescription.textContent = `${game.teams[0].code} @ ${game.teams[1].code} · ${date}`;
 		document.title = `Hoops Replay · ${game.teams[0].code} @ ${game.teams[1].code}`;
 		actionPhoto.addEventListener("error", () => {
 			if (/^https:\/\/cdn\.(nba|wnba)\.com\/headshots\//.test(actionPhoto.getAttribute("src") || "")) {
