@@ -1,68 +1,34 @@
 # Hoops Replay — Zielbild und Projektkonzept
 
-Diese Datei beschreibt das gültige fachliche Konzept des schematischen Basketballspiels. Sie ist der
-gemeinsame Ausgangspunkt für Änderungen an der Spiellogik. Zielbild und vorhandene
-Implementierung sind ausdrücklich getrennt: Eine Anforderung in dieser Datei ist kein Nachweis,
-dass sie bereits umgesetzt oder geprüft ist.
+Diese Datei beschreibt ausschließlich das fachliche Zielbild von Hoops Replay: Produktziel,
+Spielmodell, fachliche Grenzen und Anforderungen an die Bewertung. Eine Anforderung ist kein
+Nachweis, dass sie bereits umgesetzt oder geprüft ist.
 
-## Orientierung und Pflege
+## Northstar
 
-- Der [Northstar im Kopf von js/replay-engine.js](js/replay-engine.js) beschreibt das dauerhafte
-  übergeordnete Ziel. Diese Datei konkretisiert Spiellogik, fachliche Verantwortlichkeiten und deren Bewertung.
-- [AGENTS.md](AGENTS.md) enthält die verbindlichen Arbeitsregeln.
-- [README.md](README.md) beschreibt Nutzung, lokale Ausführung und Prüfkommandos.
-- Code, vorhandene Prüfungen und Server-Batchberichte belegen den Implementierungsstand.
-  Git hält die Änderungsgeschichte fest.
+Hoops Replay macht aufgezeichnete Basketballspiele als regelkonforme, zusammenhängende und
+verständliche Ballbesitze erlebbar. Ball und Spieler bewegen sich mit erkennbarem Zweck;
+die aufgezeichneten Ereignisse und ihre Anker bleiben verbindlich. Was zwischen diesen Ankern
+entsteht, ist eine plausible schematische Ergänzung und keine Rekonstruktion aus Tracking-Daten.
 
-### Was in diese Datei gehört
+## Geltungsbereich und Pflege
 
-- Verbindliche Quelldaten, ihre Interpretation und die Grenze zwischen belegten Ereignissen und
-  schematischen Ergänzungen.
-- Basketballregeln, taktische Prinzipien und ihre fachlichen Quellen sowie die daraus abgeleiteten
-  Strategien und Logiken für Ballbesitze, Aufstellungen, Positionierungen, Laufwege und Aktionen.
-- Fachliche Zustände und Zeitmodelle sowie die Verantwortlichkeiten der Module, soweit sie das
-  Spielmodell erklären.
-- Begründungen, Annahmen, bekannte Gegenbeispiele, Implementierungsgrenzen und offene fachliche
-  Lücken. Zielbild und nachgewiesener Stand müssen unterscheidbar bleiben.
+**Keine Implementierungsdetails in dieser Datei.** Dazu gehören insbesondere aktueller
+Implementierungsstand, Module und Funktionen, konkrete Algorithmen und Schwellenwerte,
+Code- und Prüfabläufe, API-Endpunkte, technische Konfiguration sowie Statuslisten. Auch
+Änderungsverläufe, Testprotokolle, einzelne Fehlergeschichten und erledigte Aufgaben gehören
+nicht hierher. Das gilt auch dann, wenn ein Detail eine Umsetzung erklärt oder gerade geändert wurde.
 
-Nicht hierher gehören UI-Aufbau und Gestaltung, Bedienelemente, UI-Texte, Browser- und
-Fensterverhalten (etwa Tab-Pausen), Fokusbehandlung, technische Plattform- und Entwicklungsregeln,
-Setup, Deployment, Analytics oder allgemeine Arbeitsanweisungen. Nutzung, Setup und Prüfkommandos
-gehören in README.md; verbindliche Arbeitsregeln stehen in AGENTS.md. Änderungsverläufe,
-Testlauf-Protokolle und erledigte Aufgaben gehören ebenfalls nicht in diese Datei.
+Hier stehen dauerhafte fachliche Anforderungen, ihre Begründungen und Quellen sowie der
+fachliche Datenvertrag. Regeln und Grenzen werden allgemein formuliert, nicht anhand einzelner
+Spiele oder Implementierungsfälle dokumentiert. Eine fachliche Erkenntnis wird direkt in den
+zuständigen Abschnitt eingearbeitet; Überholtes wird ersetzt, nichts chronologisch angehängt.
+Eine reine Implementierungsänderung ist kein Anlass, diese Datei zu erweitern.
 
-Vor jeder Ergänzung prüfen: Erklärt sie, wie das Basketballspiel fachlich modelliert wird und warum?
-Nur dann hier aufnehmen. Eine reine UI-, Browser- oder Infrastrukturänderung erfordert keine
-Ergänzung in PROJECT.md. Bestehende fachfremde Abschnitte sind kein Vorbild für neue Einträge.
-
-### Wie diese Datei gepflegt wird
-
-1. Vor fachlichen Änderungen das Zielbild und den betroffenen Implementierungsstand lesen.
-   Die konkrete Entwicklung soll erkennen lassen, welchen Teil des Konzepts sie verbessert.
-   Das Konzept ist keine pauschale Erlaubnis, bei jedem Auftrag weitere Bereiche umzubauen.
-2. Änderungen direkt im zuständigen Abschnitt einarbeiten. Überholte Aussagen ersetzen und
-   Widersprüche auflösen; keine datierten Ergänzungen, Sitzungsberichte oder Entscheidungsketten
-   anhängen. Es soll genau eine gültige Beschreibung pro Thema geben.
-3. Dauerhafte Anforderungen im Zielbild beschreiben. Im Abschnitt zum Implementierungsstand nur
-   tatsächlich vorhandenes Verhalten nennen. Geplante Module, Prüfungen und Fähigkeiten niemals
-   durch ihre Beschreibung als implementiert ausgeben.
-4. Bei einer Umsetzung den betroffenen Status und seine Grenzen im selben Änderungsvorgang
-   aktualisieren. Eine Teilumsetzung bleibt als teilweise umgesetzt erkennbar.
-   Relevante Module und Tests verlinken, statt flüchtige Testanzahlen, Framezahlen oder Laufzeiten
-   abzuschreiben.
-5. Technische Details nur bewahren, wenn sie Dateninterpretation oder Spiellogik erklären.
-   Veraltete Experimente, lokale Rechnerpfade, Browserlauf-Protokolle
-   und erledigte Arbeitsaufträge gehören nicht hierher.
-6. Gültige Einschränkungen und wichtige Gegenbeispiele erhalten, auch wenn die auslösende
-   Fehlergeschichte entfällt. Reproduzierbare Fehlerfälle gehören möglichst in Tests oder Fixtures.
-   Ein bestandener Test belegt nur seine konkrete Abdeckung.
-7. Eine neue fachliche Erkenntnis kann das Zielbild ändern. Dann die betroffenen Aussagen
-   zusammenhängend überarbeiten und gegebenenfalls den Northstar angleichen.
-   Zielbild und Implementierungsstand dürfen auseinanderliegen; dieser Abstand muss sichtbar bleiben.
-8. Arbeitsplanung und Prioritäten stehen im jeweiligen Auftrag oder Chat. Erkenntnisse aus
-   akzeptierten oder verworfenen Experimenten sollen in einem eigenen knappen Learning-Dokument
-   festgehalten werden. [Heuristik-Learnings](scripts/docs/heuristic-learnings.md) enthält diese
-   Ergebnisse und ihre Grenzen; es ersetzt weder dieses Konzept noch die Git-Historie.
+Der tatsächliche Stand ergibt sich aus Code und Tests. [README.md](README.md) beschreibt Nutzung,
+Setup, Schnittstellen und Prüfkommandos; [AGENTS.md](AGENTS.md) enthält die Arbeitsregeln.
+Git hält die Änderungsgeschichte fest. Erkenntnisse aus Experimenten stehen in den
+[Heuristik-Learnings](scripts/docs/heuristic-learnings.md).
 
 ## Produktziel
 
@@ -91,8 +57,6 @@ schematische Ergänzungen zu verstehen. Es gibt keinen Live-Spielmodus.
   Ein fehlender Assist beweist keine Isolation, ein Turnover allein keinen Fastbreak.
 - Das Replay verdichtet Zeit. Auch bei 1× ist es keine Echtzeitwiedergabe.
   Aufgezeichnete Spieluhrzeiten bleiben verbindliche Anker.
-- Vanilla HTML, CSS und JavaScript mit relativen ES-Modulen; keine neuen Dependencies, Frameworks
-  oder Build-Schritte. Regeln und Planung müssen ohne Browser prüfbar bleiben.
 - Keine zusätzlichen Menüs, Statistikseiten, PWA-Funktionen oder Tracking-Events ohne eigenen Auftrag.
   Die bestehende Lizenz nicht beiläufig ändern.
 
@@ -117,32 +81,9 @@ und passende Tests nachvollziehbar machen. Coaching-Literatur begründet plausib
 sie beweist keinen tatsächlich gespielten Ablauf. Trainingsübungen und ihre vereinfachten
 Spielregeln werden nicht ungeprüft als NBA-/WNBA-Regeln übernommen.
 
-### Fachlicher Abgleich: Ballvortrag und Halbfeldaufbau
-
-Diese erste Zuordnung ist keine vollständige Regelmatrix. Sie trennt Vorschriften von Coaching-Prinzipien
-und dokumentiert nur den jeweils benannten Teil der Umsetzung.
-
-| Anforderung / Prinzip | Konkrete Grundlage | Stand und Grenze |
-| --- | --- | --- |
-| Einwurf von außerhalb; Ball vor eigenem Betreten abgeben | NBA Rule 10, Section III; WNBA 2026 Rule 10, Section III | Einwerfer und Übergabe sind vorhanden; Frist und alle Bedingungen werden nicht systematisch geprüft |
-| Kein ergänztes Rückspiel nach kontrolliertem Vorfeldbesitz | NBA Rule 10, Section IX; WNBA 2026 Rule 10, Section IX | Der neue Outlet-Zweig gilt nur für eigene-Hälfte-Rebounds und bleibt bis zum Fang dort; kein allgemeiner Besitz-/Rückspielautomat |
-| Begrenzte Zeit in der eigenen Hälfte | NBA Rule 10, Section VIII; WNBA 2026 Rule 10, Section VIII | Ereignisuhren sind Anker; eine vollständige Acht-Sekunden-Prüfung fehlt |
-| Seitlicher Outlet und bewegter Fang | WABC Level 1, Team 2.3.1, „Basic Fast Break – Starting the Break“ | Bei ununterbrochenen Defensivrebound-Aufbauten ohne Zeitdruck werden seitliche Empfangspunkte und ein Fang in Bewegung geplant; keine Rekonstruktion des tatsächlichen Passes |
-| Mitspieler laufen früh in breite Bahnen | WABC Level 1, Team 2.3.2, „Basic Fast Break – Running Wide Lanes“ | Bestehende Vorlaufphasen und breite Flügelbahnen sind vorhanden; die Bahnwahl und Pass-voraus-Entscheidung sind noch kein vollständig quellenbasiertes Modell |
-| Raum für Ball und nächste Aktion schaffen | WABC Level 1, Team 2.1.1, „Basic Floor Spacing – Pass and Cut / Give and Go“ | Kurze Passgeber-Freiläufe vergleichen auch diagonale Vorwärtsoptionen mit Laufwegprüfung; kein vollständiges Pass-and-Cut-/Give-and-Go-Modell und keine Übernahme der Trainingsformation als tatsächlich gespieltes Set |
-| Aufenthalte in der Zone regelabhängig begrenzen | NBA Rule 10, Sections VI–VII; WNBA 2026 Rule 10, Sections VI–VII | Offensive Wartepositionen außerhalb der Zone; Diagnose der offensiven Wurfvorbereitung. Vollständige Ausnahmen und defensive Bedingungen offen |
-
-Quellen: [NBA Rule 10](https://official.nba.com/rule-no-10-violations-and-penalties/),
-[WNBA-Regelwerk 2026](https://cdn.wnba.com/sites/4/2026/05/2026-WNBA-Official-Rule-Book.pdf),
-[WABC Level 1 Coaches Manual](https://assets.fiba.basketball/image/upload/documents-corporate-wabc-coaching-level-manuals-level-1-eng.pdf).
-Die angeführten WABC-Prinzipien begründen schematische Entscheidungen, keine zusätzlichen Ereignisse
-oder aus dem Training übernommene NBA-/WNBA-Regeln. Drucksituationen, vollständige Fußarbeit und
-sämtliche Fortsetzungsfälle sind damit nicht abgedeckt.
-
 ## Architektur im Zielbild
 
-Die Verarbeitung folgt klaren Verantwortlichkeiten. Diese Aufteilung ist das Ziel; die unten
-genannten zusätzlichen Module sind noch nicht angelegt.
+Die Verarbeitung folgt im Zielbild klaren fachlichen Verantwortlichkeiten:
 
 | Baustein | Aufgabe | Grenze |
 | --- | --- | --- |
@@ -153,13 +94,6 @@ genannten zusätzlichen Module sind noch nicht angelegt.
 | Bewegung | Aufträge in erreichbare Wege, Ballflüge und Posen übersetzen | Keinen eigenständigen fachlichen Besitzwechsel entscheiden |
 | Darstellung | Den kompilierten Zustand zum Zeitpunkt X zeichnen | Keine Spielregeln oder taktischen Entscheidungen ausführen |
 | Analyse | Korrektheit prüfen, Entscheidungen erklären und Qualität vergleichen | Messungen nicht mit vollständiger Basketball-Plausibilität gleichsetzen |
-
-`replay-engine.js` soll diese Verarbeitung koordinieren und die gemeinsame Timeline bereitstellen.
-Ereignisverknüpfung kann in `replay-events.js`, Regelzustand in `replay-rules.js` und heuristische
-Planung in `replay-planner.js` liegen. `replay-data.js`, `replay-shots.js`,
-`replay-motion.js` und die Darstellung bleiben fachlich klar zugeordnet.
-Wenige verständliche Module und explizite Datenübergaben haben Vorrang vor einem allgemeinen
-Plugin- oder Regelframework. Die Dateien werden bei passenden Entwicklungen schrittweise abgegrenzt.
 
 ### Spielzustand und Darstellungszustand
 
@@ -294,13 +228,9 @@ Spieler, Spiele oder Szenen.
 
 ### Spielauswahl und Vergleichsdaten
 
-Reale NBA-/WNBA-Spiele werden über den Schedule ausgewählt und mit Boxscore und Play-by-Play
-vom bestehenden Backend geladen. Nur die Demo ohne GameID liegt als Spiel-JSON im Repository.
-Ein wachsender lokaler Vollspiel- oder Rohdatenbestand ist nicht Teil des Entwicklungsverfahrens.
-
-Eine Iteration vergleicht Ausgangsstand und Kandidat auf denselben einmal geladenen Eingaben.
-Serverantworten dürfen dafür im Arbeitsspeicher wiederverwendet werden; die Engine erhält jeweils
-unabhängige Kopien. GameIDs und Datenfingerabdrücke machen die Eingaben im Bericht erkennbar.
+Reale NBA-/WNBA-Spiele bilden die Grundlage der Spielauswahl. Eine Iteration vergleicht
+Ausgangsstand und Kandidat auf denselben Eingaben. GameIDs und Datenfingerabdrücke machen
+die Eingaben im Bericht erkennbar.
 Gleiche IDs allein garantieren bei späteren Abrufen keine gleichen Daten, da Feeds korrigiert werden können.
 Ein Fingerabdruck erkennt Unterschiede, ersetzt aber kein Archiv zur späteren Rekonstruktion.
 
@@ -339,586 +269,21 @@ Prüfungen bestehen und verwandte Fälle nicht wesentlich schlechter werden. Ein
 verworfen werden. Ein Learning hält knapp Hypothese, Hebel, Evidenz, Entscheidung und Bedingungen
 für einen erneuten Versuch fest. Es soll Wiederholungen falsifizierter Ansätze verhindern.
 
-## Vorhandene Implementierung
+## Fachlicher Datenvertrag
 
-Dieser Abschnitt beschreibt den Codebestand, nicht die vollständige Umsetzung der vorstehenden Ziele.
+Das Replay verwendet abgeschlossene NBA- und WNBA-Spiele. Play-by-Play liefert Ereignisse,
+Beteiligte, Spielstände, Spieluhrzeiten und gegebenenfalls Abschlussorte; der Boxscore liefert
+Teams, Spieler und Startaufstellungen. Verfügbare saison- und ligabezogene Roster- und
+Spielerstatistiken ergänzen Profile, ersetzen aber keine Angaben zum konkreten Spiel.
 
-### Statusübersicht
+Ereignisidentität und ursprüngliche Angaben bleiben erhalten. Eine Ereignis-ID ist nicht
+notwendigerweise eine zeitliche Reihenfolge; zeitgleiche Ereignisse sind nicht automatisch
+Duplikate. Zusammengehörige Ereignisse müssen unter Berücksichtigung ihrer fachlichen
+Abhängigkeiten interpretiert werden. Widersprüchliche Daten dürfen nicht durch pauschales
+Umsortieren oder das Abschalten von Prüfungen verdeckt werden.
 
-| Konzeptbereich | Tatsächlicher Stand | Fehlender Teil des Zielbilds |
-| --- | --- | --- |
-| Daten und Quellen | Gemeinsame Normalisierung, Backend-Laden und Schedule-Auswahl für Batchläufe vorhanden; nur Demo lokal | Kein Adapter für beliebige andere Feed-Formate |
-| Ereignisverknüpfung | Blocks/Steals, Auswechslungen, Rebounds und And-one-Zuordnung vorhanden | Keine umfassende Auflösung aller verschachtelten Strafen |
-| Spielregeln | Fallbezogene Fortsetzungen innerhalb der Engine vorhanden | Keine vollständige Regelmatrix und kein separates allgemeines Regelmodell |
-| Zustände und Module | Browserfreie Kompilierung, getrennte Wurf-/Bewegungsmodule vorhanden | Fachlicher Zustand und Animation noch im Compilerzustand vermischt; Zielaufteilung nicht umgesetzt |
-| Choreografie | Kontext, Formationsplanung, Passauswahl und defensive Reaktionen vorhanden | Kein vollständig aus Coaching-Referenzen abgeleitetes Heuristiksystem |
-| Zeitabhängige Regeln | Spieluhrabstände steuern die Vorbereitung; offensive Zonenaufenthalte im Aufbau werden diagnostiziert | Keine vollständige offensive/defensive Drei-Sekunden-Prüfung oder Shot-clock-Logik |
-| Batch-Auswertung | Schedule-basierter Server-Audit und bestehende Einzelprüfungen mit Serverdaten vorhanden | Kein automatischer Baseline-/Kandidatenvergleich mit kontextabhängiger Qualitätsbewertung |
-| Diagnose und Lernen | Einzelne Planungsmetadaten und teilbare Szenen vorhanden | Kein umfassendes Entscheidungsprotokoll, A/B-Verfahren oder separates Learning-Dokument |
-
-Die neue Regelmatrix, zusätzliche Architekturmodule, vollständige Regelprüfung und systematische
-Baseline-/Learning-Infrastruktur sind Konzept, keine durch diese Dokumentation implementierten Funktionen.
-Bestehende Heuristiken und Tests sind eine Grundlage dafür, kein Nachweis vollständiger Abdeckung.
-
-### Aktuelle Module
-
-| Datei | Aktuelle Verantwortung |
-| --- | --- |
-| [js/app.js](js/app.js) | Laden und Freigabe, Canvas, Darstellung, Playback, Controls und Resize |
-| [js/replay-data.js](js/replay-data.js) | Backend-Abruf und gemeinsame Feed-Normalisierung |
-| [js/replay-profiles.js](js/replay-profiles.js) | Mischrollen, Stichprobengewichtung sowie Profilbewertung für Innenrollen und Matchups |
-| [js/replay-engine.js](js/replay-engine.js) | Szenen, Lineups, Besitz, Matchups, Vorbereitung, Regelsonderfälle und Timeline |
-| [js/replay-motion.js](js/replay-motion.js) | Verbindende Routen, Halten, Reaktionszeiten und Kreuzungsreservierungen |
-| [js/replay-shots.js](js/replay-shots.js) | Wurfprofile, Abschlussbewegungen und Ballflug |
-| [js/replay-leagues.js](js/replay-leagues.js) | Ligaerkennung, Viertellänge und Dreiergeometrie |
-| [js/replay-rules.js](js/replay-rules.js) | Offensive Zonengeometrie und nahe Wartepositionen außerhalb |
-| [js/replay-teams.js](js/replay-teams.js) | NBA-/WNBA-Teamdaten, Paletten und lokale Logos |
-| [js/replay-colors.js](js/replay-colors.js) | Farbähnlichkeit, Kontrast und Jersey-Auswahl |
-| [js/replay-validation.js](js/replay-validation.js) | Gemeinsame Prüfung für Browser und Audit |
-| [scripts/replay-source.js](scripts/replay-source.js) | Serverabruf, Schedule-Auswahl und Wiederverwendung im Arbeitsspeicher für CLI-Aufrufer |
-| [scripts/check-replay.js](scripts/check-replay.js) | Re-Export der gemeinsamen Prüfung für CLI-Aufrufer |
-| [scripts/audit-replays.js](scripts/audit-replays.js) | Auswahl und Auswertung abgeschlossener Server-Spiele mit Fehlerbericht je Verarbeitungsschritt |
-
-`compileReplay(data)` erzeugt Szenen, Keyframes, Marker und Navigationsgrenzen ohne DOM oder Netzwerk.
-`getReplayFrame(replay, time)` liefert den Zustand zu einem beliebigen Zeitpunkt.
-Die aktuelle Engine bündelt mehrere Verantwortlichkeiten des Zielbilds; die zusätzlichen Dateien
-`replay-events.js` und `replay-planner.js` existieren noch nicht. `replay-rules.js` enthält bislang
-nur Zonengeometrie, keinen allgemeinen Regelzustand.
-
-### Aktuelle Ereignis- und Bewegungsbehandlung
-
-- Szenen werden nach `orderNumber` gebildet. Zugehörige Blocks/Würfe, Steals/Turnover und
-  Offensivfouls/Turnover werden gemeinsam behandelt; zeitgleiche Auswechslungen zusammengefasst.
-- Innerhalb einer zusammenhängenden Gruppe mit identischer Periode und identischem `clock`
-  können widersprechende Auswechslungen anhand der aktiven Beteiligten kausal angeordnet werden.
-  Übrige Spielereignisse und Wechselgruppen behalten ihre relative Reihenfolge.
-  Widersprüchliche Abhängigkeiten lassen die ursprüngliche Gruppe unverändert; es wird nicht über
-  Uhr- oder Periodengrenzen umgeordnet. Originalfelder und Rohdaten bleiben erhalten.
-- Nennt eine Auswechslung einen bereits inaktiven Abgänger, darf der Replay-Plan nur dann einen
-  anderen aktiven Spieler zuordnen, wenn genau dessen nächste Erwähnung innerhalb derselben
-  Periode ein Einwechseln ist und vorher kein Court-Ereignis seinen Einsatz verlangt. Andere
-  genannte Ein-/Auswechselspieler derselben Gruppe bleiben ausgeschlossen. Die Ableitung ist
-  eine Konsistenzkorrektur, kein unabhängig gemessener Wechsel. Originalereignisse bleiben erhalten;
-  `scene.substitutionCorrections` nennt Quellperson, abgeleitete Person und belegendes Ereignis.
-  Ohne eindeutige Zuordnung, bei ungleichen Ein-/Auswechselzahlen oder doppelten aktiven Spielern
-  bricht die Kompilierung mit einer konkreten Wechselmeldung ab. Ein nicht aktiver Schütze wird
-  ebenfalls ausdrücklich gemeldet, statt mit einer undefinierten Passlinienposition weiterzuplanen.
-- Sprungbälle verwenden genannte Springer und Fänger. Fehlende Springer werden aus der aktiven
-  Aufstellung ergänzt: bevorzugt Spieler mit C-Position, andernfalls der aktuelle C-Slot.
-  Fehlt nur ein Springer, bestimmt der genannte Gegner die Teamzuordnung. Ein fehlender Fänger
-  wird als nächstgelegener aktiver Nicht-Springer des belegten Gewinnerteams ergänzt.
-  Ergänzungen stehen mit Herkunft in `scene.jumpBallPlan`; Originalereignisse und Statistiken
-  bleiben unverändert. Eröffnung, Overtime, `doubleviolation`, `lodgedball` und `challenge`
-  verwenden den Mittelkreis. Andere Ereignisse verwenden den zum verfügbaren Ort nächstgelegenen
-  Kreis (x 19, 47 oder 75, y 25); ohne Feed-Koordinaten dient die vorherige schematische Ballposition.
-  Bei unbekanntem Descriptor ist diese Kreiswahl eine Annahme, keine rekonstruierte Entscheidung.
-  Bei Eröffnungs- und Overtime-Tip-offs stehen die Nicht-Springer gestaffelt: Der belegte Fänger
-  steht zurückversetzt in seiner eigenen Hälfte, zwei Mitspieler seitlich am Kreis und einer
-  tiefer zur Absicherung. Ist der Fänger selbst Springer, übernimmt ein Nicht-Springer nur den
-  zurückversetzten Aufstellungsplatz; der belegte Fänger bleibt unverändert.
-  Drei Gegner stehen versetzt zu den Empfangs-/Kreispositionen, ein weiterer sichert ihre eigene
-  Hälfte. Die Aufstellung richtet sich nach der aus den Wurfdaten bestimmten Angriffsrichtung.
-  Spiel-ID, Periode und Fänger bestimmen reproduzierbare Varianten der seitlichen Orientierung,
-  Abstände und Rollenverteilung der übrigen Nicht-Springer. Fängerplatz, Kreisabstand und tiefe
-  Absicherung bleiben erhalten; Neuladen und Seeking erzeugen keine neue Zufallsaufstellung.
-  Positionen und Zuordnungen sind schematisch, keine gemessene NBA-Aufstellung oder ein belegter Spielzug.
-  Grundlage für Kreisnähe und Gegenspielerbezug: Basketball England, Level 2 Coach Manual,
-  Abschnitt 5.8, gedruckte Seite 133
-  ([Manual](https://www.sportstructures.com/media/bfljw1vf/level-2-coach-manual.pdf#page=130));
-  die tiefere Absicherung ist auch in [Coach’s Clipboard, Opening Tip Play](https://www.coachesclipboard.net/TipPlay.html)
-  beschrieben. Dessen konkreter Angriffsspielzug wird nicht übernommen; NBA-Platzansprüche am
-  Kreis haben Vorrang vor der dortigen Coaching-Variante.
-  Die Springer stehen auf der ihrem jeweiligen Zielkorb abgewandten Seite des Sprungkreises,
-  die übrigen Spieler bleiben vor dem Tipp außerhalb des Kreises.
-  Hochwurf, Sprung, Tipp und Fang werden animiert; Aufbauzeit vor dem Tipp verbraucht keine
-  zusätzliche Spielzeit. Ein als Fänger genannter Springer erhält vorher einen schematischen
-  Bodenkontakt des Balls. Das Ergebnis bleibt beim im Feed belegten Team.
-  Grundlage: Rule 6, Sections V–VII in [NBA Rules](https://official.nba.com/rule-no-6-putting-ball-in-play-live-dead-ball/)
-  und [WNBA 2026](https://cdn.wnba.com/sites/4/2026/05/2026-WNBA-Official-Rule-Book.pdf#page=35).
-  Die Zuordnung unbekannter Ereignistypen und alle Sonderfolgen sind damit nicht vollständig modelliert.
-- Wechselketten verändern zuerst die Slots; animiert wird nur der Unterschied zwischen ursprünglicher
-  und endgültiger Aufstellung. Eingewechselte Spieler übernehmen Position und Matchup ihres Vorgängers.
-- Formationen entstehen aus bisherigen Positionen und dem nächsten belegten Wurf oder Wurffoul.
-  Die Vorausplanung endet vor einem offensiven Wechsel; feste Five-out-/Horns-Schablonen werden nicht
-  als reale Sets behauptet. `FALLBACK_SPACING` hilft beim ersten Aufbau.
-- Bekannte Foul-, Block- und Steal-Kontakte priorisieren Matchups. Übrige Paare bleiben im Angriff stabil.
-  Bei einem Seiteneinwurf nach einem Foul werden Formation und Matchups neu geplant, damit frühere Foulkontakte
-  nicht die Zuordnung beim nächsten Angriff nach der Unterbrechung festlegen.
-  Die Defense reagiert zusätzlich auf Ball und Korb, hilft und schließt nach Pässen zum Empfänger auf.
-- `attackContext` unterscheidet Einwurf, Outlet, Steal, zweite Chance und Fortsetzung. Der PG ist
-  der Spieler im ersten Lineup-Slot, keine aus dem Feed bestätigte Ballführerrolle. Alle vier
-  Mitspieler laufen beim normalen Vortrag voraus auf ihre Ziele; es gibt keinen festen Big-Man-Trailer.
-  Belegte Außenaktionen gehen vor einer schematischen Innenrolle.
-  Nach einem ununterbrochenen Defensivrebound in der eigenen Hälfte kann ein anderer Ballführer
-  einen seitlichen Outlet erhalten: nahe der verlängerten Freiwurflinie, bei weiterem Rebound weiter
-  vorn, weiterhin in der eigenen Hälfte. Die Auswahl prüft drei Empfangspunkte zur näheren Seitenlinie,
-  etwas zur Grundlinie und etwas zur Mitte gegen Mitspielerabstände und die aktuelle schematische
-  Defense im Passkorridor. Der Empfänger startet zwei Fuß hinter dem Fangpunkt und fängt im Vorlaufen.
-  Ist kein Punkt geeignet, bleibt der bisherige Aufbau erhalten. `scene.outletPlan` beschreibt nur die
-  ergänzte Verbindung, keinen belegten Assist oder zusätzlichen PbP-Pass.
-  Bereits selbst ballführender PG, kurze Transitionen, Unterbrechungen, Steals, Einwürfe und
-  Backcourt-Abschlüsse erhalten keinen solchen neuen Outlet. Der PG bleibt eine schematische Slot-Rolle.
-- Spätere Empfangswege, bewegte Fänge, kurze Passgeber-Relokationen und passende Folgeempfänger
-  werden teilweise vorausgeplant. Passfolgen werden deterministisch verglichen. Ohne geeignete
-  Verbindung bleibt eine kurze Dribbelsondierung mit Haltephase möglich; höchstens zwei freie
-  Angreifer korrigieren ihr Spacing in der Vorbereitung. Eine optionale Dribbelsondierung
-  entfällt, solange der zugeordnete Verteidiger noch nicht nah genug angekommen ist.
-  Nach einem schematischen Pass kann ein freier Passgeber auch kurz diagonal Richtung Korb
-  freilaufen. Die Auswahl behält die bestehende Grenze von sechs Fuß und das verfügbare Zeitfenster
-  bei. Vier Zwischenpunkte prüfen geplante Mitspielerpositionen, aktuelle Verteidiger und die Zone;
-  eine bereits freie Station darf halten. Diese begrenzte Relokation erzeugt keinen zusätzlichen
-  Rückpass und ist kein vollständiger Korb-Cut. Verteidiger werden dafür nicht vorausberechnet;
-  die Stichproben garantieren keine durchgehende Kollisionsfreiheit der dargestellten Routen.
-- Routen werden aus Szenenankern geplant: Gerade, Perimeterbogen oder ein einfacher Ausweichbogen.
-  Ein späterer Start kann Kreuzungen entzerren. Wege bleiben beim Seeking unverändert; ruhende
-  Spieler werden nicht durch nachträgliche Abstoßung verschoben.
-- Wurfarten umfassen Sprungwurf, Layup, Dunk, Hook und Heave mit kombinierbaren Merkmalen wie
-  Alley-oop, Tip, Putback, Reverse, Floater, Bank, Running, Driving, Cutting, Pull-up,
-  Step-back, Fadeaway und Turnaround. Unbekannte Kombinationen können generisch dargestellt werden.
-- Rebounds verwenden `shotActionNumber`; nur bei fehlender/null Referenz ist der unmittelbar
-  vorausgehende Wurf ein Fallback. Ungültige explizite Referenzen werden nicht ersetzt.
-  Ein freier Offensivrebounder kann während der Vorbereitung eine erreichbare Position 8–12 Fuß
-  vom Korb anlaufen. Gerade Wege durch gehaltene Angreiferplätze und belegte Abschluss-/Empfangsorte
-  sowie Ziele in der Passlinie werden verworfen; bestehende Innenpositionen dürfen gehalten werden.
-  Später geplante Spacing-Ziele halten mindestens drei Fuß Abstand zum reservierten Reboundplatz.
-  Schütze, Assistent, Ballhalter und vorausgeplanter Folgeempfänger behalten ihre Aufgaben.
-  Es gibt keinen erzwungenen Platztausch. Der Aufbau berücksichtigt den nötigen Lauf mit höchstens
-  8 Fuß pro Replay-Sekunde; der laufende Rebounder wird nicht zusätzlich als Passoption verwendet.
-  Dies folgt dem Positionierungs-/Kontinuitätsprinzip des Northstars, modelliert aber kein belegtes Box-out.
-  Erst ab sichtbarem Korb-/Blockausgang führt der Fangweg zum schematischen Abprallort. Seine
-  Geschwindigkeit bleibt mit durchgängiger Beschleunigung/Bremsung auf 14 Fuß pro Replay-Sekunde
-  begrenzt; bei nötigen längeren Wegen verlängert sich die freie Ballphase, nicht der Wurfflug.
-  Das gilt auch, wenn keine freie Vorbereitungsroute vorhanden ist oder der Rebounder am Wurf
-  beteiligt war. Dadurch können Aufbau und Abprallphase länger dauern. Die aufgezeichneten
-  Ereignisse und Spieluhranker bleiben erhalten; vollständige Kollisionsfreiheit ist nicht zugesichert.
-  Blocks dürfen diese Verbindung erhalten; Fouls, Timeouts und Wechsel unterbrechen den Vorlauf.
-  Team-Rebounds erfinden keinen individuellen Fänger.
-- Steals erhalten einen Zugang zum Ball beziehungsweise zu einer plausiblen Passlinie; Besitz
-  wechselt beim Fang. Fehlpässe ins Aus fliegen knapp an einem aktiven Mitspieler vorbei über
-  die Außenlinie. Der Abstand zur Empfangshand wird an der Fluggeraden berechnet;
-  zu nahe Empfänger und Flugrichtungen, die vor der Empfangsstation ins Aus führen, scheiden aus.
-  Empfänger, Passweg und Abprallorte sind schematisch.
-- Timeouts einschließlich Challenges und Periodenenden führen beide Teams schematisch an den
-  Rand. Wechsel während der Unterbrechung bleiben erhalten; die aktuelle Aufstellung kehrt vor
-  der nächsten Spielaktion zurück. Nach Spielende bleiben die Teams außerhalb.
-
-### Vorhandene Regelsonderfälle und ihre Grenzen
-
-| Fall | Aktuelle Behandlung |
-| --- | --- |
-| Treffer und folgendes gewöhnliches Live-Foul | Gegnerischer Grundlinieneinwurf vor dem neuen Aufbau; dessen Fortschritt hängt vom Spieluhrabstand ab |
-| Persönliches Foul ohne Descriptor | Schematisch am Ball; der Gefoulte erhält den Ball vor dem Kontakt gegebenenfalls durch einen ergänzten Pass. Keine Aussage über den tatsächlichen Ballbesitzer |
-| Persönliches Foul mit `off-the-ball` | Kein pauschaler Balltransfer an den Gefoulten; Loose-ball- und technische Fouls behalten ihre Sonderbehandlung |
-| Wurffoul | Zwei-/Dreipunktbereich aus Qualifiers oder folgender regulärer Freiwurfserie; schematische Annahme vor dem Kontakt |
-| And-one | Gleiche Periode/Uhr, passender Schütze und gegnerisches Wurffoul verknüpfen Treffer und Kontakt; kein zweiter Aufbau oder Gegner-Einwurf |
-| Turnover mit folgendem Loose-Ball-Foul | Direkte zeitgleiche Bad-pass-/Lost-ball-Folgen ohne Steal oder Aus-Turnover können Ballabgabe, schematische gegnerische Ablenkung, freie Ballphase und Kontakt gemeinsam planen. Beide Ereignis-IDs bleiben erhalten. Nicht verknüpfbare Fälle und Fälle ohne zulässigen Weg behalten die bisherige Behandlung |
-| Reguläre Freiwürfe | Teamgerechte Lane-Aufstellung; Zwischenwurf und letzter Wurf unterschieden. Beim letzten Versuch beginnt schematisches Ausboxen ab Release, nach Fehlwurf folgt der belegte Live-Rebound |
-| Technischer Freiwurf | Vorheriger Team-Ballbesitz und Positionen werden grundsätzlich wiederhergestellt; keine normale Rebound-Vorabplanung |
-| Technisches Foul gegen Person außerhalb des Rosters | Bei bekanntem Team als Teamereignis ohne erfundenen Court-Spieler erhalten |
-| Freiwurf mit Descriptor `flagrant` | Nach Ende der Serie unabhängig vom Ergebnis Seiteneinwurf des gefoulten Teams an der verlängerten Freiwurflinie; Team-Rebound überschreibt den Ort nicht |
-| Weitere Ereignisse | Spezifische Zweige unter anderem für Charge, Loose-ball, Traveling, Shot-clock, Aus, Lost-ball, offensives Goaltending und Kicked Ball |
-
-Die Freiwurfaufstellung folgt NBA/WNBA Rule 9, Section I: zwei Verteidiger korbnah,
-zwei Angreifer auf den benachbarten Plätzen und ein weiterer Verteidiger auf einem dritten Platz.
-Die übrigen Spieler stehen oberhalb der verlängerten Freiwurflinie außerhalb des Dreierbogens.
-Innenprofile unterstützen die Platzverteilung unabhängig vom späteren Reboundgewinner.
-So bleiben die Plätze innerhalb einer Serie bei gleicher Aufstellung stabil. Dies ist eine plausible
-Aufstellung, keine rekonstruierte Positionierung.
-
-Beim letzten regulären Versuch bewegen sich die Lane-Spieler ab Release gemeinsam:
-zunächst Gegnerzugang sichern, dann zum Korb eindrehen. Verteidiger halten dabei die Innenposition,
-Angreifer versuchen einen seitlichen Zugang. Grundlage sind
-[WABC Level 1, Abschnitt 1.2.4 „Blocking out an offensive rebounder“](https://assets.fiba.basketball/image/upload/documents-corporate-wabc-coaching-level-manuals-level-1-eng.pdf)
-und [Jr. NBA „Rebounding“](https://jr.nba.com/faq/rebounding/).
-Die Vorbereitung hängt nicht vom Trefferergebnis ab und zielt nicht auf den künftigen Abprallpunkt.
-Der Schütze bleibt bis zum Korbausgang an der Linie. Nach einem Fehlwurf beginnt der bestehende,
-geschwindigkeitsbegrenzte Fangweg des belegten Rebounders; die übrigen Spieler halten ihre
-Ausboxpositionen. Team-Rebounds erfinden keinen Fänger. Zwischenwürfe erhalten kein Ausboxen;
-bei technischen und erkannten Flagrant-Freiwürfen bleiben die Lane-Plätze frei.
-Einzelne Hände/Füße, vollständige Kontaktphysik, alle offensiven Ausweichwege und weitere
-Sonderstrafen sind nicht modelliert. Die gezielten Szenarien stehen in
-[scripts/replay-freethrows_test.js](scripts/replay-freethrows_test.js).
-
-Bei verknüpften Turnover-/Loose-Ball-Foul-Folgen wird der Ball sichtbar abgegeben, von einem
-gegnerischen Kontaktpartner schematisch abgelenkt und ohne kontrollierten Fang weiterbewegt.
-Nach dem Bodenkontakt hüpft er kurz in Bewegungsrichtung weiter, bevor er am Kontaktbereich liegen bleibt.
-Die Beteiligten reagieren nach der Abgabe; ihre begrenzten Wege führen zum selben Ballbereich.
-Die Foulpose verändert den Ballort nicht mehr. Ein kurzer Kontakt beendet den Ablauf, bevor die
-aufgezeichnete Strafe folgt. Die Ablenkung ist eine ergänzte Bewegung ohne zusätzlichen Steal.
-Ein unbekanntes tatsächliches Festhalten, Hechten oder Fallen wird nicht aus dem Descriptor abgeleitet.
-Grundlage sind NBA Rule 4, Sections IV und XVI, sowie Rule 12B, Section VIII, und
-[WNBA 2026 Rule 4, Sections IV/XVI, und Rule 12B, Section VIII](https://cdn.wnba.com/sites/4/2026/05/2026-WNBA-Official-Rule-Book.pdf).
-Ein fliegender Pass allein beendet Teamkontrolle nicht; die gegnerische Ablenkung kann sie beenden,
-ohne dass die Defense den Ball kontrolliert. `ball.owner === null` ist kein allgemeines Regelmodell
-für Teamkontrolle. Die bestehende Engine trennt diese Zustände weiterhin nicht vollständig.
-Die Auswahl von Passziel, Ablenkung und Kontaktbereich bleibt eine Replay-Heuristik.
-Für andere Loose-Ball-Fouls, insbesondere nach Würfen und Rebounds, ist kein solcher gemeinsamer
-Ablauf umgesetzt. Eine allgemeine Kontaktphysik oder vollständige Prüfung aller Pfiffbedingungen fehlt.
-
-Diese Zweige sind keine vollständige Regelabdeckung. Insbesondere sind Fortsetzungen nach
-verschachtelten technischen Strafen und alle Sonderfoul-Kombinationen nicht umfassend modelliert.
-Freiwurfaufstellung, Lane Violations/Wiederholungen, Clear Path, Transition Take, Away-from-play,
-Doppelfouls, defensive Goaltending-Folgen, Einwurfvorverlegung und geänderte Review-Entscheidungen
-dürfen ohne gezielte Prüfung nicht als vollständig umgesetzt gelten.
-Eine Challenge-Darstellung allein modelliert noch nicht die Folgen einer geänderten Entscheidung.
-
-Der Shot-clock-Rückblick verlängert die Vorbereitung vor einem aufgezeichneten Verstoß.
-Er berechnet keine durchgängige Restuhr mit allen 24-/14-Sekunden-Resets.
-Offensive Wartepositionen im Halbfeld liegen außerhalb der Zone. Bei längerer Vorbereitung warten
-auch spätere Innenschützen zunächst außerhalb; ihre eigentliche Anspiel-/Abschlussposition bleibt
-erhalten. Kurze Zuspiele in die Zone, Abschlüsse und direkte zweite Chancen bleiben möglich.
-Spieler, die nach einem Rebound innen stehen, können sich auf kurzem Weg aus der Zone lösen.
-Auch bei übernommenen Positionen in einem fortgesetzten Aufbau wird eine Innenposition durch
-den nächstgelegenen Wartepunkt außerhalb ersetzt. Dafür muss keine zusätzliche Wartephase übrig
-sein. Begrenzte Positionskorrekturen werden an ihrem tatsächlich verwendeten Endpunkt beurteilt;
-ein freier, weiter entfernter Zielpunkt allein genügt nicht. Die Erhaltungsprüfung erlaubt bei
-übernommenen Positionen genau dieses kurze Freimachen, keine beliebige Neuaufstellung.
-Zwischenstationen des längeren Live-Aufbaus liegen ebenfalls außerhalb der Zone. Innen stehende
-Mitspieler lösen sich zunächst nach außen, während der Rebounder den gesicherten Ball behält.
-Für einen vorbereitenden Lauf zum nächsten Abschluss wird die vom aktuellen Standort nähere
-Außenseite gewählt; die eigentliche Anspiel- und Abschlussposition bleibt erhalten.
-
-`checkReplay()` meldet `offensiveLaneStays` als Prüfkandidaten, nicht als Fehler oder Pfiffe:
-In den bereits vorhandenen Abtastungen alle 0,2 Replay-Sekunden wird ab bekannter Ballkontrolle
-im Vorfeld die abgebildete Spielzeit je Angreifer innerhalb der Zone summiert. Die Diagnose gilt
-nur innerhalb einer Wurfszene vor deren Abschlussbewegung; Tip-ins, Putbacks und Backcourt-Szenen
-sind ausgenommen. Sie läuft nicht über Szenengrenzen und erfasst keine vollständige Regelkonformität.
-Körpermittelpunkte ersetzen keine Füße; unmittelbares Verlassen, Schussbewegungen und gegnerische
-Ballberührungen sind nicht vollständig als Regelausnahmen modelliert. Deshalb bleiben auch
-Bewegungsfälle über drei Sekunden sichtbar und müssen beurteilt werden. Defensive drei Sekunden
-werden weiterhin nicht geprüft. Grundlage: NBA/WNBA Rule 10, Section VI.
-
-### Zeit und Geometrie
-
-- Court-Koordinaten: 94 × 50 Fuß, Körbe bei x 5,25/88,75 und y 25.
-  Reguläre Feed-Koordinaten werden mit x × 0,94 und y × 0,5 umgerechnet.
-  Die Canvas-Welt umfasst 110 × 65 mit Court-Versatz (8,9).
-- Die erste Feldwurfaktion mit gültigem `side` belegt die Richtung; das andere Team greift
-  entgegengesetzt an, zur Halbzeit wird gewechselt. Verlängerungen behalten die zweite Halbzeit.
-  Ohne Seitenbeleg dient Heimteam vor der Halbzeit nach rechts als schematischer Fallback.
-- NBA-Viertel verwenden 720, WNBA-Viertel 600, Verlängerungen 300 Sekunden.
-  Dreierlinien berücksichtigen Ligageometrie und gerade Ecklinien.
-- `scene.liveSeconds` ist der Abstand aufgezeichneter Ereignisse, nicht automatisch eine
-  vollständige Ballbesitzdauer. Normale Vorbereitungsbudgets verwenden grundsätzlich 50 Prozent
-  bis zwölf Replay-Sekunden; markierter Shot-clock-Druck 85 Prozent bis 24 Replay-Sekunden.
-  Abschlussreserven und notwendige Wege können eine Szene verlängern.
-- Einwurf und Rückkehr liegen bei stehender Uhr vor `liveAt`; die Uhr erreicht am `eventAt`
-  den aufgezeichneten Wert. Ballflüge und Abschlussphasen behalten eigene Dauern.
-- Wegabhängige Dauer und Geschwindigkeitsgrenzen gelten nur für die jeweiligen markierten
-  Bewegungsabschnitte, nicht pauschal für jede Pose, jeden Freiwurf oder Kontakt.
-  Es gibt keine garantierte Kollisionsfreiheit aller zehn Spieler.
-- Szenenzeiten werden auf Millisekunden gerundet. Die Timeline behält `step="0.001"`,
-  damit Endpunkte und Fangmomente exakt angesprungen werden können.
-
-## Datenvertrag und Integration
-
-### Laden und Wiederverwenden
-
-Öffentliche Anwendung: [Hoops Replay](https://tehes.github.io/hoops-replay/).
-Ohne GameID werden beide Liga-Schedules geladen und bis zu drei abgeschlossene Spiele nach
-`gameDateTimeUTC` absteigend ausgewählt; bei gleicher Zeit entscheidet die GameID absteigend.
-Zugelassen sind NBA-Regular-Season, Playoffs, Play-in und Cup-Finale (Präfixe `002/004/005/006`)
-sowie WNBA-Regular-Season, Playoffs und Cup-Finale (`102/104/105`), keine Preseason oder All-Star-Spiele.
-Fehlende oder ungültige Spielzeiten werden nicht zur Auswahl verwendet. Doppelte IDs werden entfernt.
-Das erste erfolgreich normalisierte, kompilierte und geprüfte Spiel wird geöffnet und seine GameID
-in die URL geschrieben; weitere Kandidaten werden bei Fehlern mit Konsolenwarnung versucht.
-Fehler beim Laden eines Schedules, keine geeigneten Spiele oder drei gescheiterte Kandidaten
-ergeben den bestehenden Ladefehler. Es gibt keine lokale Demo und keinen lokalen Datenordner.
-Jede explizite zehnstellige `?game=GAME_ID` lädt Boxscore und Play-by-Play vom bestehenden Backend
-`https://hoops-replay.tehes.deno.net`. Es gibt keine lokalen Ersatzspiele bei Fehlern.
-IDs mit Präfix `10` verwenden WNBA und den Query `?league=wnba`; andere NBA.
-
-Normalisierung, Kompilierung und gemeinsame Prüfung müssen vor Freigabe des Replays erfolgreich sein.
-Unfertige Spiele, falsche IDs, HTTP-Fehler und inkonsistente Daten ergeben einen Fehler, kein
-stilles Ersatzspiel bei expliziter GameID. Es gibt weder Polling noch automatische Aktualisierung
-oder lokale Spielspeicherung.
-
-Auch Entwicklungs- und Einzelprüfungen laden reale Spiele vom Server. Der frühere Importer und
-seine lokalen Rohdaten, Vollspiel-Snapshots und Szenen-JSONs sind entfernt. Die vorhandenen
-Einzelprüfungen bleiben fachlich unverändert; ein benötigter Szenenausschnitt entsteht aus dem
-Serverfeed. Wiederholte Abrufe derselben Quelle werden innerhalb des Prozesses im Arbeitsspeicher
-wiederverwendet, niemals als Spiel-JSON gespeichert. Kopien schützen die Eingaben vor Szenenänderungen.
-
-Das eigene Backend in [api/main.js](api/main.js) stellt Spieldaten, NBA-/WNBA-Roster und
-Spielerstatistiken bereit. Die Anwendung lädt ihre Spieldaten von diesem Backend.
-Der Replay-Client lädt zusätzlich die beiden Roster der Spielsaison und übernimmt deren
-Spielerpositionen unverändert anhand der Player-ID. Diese Positionen stehen den bestehenden
-rollenabhängigen Entscheidungen zur Verfügung. Verfügbare Rostermaße werden als `heightCm` und
-`weightKg` normalisiert; fehlende Werte bleiben `null`. Zusätzlich lädt der Client pro Team
-Saisonstatistiken für Regular Season, Pre Season oder Playoffs entsprechend der GameID.
-`seasonStatistics` erhält Spiele, Feldwurf-/Dreierversuche pro Spiel, Dreierquote, Assists und Rebounds.
-Fehlt dieser Abruf oder ein Spieler darin, bleibt das Rosterprofil nutzbar; ein Abruffehler wird
-protokolliert. `statisticsSource` dokumentiert erfolgreiche Teamabrufe. Diese Profile sind aktuelle
-Aggregate der angefragten Saison und Wettbewerbsart, kein archivierter Stand vor dem Spiel.
-
-[replay-profiles.js](js/replay-profiles.js) gewichtet bei Mischpositionen beide Bestandteile mit
-70/30 zugunsten der ersten Angabe. Außen- und Innenneigung sind getrennte Werte; ein `F-G` bleibt
-auch als Forward für Außenpositionen und die Vorbereitung eines belegten Drives geeignet.
-Dreieranteil, Dreierquote und die aus Spielen und Versuchen angenäherte Stichprobe beeinflussen
-die Außenneigung; kleine Stichproben werden zur Positionsgrundlage zurückgewichtet.
-Assistwerte ergänzen das Aufbauprofil für den Rollenvergleich. Zweipunktversuche begründen keine
-Drive-Häufigkeit, Reboundwerte werden derzeit nur bereitgestellt und nicht zur Rollenwahl verwendet.
-
-Die Engine wählt eine freie Innenrolle nach dem Profil und den relativen Maßen der aktiven Fünf.
-Belegte Schützen, Assistenten und Folgeempfänger behalten Vorrang. Bei fünf ausreichend nach außen
-orientierten Profilen entfällt die erzwungene Innenrolle (`spacing: "five-out"`), andernfalls kommt
-bei geeigneter freier Innenrolle `four-out-one-in` zum Einsatz. Ohne geeignete Innenrolle bleibt die
-Verteilung `open`; Backcourt-Abschlüsse behalten ihre eigene Geometrie. Gibt es neben der ersten
-Innenrolle einen weiteren geeigneten freien Post-Spieler, kann `three-out-two-in` gewählt werden.
-Der zweite Post wird nach Innenprofil und relativen Maßen ausgewählt. Er belegt entweder einen
-zweiten tiefen Anspielraum (`postLayout: "double-low"`) oder einen hohen Anspielraum
-(`postLayout: "high-low"`). Verfügbare Plätze werden gegen Mitspieler und den belegten
-Abschluss-/Passkorridor geprüft. Weglänge aus der bisherigen Position und das Aufbauprofil
-entscheiden zwischen zulässigen Varianten. Ohne freie zweite Station bleibt eine Innenrolle.
-Hohe Warteplätze liegen vor der Zone, tiefe seitlich außerhalb. Beide Post-Rollen bleiben bei
-weiteren Spacing-Korrekturen geschützt; Auswechslungen übernehmen den zugehörigen Formationsplatz.
-`interiorSlots` und `interiorIds` dokumentieren die gewählten Rollen bei der Formationsplanung,
-`highPostSlot` die hohe Rolle. Die bisherigen Singularfelder bezeichnen weiter die erste tiefe Rolle.
-Dies sind schematische Spacing-Entscheidungen, kein Nachweis einer tatsächlich gespielten
-Motion-Offense. Automatische Spielzugabläufe wie Horns, Flex oder Triangle sind nicht umgesetzt.
-`formation.roles` hält Profilwerte und vorhandene Maße für die Entscheidung nachvollziehbar fest.
-
-Belegte Kontakte und die bestehende begrenzte Reboundzuordnung werden zuerst reserviert.
-Ein unmittelbar auf einen Turnover folgendes Loose-Ball-Foul bei gleicher Periode und Spieluhr
-reserviert das Kontaktpaar bereits im vorausgehenden Angriff, bevor dessen Ballbesitz wechselt.
-Für übrige Matchups vergleicht der Planer alle verbleibenden Zuordnungen gemeinsam nach
-Mischrollen, Außen-/Aufbauprofil, Größen- und Gewichtsdifferenz. Bestehende Zuordnungen erhalten
-einen kleinen Kontinuitätsvorteil. Die Wahl gilt für den Angriff; Wechsel behalten die vorhandene
-Übergabelogik. Es wird keine gemessene defensive Fähigkeit oder tatsächliche Bewachung behauptet.
-
-Fachliche Grundlage sind WABC Level 1, Team 2.1.1 (Spacing) und 2.1.3 (zweckgerichtete Bewegung)
-sowie Player 2.8.2 (Postpositionen und Größenmismatches unabhängig vom Positionsetikett),
-[offizielles Handbuch](https://assets.fiba.basketball/image/upload/documents-corporate-wabc-coaching-level-manuals-level-1-eng.pdf).
-WABC Level 2, Team 2.1.2, „Receivers Principles with Post Players“, ergänzt die Grundlage für
-Grundordnungen mit einem oder zwei Post-Spielern
-([Handbuch](https://assets.fiba.basketball/image/upload/documents-corporate-wabc-coaching-manual-level-2-eng.pdf)).
-Die Gewichtungen, Raumgrenzen und Auswahlkosten sind eigene Replay-Heuristiken, keine Formeln aus den Handbüchern.
-Die Jugend-Trainingsabläufe werden nicht als NBA-/WNBA-Spielzug oder NBA-/WNBA-Regel übernommen.
-
-Die lokale Vorschau verwendet ausdrücklich `http://127.0.0.1:5500` wegen der Backend-CORS-Freigabe.
-`localhost` oder andere Ports sind kein gleichwertiger Ersatz. Den Origin-Header nicht im
-Browsercode setzen. Ein erfolgreicher CLI-Abruf ersetzt keine Browser-CORS-Freigabe.
-Custom-Domain und weitere Spielplan-Integration sind kein eingerichteter Produktbestandteil.
-
-### API-Endpunkte und Auswahl von Game IDs
-
-Maßgebliche Serverlogik:
-[api/main.js](api/main.js).
-Basis-URL: `https://hoops-replay.tehes.deno.net`. Die folgenden Abrufe verwenden `GET`.
-
-| Daten | NBA | WNBA | Relevante Antwortfelder |
-| --- | --- | --- | --- |
-| Schedule | `/schedule` | `/schedule?league=wnba` | `leagueSchedule.gameDates[].games[]` mit `gameId`, `gameStatus`, `gameDateTimeUTC`, `homeTeam` und `awayTeam` |
-| Boxscore | `/boxscore/GAME_ID` | `/boxscore/GAME_ID?league=wnba` | `game.gameId`, `game.gameStatus`, Teams, Spieler und Statistiken |
-| Play-by-Play | `/playbyplay/GAME_ID` | `/playbyplay/GAME_ID?league=wnba` | `game.gameId` und `game.actions[]` |
-| Roster | `/roster/TEAM_ID?season=YYYY-YY` | `/roster/TEAM_ID?season=YYYY&league=wnba` | `CommonTeamRoster` mit Player-ID, Position, Größe und verfügbarem Gewicht |
-| Spielerstatistiken | `/players/TEAM_ID?season=YYYY-YY` | `/players/TEAM_ID?season=YYYY&league=wnba` | `PlayersSeasonTotals`; `seasonType=Regular Season`, `Pre Season` oder `Playoffs` |
-
-Beispiel-URLs:
-
-- `https://hoops-replay.tehes.deno.net/schedule`
-- `https://hoops-replay.tehes.deno.net/schedule?league=wnba`
-- `https://hoops-replay.tehes.deno.net/boxscore/0022600007`
-- `https://hoops-replay.tehes.deno.net/playbyplay/0022600007`
-- `https://hoops-replay.tehes.deno.net/boxscore/1042600304?league=wnba`
-- `https://hoops-replay.tehes.deno.net/playbyplay/1042600304?league=wnba`
-
-Der Server wählt die Liga ausschließlich über `league=nba|wnba`; ohne Parameter gilt NBA.
-Anders als der Replay-Client leitet er WNBA nicht aus der GameID ab.
-`GAME_ID` muss genau zehn Ziffern enthalten und als String mit führenden Nullen erhalten bleiben.
-
-Für den Schedule ist zusätzlich `region=de|us` möglich. Standard ist `de` (Broadcast-Code 14),
-`us` verwendet Code 1. `region=none` und unbekannte Werte fallen ebenfalls auf Code 14 zurück;
-`none` bedeutet auf diesem Server nicht „ohne Broadcaster“.
-Die Region wählt die Broadcast-Variante des Schedules, keine Replay-Liga oder Saison.
-
-Schedule, Boxscore und Play-by-Play werden aus den jeweiligen offiziellen CDN-Feeds durchgereicht.
-Der Schedule verweist auf `scheduleLeagueV2_<regionCode>.json`; es gibt in diesen Routen keinen
-implementierten Saison-, Datums-, Pagination- oder Mehrfach-GameID-Parameter.
-Der verfügbare Saisonstand stammt aus der Upstream-Antwort
-(`leagueSchedule.seasonYear`, ersatzweise `meta.seasonYear`).
-Ein Abruf ist kein beliebiges historisches Saisonarchiv. Der Batchbericht hält deshalb Quelle,
-Saison und ausgewählte IDs fest; je ausgewertetem Spiel kommt ein Datenfingerabdruck hinzu.
-
-Alle drei Routen verlangen bereits serverseitig einen freigegebenen `Origin`; ohne passenden
-Header liefert der Server 403. Für CLI-Werkzeuge ist
-`Origin: http://127.0.0.1:5500` zu verwenden. Im Browser entsteht der Header aus der tatsächlichen
-Seitenherkunft. Ungültige Liga oder GameID liefern 400; Upstream- und Netzwerkfehler müssen
-auch bei einer Batch-Auswahl ausdrücklich behandelt werden.
-
-### Schedule-basierte Batch-Auswertung
-
-[scripts/audit-replays.js](scripts/audit-replays.js) verwendet standardmäßig beide Ligen und
-höchstens zehn abgeschlossene Spiele je Liga. Die Auswahl dedupliziert gültige String-GameIDs,
-sortiert nach Spieldatum und ID und verteilt eine begrenzte Stichprobe gleichmäßig über den
-verfügbaren Zeitraum. Sie umfasst bei mehreren gewählten Spielen den ersten und letzten Eintrag;
-bei nur einem den letzten. Preseason und Postseason bleiben Teil der Auswahl, sofern der Schedule
-sie enthält. Dies ist eine zeitlich gestreute Stichprobe, keine garantierte Abdeckung aller Regeltypen.
-
-`--league=nba|wnba|all` begrenzt die Ligen, `--limit=N` die Auswahl je Liga; `--limit=0` wählt alle
-abgeschlossenen Spiele. Explizite zehnstellige GameIDs umgehen die Schedule-Auswahl und das Limit.
-Eine explizite Liga muss zu diesen IDs passen. Kommandos stehen in README.md.
-
-Der Ablauf ist Schedule → abgeschlossene GameIDs (`gameStatus === 3`) → Boxscore und Play-by-Play →
-Normalisierung → Rosteranreicherung → Kompilierung → vorhandene gemeinsame Prüfung. Spiele werden nacheinander
-verarbeitet; die beiden Detailfeeds werden parallel geladen, anschließend die beiden Saisonroster
-und die beiden Spielerstatistikantworten.
-Browser und Audit verwenden dieselbe Rosteranreicherung; der CLI-Lauf verwendet seinen bestehenden
-prozessinternen Antwortcache auch für Roster und Spielerstatistiken.
-
-Die JSONL-Ausgabe enthält Auswahlquelle, Saison, Anzahl verfügbarer abgeschlossener Spiele,
-ausgewählte IDs, Zeitpunkt, SHA-256-Fingerabdruck der normalisierten Eingaben ohne variable
-Erfassungszeit sowie den vorhandenen Auditbericht je Spiel mit Liga. Fehler in Schedule,
-Datenabruf/Normalisierung, Kompilierung oder Prüfung werden mit Verarbeitungsschritt protokolliert.
-Ein fehlerhaftes Spiel verhindert die Auswertung der übrigen nicht und wird nicht stillschweigend
-ersetzt. Die Zusammenfassung nennt gewählte, erfolgreiche und fehlgeschlagene Spiele; bei Fehlern
-endet der Lauf mit Exitcode 1. Warnungen laufen getrennt über stderr.
-
-Die bestehende Prüfung wird wiederverwendet, ihre Maßstäbe werden hier nicht erweitert.
-Ein bestandener Audit bedeutet weder vollständige Regelkonformität noch visuelle Basketballqualität.
-Ein Fehler bei Daten oder Kompilierung ist zunächst eine Diagnose, kein Beweis für einen Feedfehler.
-
-Ein automatischer Baseline-/Kandidatenvergleich auf denselben Speicher-Eingaben, eine vollständige
-Regelmatrix und literaturgestützte Qualitätsmessung sind noch nicht implementiert. Einzelne
-CLI-Läufe laden erneut vom Server; für spätere Vergleiche müssen Eingabegleichheit und Kriterien
-explizit geprüft werden. Der Top-Excitement-Filter des Spielplans wird nicht verwendet.
-
-### Normalisiertes Schema
-
-| Feld | Bedeutung |
-| --- | --- |
-| `gameId`, optional `league`, `date`, `arena`, `season` | Partie und Metadaten; Liga bei der Demo aus der ID ableitbar |
-| `sources` | Quell-URLs und Erfassungsangaben |
-| `teams` | Auswärts zuerst, Heimteam danach; ID, Code, Name, Heimstatus, Endstand und Spieler |
-| `players` | ID, Name, Nummer, Quellposition `position`, Herkunft `positionSource`, ursprüngliche `boxscorePosition`, verfügbare `heightCm`/`weightKg` und `seasonStatistics`, Starterstatus und Minuten |
-| `actions` | Übernommene Ereignisfelder einschließlich IDs, Ordnung, Uhr, Typ, Beteiligten und optionaler Orts-/Wurf-/Besitzangaben |
-
-Neue Normalisierung leitet NBA-Saison aus dem Spieldatum und WNBA-Saison aus dem Kalenderjahr ab.
-Fünf Starter je Team sind erforderlich. Rosterpositionen wie `G`, `F-G` und `C-F` bleiben
-unverändert; doppelte Positionen sind zulässig. `positionSource` ist `roster`, `boxscore` oder
-bei fehlender Angabe `null`. Fehlt ein Spieler oder seine Position im Saisonroster, bleibt die
-Boxscoreposition erhalten; ohne beide Quellen bleibt die Position leer. Bei einem fehlerhaften
-Rosterabruf wird eine Warnung protokolliert und der Boxscore verwendet. Ein erfolgreicher Abruf
-ist am Team als `rosterSource` dokumentiert. Saisonroster ergänzen Positionen und verfügbare Maße;
-Teilnehmer, Nummern und Starterstatus bleiben aus dem konkreten Spiel.
-Die Engine ordnet ihre fünf Formationsplätze nach der Boxscoreposition, ersatzweise nach der
-Rosterposition; sie erfindet keine individuellen PG–C-Positionen. Unbekannte Positionen folgen
-am Ende, bei gleicher Sortierung bleibt die Quellreihenfolge erhalten.
-
-Wichtige Datenregeln:
-
-- `actionNumber` ist eine Ereignis-ID, keine verlässlich monotone Reihenfolge.
-  `orderNumber` bestimmt die Ausgangsordnung. Niemals allgemein nach Ereignis-ID umsortieren.
-- Zeitgleiche Ereignisse sind nicht automatisch Duplikate. Begrenzte kausale Wechselkorrekturen
-  betreffen den Replay-Plan, nicht die ursprünglichen Feed-Felder.
-- Der Feed schreibt `jumpBallRecoverdPersonId` tatsächlich so.
-- Feldwürfe brauchen endliche x/y. Nur hinreichend belegte Orte sind Abschlussanker;
-  Nullkoordinaten anderer Ereignisarten sind kein Tracking-Nachweis.
-- Normalisierung prüft x/y gegen `side` und `shotDistance` mit einem Fuß Toleranz.
-  Nur wenn `100 - x` den Widerspruch auflöst, wird x mit erhaltenem `sourceX` und
-  `coordinateCorrection: "mirrored-x"` korrigiert. Andernfalls wird abgelehnt.
-  Ohne Distanz-/Seitenbeleg wird keine Korrektur geraten; Rohfeeds und y bleiben unverändert.
-- Heaves ohne genauen Ort werden aus Distanz und Korbrichtung angenähert.
-  Rebounds, Fouls und Freiwurfaufstellungen haben überwiegend abgeleitete Positionen.
-- Die Normalisierung verarbeitet den modernen liveData-artigen Feed. Legacy-/Stats-Feeds
-  besitzen keinen Adapter und dürfen nicht ungeprüft beigemischt werden.
-- Unbekannte Personen sind grundsätzlich ein Fehler. Die eng begrenzte Ausnahme für technische
-  Fouls bei bekanntem Team erfindet weder Spieler noch eine Trainerrolle.
-
-## Oberfläche und Darstellung
-
-- Ein waagerechter vollständiger Court, Jumbotron und Playback-Controls bilden die Oberfläche.
-  Heimlogo und Paint identifizieren den Homecourt. Heimteamname und Arena stehen außen hochkant,
-  ungespiegelt; die Korbanlagen bleiben über den Spielern, Ball und Wurfeffekte darüber sichtbar.
-- Initiale Seite und Social-Metadaten bleiben neutral „Hoops Replay“. Titel, Teamdaten und Court
-  werden erst nach erfolgreicher Datenprüfung konkret. Bis dahin bleibt die Darstellung neutral.
-- Das Jumbotron zeigt Score, Periode und Uhr sowie ab dem Ereignis Spieler/Team und originalen
-  PbP-Text für höchstens fünf Replay-Sekunden oder bis zum nächsten Ereignis.
-  Zusammengefasste Szenen zeigen den Text der Hauptaktion. Ohne aktive Aktion erscheint
-  Matchup/Spieldatum nach America/New_York; Perioden-/Finaltexte stehen ebenfalls im Jumbotron.
-- Spieler erscheinen als nummerierte ärmellose Jerseys; Namen beim Antippen. Keine zusätzlichen
-  Auswahl- oder Ballbesitzerkreise. Teamlogos liegen lokal, Spielerfotos kommen vom jeweiligen
-  NBA-/WNBA-CDN mit Teamlogo als Fallback. Fotos zeigen den aktuellen CDN-Stand.
-- Treffer erhalten grüne Punkte, Fehlwürfe rote Kreuze unter den Jerseys, dazu Punktewerte.
-  Sichtbarkeit und Ausblenden laufen in Replay-Zeit; andere Ereignis-Icons bleiben vom Court fern.
-- Die schlichte Balldarstellung führt ihre Naht-Drehstellung über Fänge und Szenenwechsel fort.
-  Passrotation, Rückwärtsrotation bei Würfen und minimale Dribbelbewegung werden vorab auf der
-  Replay-Zeitachse geplant; Pause und Seeking verändern die Drehstellung eines Zeitpunkts nicht.
-- Play/Pause, 0,5×/1×/1,5×/2×/4×, Scrubbing, Perioden- und Angriffssprünge bleiben konsistent.
-  Leertaste/Pfeile ergänzen die Steuerung. Play am Ende startet neu.
-- `?game=GAME_ID&action=ACTION_NUMBER` öffnet eine Szene am Ereignis pausiert.
-  Auch IDs zugehöriger Annotationen führen zur gemeinsamen Szene. Ungültige IDs warnen und
-  lassen den Start bei null; die URL wird während der Wiedergabe nicht fortgeschrieben.
-- Der Fußtext erklärt belegte Eckpunkte, schematische Ergänzungen und verdichtete Zeit.
-  Uniformen, Formationen und Laufwege werden nicht als gemessene Originale ausgegeben.
-- Darunter verlinken lokale GitHub- und Threads-Icons ohne sichtbaren Text die Profile von Tehes.
-- Runtime-Pfade bleiben relativ und GitHub-Pages-kompatibel. Es gibt keinen aktiven Service Worker
-  oder Offline-Cache. Umami erfasst bestehende Seitenaufrufe auf `tehes.github.io`, keine neuen Events.
-
-### Teamfarben
-
-Die verbindlichen NBA-/WNBA-Paletten stehen in `js/replay-teams.js`. Alternates sind bewusst
-pragmatische Replay-Farben, keine saisonal recherchierten tatsächlichen Uniformen. Schwarz bleibt
-eine implizite Option. Historische Uniformrecherche ist keine Freigabebedingung.
-
-Home bleibt normalerweise weiß, Away trägt Primary. Erst die Farbähnlichkeits- und
-Verbesserungsentscheidung nach Spielplan-Prinzip löst die Away-Suche aus; bloß geringer
-Helligkeitskontrast genügt nicht. Away versucht Alternate, dann Schwarz bei weißem Home.
-Erst wenn keine geeignete Variante mit lesbaren eigenen Teamdetails gelingt, wechselt Home
-zu Primary; Away versucht Alternate, danach Weiß/Schwarz. Away-Primary bleibt dann ausgeschlossen.
-
-Nummern/Ränder brauchen mindestens 4:1 gegen das eigene Jersey. Eigene Teamfarben werden in
-Grundfläche oder Details bevorzugt; nötigenfalls sind neutrale Details erlaubt.
-Zwischen Jersey-Flächen beziehungsweise Away und Paint gibt es keine feste Mindest-Kontrastrate.
-Die Auswahl bleibt bei Pause, Seeking und Seitenwechsel stabil; Court-Paletten ändern sich nicht.
-Details der OKLab-Schwellen und Auswahlreihenfolge sind in `replay-colors.js` und dessen Tests maßgeblich.
-
-## Auswertung und bekannte Grenzen
-
-Der gemeinsame Replay-Audit läuft mit Serverdaten über
-[scripts/audit-replays.js](scripts/audit-replays.js). Er prüft unter anderem End- und Zwischenstände,
-Repräsentation der Ereignisse, aktive Aufstellungen, Ballbesitzer, endliche Koordinaten,
-Wurf-/Reboundverhalten und interpolierte Zustände. Die Fadeaway-Landung wird am Wurfende
-(`eventAt`) bewertet, bevor ein eigener Rebound-Lauf die Position verändern kann.
-Formationserhalt nach Offensivrebound wird
-nur bei einer ununterbrochenen Live-Fortsetzung des verknüpften Wurfs mit vorhandener Formation
-verlangt. Ein als `deadball` erfasster Team-Rebound nach einer Strafe erfordert diesen Erhalt nicht.
-Nach Flagrant-Freiwürfen ist der anschließende Einwurf zulässig; Grundlage ist für die WNBA
-[Rule 12B, Section IV des Regelwerks 2026](https://cdn.wnba.com/sites/4/2026/05/2026-WNBA-Official-Rule-Book.pdf#page=60).
-Die vorhandenen Einzelprüfungen in
-[replay-data_test.js](scripts/replay-data_test.js) laden ihre realen Ausgangsspiele ebenfalls vom
-Server; [replay-motion_test.js](scripts/replay-motion_test.js) und
-[replay-colors_test.js](scripts/replay-colors_test.js) benötigen keine Spieldateien.
-Ausführung steht in [README.md](README.md). Es werden keine neuen festen Einzeltests als
-Voraussetzung des Iterationsverfahrens eingeführt.
-
-Alle realen Vergleichsfälle hängen vom aktuellen Serverfeed ab. Es gibt keine automatische
-Übernahme früherer Prüfergebnisse auf nachträglich korrigierte Daten.
-
-Dauerhaft wichtige Gegenbeispiele und Grenzen:
-
-- MIN–CLE `0022600120`: Dosunmus zeitgleicher Steal 385/386 und Auswechslung 254/253 sind
-  Gegenbeispiele zur reinen Quellordnung. Die bestehende Einzelprüfung untersucht die begrenzte
-  kausale Replay-Korrektur am Serverfeed; dessen unveränderter Fortbestand ist nicht garantiert.
-  Die Overtime dieses Spiels ist nicht visuell vollständig abgenommen.
-- CLE–ATL `0022600144`: Die bestehende Einzelprüfung schneidet den Serverfeed bis Rebound 57
-  zu. Aktion 56 untersucht Alexander-Walkers Vorbereitung ohne den früheren Platztausch mit McCollum,
-  gespiegelt und mit verkürztem Spieluhrabstand. Die Team-Endstände stammen aus dem vollständigen Spiel.
-- Burton/Canada in `1042600305`: Treffer/Foul 450/451 bei Q4 6:27, Fehlfreiwurf 453 und
-  Hillmon-Rebound 454 bei 6:25. Der gezielte Test sichert den And-one-Kontakt ohne zweiten Angriff;
-  die Ereignisfolge ist im Testcode definiert, ihre Ausgangsaufstellung kommt vom Server.
-- HOU–SAS `0022600009` ist ein bekannter inkonsistenter Feedfall, dessen aktuelle Serverdaten geprüft werden.
-  Endstand allein genügt nicht. Widersprechende Zeiten/Zwischenstände dürfen nicht durch allgemeines
-  Umsortieren oder Abschalten von Prüfungen verdeckt werden.
-- Andere seltene Ereignisse, neue Descriptor-Schreibweisen, fehlende Koordinaten, unbekannte Personen
-  oder unpassende Wechsel können weiterhin zur Ablehnung oder generischen Darstellung führen.
-  Ein Ladefehler ist nicht automatisch ein nachgewiesener Fehler des Feeds.
-- Frühere Sichtprüfungen zeigten einen Canvas-`drawImage`-Fehler beim Wechsel von Desktop- zu
-  Mobilgröße im bereits geladenen Replay. Ein behobener Zustand ist nicht belegt; Resize benötigt
-  eine gezielte aktuelle Prüfung. Daraus folgt keine allgemeine Behauptung, Mobilansichten seien defekt.
-- Es gibt keine vollständige Safari-/iPhone-Abnahme und keine garantierte kollisionsfreie
-  Zehn-Spieler-Simulation. Die neue Regel- und Qualitätsbewertung ist noch nicht implementiert.
-
-Jede Weiterentwicklung kann an diesen Konzeptgrenzen ansetzen. Ihr Abschluss beschreibt, welcher
-Teil tatsächlich verbessert wurde und welche Lücke verbleibt, ohne die gesamte Zielarchitektur
-oder Regelabdeckung vorwegzunehmen.
+Nur hinreichend belegte Orte sind verbindliche Abschlussanker. Fehlende oder widersprüchliche
+Ortsangaben dürfen nicht als Tracking-Daten ausgegeben werden; sachlich begründete Korrekturen
+müssen von ursprünglichen Angaben unterscheidbar bleiben. Nicht belegte Positionen, Wege und
+Passfolgen bleiben schematische Ergänzungen. Unzureichende oder inkonsistente Daten müssen
+als solche erkennbar bleiben, statt Sicherheit oder zusätzliche Ereignisse vorzutäuschen.

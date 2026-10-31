@@ -3,6 +3,26 @@
 Dieses Dokument hält begrenzte fachliche Iterationen fest. PROJECT.md beschreibt das gültige Konzept.
 Reale Spiele kommen vom Server; IDs bezeichnen Vergleichsfälle, keine unveränderlichen Datenarchive.
 
+## Aufgezeichnete defensive Drei-Sekunden-Verstöße
+
+- **Verworfener Ansatz:** Einen freien Punkt in der Zone wählen und den Verteidiger so hineinlaufen
+  lassen, dass ein geometrischer Timer beim belegten Pfiff überschritten ist. Die Zeit- und
+  Positionsprüfungen bestanden, aber der Nutzer beurteilte den Lauf in `0022600024` als gestellt:
+  Ball, Gegenspieler und Verteidiger lieferten keinen erkennbaren Anlass für das Einrücken.
+- **Fachliche Grundlage:** WABC Level 1, Team 1.1.7–1.1.8 beschreibt ballferne Hilfspositionen,
+  Hilfe gegen Penetration und Rückkehrsignale. NBA/WNBA Rule 10, Section VII bestimmt die
+  Voraussetzungen und Ausnahmen des defensiven Zonentimers. Coaching-Prinzipien belegen keine
+  tatsächlichen Pässe oder Laufwege der aufgezeichneten Partie.
+- **Neuer Kandidat:** Bei ballfernem Gegenspieler kann eine zunächst bewachte Hilfsposition mit
+  dessen späterem Freilaufen verbunden werden. Bei freier Bahn kann eine Penetration die Hilfe
+  auslösen und ein anschließender Rückzug die unterlassene Rückkehr erkennbar machen. Wenn der
+  belegte Spieler zuvor am Ball war, muss zunächst ein passender Ballwechsel möglich sein.
+  Auswahl und Bewegungen verwenden Ball, Gegenspieler, Korb und freie Wege; nicht unterstützte
+  Kontexte werden ausgewiesen, statt einen ursachenlosen Zonenlauf zu ergänzen.
+- **Beurteilung:** Die Kausalitäts-, Zeit-, Seeking- und Feed-Prüfungen sind gezielte technische
+  Kriterien. Sie belegen keine vollständige Basketballplausibilität oder die tatsächliche Aktion.
+  Die visuelle Nutzerabnahme des neuen Kandidaten bleibt offen.
+
 ## Turnover und anschließendes Loose-Ball-Foul
 
 - **Hypothese und Hebel:** Das belegte Kontaktpaar bereits vor dem Turnover reservieren,

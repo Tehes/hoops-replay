@@ -3,7 +3,7 @@ import { attackDirection, clockSeconds, compileReplay, getReplayFrame } from "..
 import { checkReplay } from "../js/replay-validation.js";
 import { getTeamColors, getTeamLogo, getTeamName } from "../js/replay-teams.js";
 import { loadFeed, loadGame } from "./replay-source.js";
-import { getLaneWaitingPoint, isInOffensiveLane } from "../js/replay-rules.js";
+import { getLaneWaitingPoint, isDefensiveLaneCountActive, isInOffensiveLane } from "../js/replay-rules.js";
 
 Deno.test("linked turnovers show a free ball before the recorded foul in either court direction", async () => {
 	const data = await loadGame("0022600002");
@@ -2714,4 +2714,121 @@ Deno.test("unanchored half-court possessions give an available center an interio
 		}
 	}
 	assert(checked > 10, "missing NBA/WNBA unanchored-possession coverage");
+});
+
+Deno.test("recorded DEN-PHX defensive three seconds preserve both whistles with a qualifying lane stay", async () => {
+	const source = await loadGame("0022600024");
+	for (const mirrored of [false, true]) {
+		const data = structuredClone(source);
+		if (mirrored) {
+			for (const action of data.actions) {
+				if (["left", "right"].includes(action.side)) {
+					action.side = action.side === "left" ? "right" : "left";
+				}
+				if (action.isFieldGoal) {
+					action.x = 100 - action.x;
+				}
+			}
+		}
+		const original = JSON.stringify(data);
+		const replay = compileReplay(data);
+		for (const actionNumber of [147, 177]) {
+			const scene = replay.scenes.find((scene) => scene.action.actionNumber === actionNumber);
+			const plan = scene.defensiveThreeSeconds;
+			assert(plan, "recorded violation has no causal context");
+			assert(plan.kind === (actionNumber === 147 ? "missed-follow" : "help-and-recover"),
+				"different game situations received the same forced lane entry");
+			const direction = attackDirection(data, scene.attackTeam, scene.action.period);
+			if (plan.kind === "missed-follow") {
+				const setup = plan.phases.find((phase) => phase.kind === "weak-side-position");
+				const relocation = plan.phases.find((phase) => phase.kind === "receiver-relocates");
+				const before = getReplayFrame(replay, scene.start + setup.end);
+				const after = getReplayFrame(replay, scene.start + relocation.end);
+				const defender = before.players.find((player) => player.id === plan.playerId);
+				const opponent = before.players.find((player) => player.id === plan.opponentId);
+				const laterDefender = after.players.find((player) => player.id === plan.playerId);
+				const laterOpponent = after.players.find((player) => player.id === plan.opponentId);
+				assert((opponent.y - 25) * (before.ball.y - 25) < 0, "helper was not on the weak side");
+				assert(Math.hypot(defender.x - opponent.x, defender.y - opponent.y) <= 4.5,
+					"the initial help abandoned its opponent");
+				assert(Math.hypot(laterOpponent.x - opponent.x, laterOpponent.y - opponent.y) >= 4 &&
+					Math.hypot(laterDefender.x - defender.x, laterDefender.y - defender.y) < 0.01,
+					"the violation was not caused by a missed adjustment to the receiver");
+			} else {
+				const penetration = plan.phases.find((phase) => phase.kind === "penetration-and-help");
+				const retreat = plan.phases.find((phase) => phase.kind === "retreat-and-recover");
+				const before = getReplayFrame(replay, scene.start + penetration.start);
+				const atHelp = getReplayFrame(replay, scene.start + penetration.end);
+				const after = getReplayFrame(replay, scene.start + retreat.end);
+				const driverBefore = before.players.find((player) => player.id === plan.driverId);
+				const driver = atHelp.players.find((player) => player.id === plan.driverId);
+				const helper = atHelp.players.find((player) => player.id === plan.playerId);
+				const laterDriver = after.players.find((player) => player.id === plan.driverId);
+				const laterHelper = after.players.find((player) => player.id === plan.playerId);
+				assert((driver.x - driverBefore.x) * direction >= 3 &&
+					(helper.x - driver.x) * direction > 0, "help had no penetration or rim-protection cue");
+				assert((driver.x - laterDriver.x) * direction >= 3 &&
+					Math.hypot(laterHelper.x - helper.x, laterHelper.y - helper.y) < 0.01,
+					"helper did not miss the recovery after the retreat");
+			}
+			let seconds = 0;
+			let previous = null;
+			for (let local = plan.settledAt; local < scene.eventAt; local += 0.02) {
+				const frame = getReplayFrame(replay, scene.start + local);
+				const active = isDefensiveLaneCountActive(frame, scene.action.personId, direction);
+				seconds = active && previous?.active ? seconds + previous.clock - frame.clock : 0;
+				previous = { active, clock: frame.clock };
+			}
+			assert(seconds > 3 && seconds < 5, `recorded violation had ${seconds} qualifying seconds`);
+			const whistle = getReplayFrame(replay, scene.start + scene.eventAt);
+			assert(whistle.clock === clockSeconds(scene.action.clock), "whistle changed its recorded clock");
+			assert(whistle.gameState.ballStatus === "dead", "whistle did not stop play");
+			assert(scene.rules.after.resume.restart === "free-throw-line", "wrong retained-possession continuation");
+			const mid = scene.start + (plan.phases[0].start + plan.phases[0].end) / 2;
+			const frame = JSON.stringify(getReplayFrame(replay, mid));
+			getReplayFrame(replay, replay.duration);
+			assert(JSON.stringify(getReplayFrame(replay, mid)) === frame, "seeking changed the lane entry");
+		}
+		assert(JSON.stringify(data) === original, "lane planning mutated source events");
+		assert(checkReplay(data, replay).errors.length === 0, "defensive lane planning broke replay invariants");
+	}
+});
+
+Deno.test("a recorded WNBA violation uses an open driving lane when the other side is occupied", async () => {
+	const source = await loadGame("1012600001");
+	for (const mirrored of [false, true]) {
+		const data = structuredClone(source);
+		if (mirrored) {
+			for (const action of data.actions) {
+				if (["left", "right"].includes(action.side)) {
+					action.side = action.side === "left" ? "right" : "left";
+				}
+				if (action.isFieldGoal) {
+					action.x = 100 - action.x;
+				}
+			}
+		}
+		const replay = compileReplay(data);
+		const scene = replay.scenes.find((item) => item.action.actionNumber === 468);
+		const plan = scene.defensiveThreeSeconds;
+		assert(plan?.kind === "help-and-recover", "missing contextual help against penetration");
+		assert((plan.probe.y - plan.origin.y) * (plan.origin.y - 25) > 0,
+			"the occupied direction was not rejected");
+		const movement = plan.phases.filter((phase) => ["probe-gap", "penetration-and-help"].includes(phase.kind));
+		for (const phase of movement) {
+			for (let local = phase.start; local <= phase.end; local += 0.02) {
+				const frame = getReplayFrame(replay, scene.start + local);
+				const driver = frame.players.find((player) => player.id === plan.driverId);
+				for (const id of scene.lineups[scene.attackTeam].filter((id) => id !== plan.driverId)) {
+					const teammate = frame.players.find((player) => player.id === id);
+					assert(Math.hypot(driver.x - teammate.x, driver.y - teammate.y) >= 3.5,
+						"the dribbler cut through a teammate");
+				}
+			}
+		}
+		const report = checkReplay(data, replay);
+		const stay = report.defensiveLaneStays.find((item) => item.action === 468);
+		assert(stay?.seconds > 3 && !stay.reason, "missing continuous defensive lane stay");
+		assert(report.errors.length === 0, "contextual WNBA replay failed validation");
+	}
 });

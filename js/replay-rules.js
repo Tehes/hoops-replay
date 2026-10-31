@@ -14,3 +14,296 @@ export function getLaneWaitingPoint(point, direction, origin = point) {
 		{ x: point.x, y: 34.5 },
 	].sort((a, b) => Math.hypot(a.x - origin.x, a.y - origin.y) - Math.hypot(b.x - origin.x, b.y - origin.y))[0];
 }
+
+// NBA/WNBA Rules 6 and 9, and Rule 12A, Section V: resolve continuations before animation.
+function continuation(phase, teamId = null, restart = null) {
+	return {
+		ballStatus: ["play", "rebound", "loose-ball"].includes(phase) ? "live" : "dead",
+		phase,
+		entitledTeam: teamId,
+		controlTeam: phase === "play" ? teamId : null,
+		restart,
+	};
+}
+
+function freeThrow(action) {
+	const sequence = action.subType.match(/(\d) of (\d)/);
+	return {
+		actionNumber: action.actionNumber,
+		teamId: action.teamId,
+		shooterId: action.personId,
+		attempt: sequence ? Number(sequence[1]) : 1,
+		total: sequence ? Number(sequence[2]) : 1,
+		technical: action.descriptor === "technical" || Boolean(action.qualifiers?.includes("technical")),
+		retained: action.descriptor === "flagrant",
+	};
+}
+
+function upcomingFreeThrows(scenes, index) {
+	const action = scenes[index].action;
+	const attempts = [];
+	for (let i = index + 1; i < scenes.length; i++) {
+		const next = scenes[i];
+		if (
+			next.action.period !== action.period || next.action.clock !== action.clock ||
+			["2pt", "3pt", "heave", "turnover", "jumpball", "period", "game"].includes(next.kind)
+		) {
+			break;
+		}
+		if (next.kind === "freethrow") {
+			attempts.push(freeThrow(next.action));
+		}
+	}
+	return attempts;
+}
+
+export function planGameStates(scenes, data) {
+	const opponent = (teamId) => data.teams.find((team) => team.id !== teamId).id;
+	const openingTeam = scenes.find((scene) => scene.kind === "jumpball")?.action.teamId ?? null;
+	let state = { ...continuation("jump-ball", null, "jump-ball"), pendingFreeThrows: [], resume: null };
+	for (const [index, scene] of scenes.entries()) {
+		const action = scene.action;
+		const defensiveThreeSeconds = scene.kind === "foul" && action.subType === "technical" &&
+			action.descriptor === "defensive-3-second";
+		const before = state;
+		let offense = before.entitledTeam;
+		if (["2pt", "3pt", "heave", "freethrow", "turnover", "jumpball"].includes(scene.kind)) {
+			offense = action.teamId;
+		} else if (scene.kind === "foul") {
+			offense = action.subType === "offensive"
+				? action.teamId
+				: action.possession || before.entitledTeam || opponent(action.teamId);
+		} else if (scene.kind === "steal") {
+			offense = before.controlTeam ?? before.entitledTeam ?? opponent(action.teamId);
+		} else if (action.possession) {
+			offense = action.possession;
+		}
+		const requiresPlay = ["2pt", "3pt", "heave", "turnover", "steal"].includes(scene.kind) ||
+			(scene.kind === "foul" && action.descriptor === "shooting" && scene.andOneShotIndex === undefined &&
+				before.pendingFreeThrows.length === 0) ||
+			(scene.liveSeconds > 0 && ["foul", "violation", "timeout"].includes(scene.kind) &&
+				scene.andOneShotIndex === undefined && before.pendingFreeThrows.length === 0);
+		const play = { ...continuation("play", offense), pendingFreeThrows: [], resume: null };
+		let after = requiresPlay ? play : before;
+		let attempt = null;
+		if (["2pt", "3pt", "heave"].includes(scene.kind)) {
+			after = {
+				...play,
+				...continuation(
+					action.shotResult === "Made" ? "throw-in" : "rebound",
+					action.shotResult === "Made" ? opponent(action.teamId) : null,
+					action.shotResult === "Made" ? "baseline" : null,
+				),
+			};
+			if (scene.andOneFoul) {
+				after = {
+					...after,
+					...continuation("free-throws", action.teamId),
+					pendingFreeThrows: upcomingFreeThrows(scenes, index),
+					resume: null,
+				};
+			}
+		} else if (scene.kind === "foul") {
+			const attempts = upcomingFreeThrows(scenes, index);
+			const technical = action.subType === "technical";
+			const interrupted = requiresPlay
+				? continuation("throw-in", offense, defensiveThreeSeconds ? "free-throw-line" : "sideline")
+				: before.resume ||
+					(before.phase === "play" || before.phase === "rebound"
+						? continuation("throw-in", offense, "sideline")
+						: continuation(before.phase, before.entitledTeam, before.restart));
+			const restart = continuation(
+				"throw-in",
+				action.subType === "offensive" ? opponent(action.teamId) : offense,
+				"foul",
+			);
+			after = {
+				...after,
+				...continuation(
+					attempts.length ? "free-throws" : technical ? interrupted.phase : "throw-in",
+					attempts[0]?.teamId ?? (technical ? interrupted.entitledTeam : restart.entitledTeam),
+					attempts.length ? null : technical ? interrupted.restart : restart.restart,
+				),
+				pendingFreeThrows: attempts,
+				resume: attempts.length ? technical ? interrupted : restart : null,
+			};
+		} else if (scene.kind === "freethrow") {
+			attempt = freeThrow(action);
+			const pending = upcomingFreeThrows(scenes, index);
+			attempt.live = attempt.attempt === attempt.total && !attempt.technical && !attempt.retained &&
+				pending.length === 0;
+			let resume = before.resume || continuation("throw-in", before.entitledTeam ?? action.teamId, "sideline");
+			if (!attempt.technical && attempt.attempt === attempt.total) {
+				resume = attempt.retained
+					? continuation("throw-in", action.teamId, "flagrant")
+					: action.shotResult === "Made"
+					? continuation("throw-in", opponent(action.teamId), "baseline")
+					: continuation("rebound");
+			}
+			after = {
+				...(pending.length ? continuation("free-throws", pending[0].teamId) : resume),
+				pendingFreeThrows: pending,
+				resume: pending.length ? resume : null,
+			};
+		} else if (scene.kind === "rebound") {
+			if (before.ballStatus !== "dead") {
+				const caught = Boolean(action.personId) && !action.qualifiers?.includes("deadball");
+				after = {
+					...before,
+					...continuation(caught ? "play" : "throw-in", action.teamId, caught ? null : "sideline"),
+				};
+			}
+		} else if (scene.kind === "turnover" || scene.kind === "steal") {
+			const stolen = Boolean(action.stealPersonId) || scene.kind === "steal";
+			after = {
+				...play,
+				...continuation(
+					stolen ? "play" : "throw-in",
+					stolen && scene.kind === "steal" ? action.teamId : opponent(offense),
+					stolen ? null : "sideline",
+				),
+			};
+			if (scene.looseBallFoulIndex !== undefined) {
+				after = { ...play, ...continuation("loose-ball") };
+			}
+		} else if (scene.kind === "jumpball") {
+			after = play;
+		} else if (scene.kind === "timeout") {
+			after = {
+				...after,
+				...(requiresPlay || before.ballStatus === "live" ? continuation("throw-in", offense, "sideline") : {}),
+			};
+		} else if (scene.kind === "violation" && action.subType === "kicked ball") {
+			after = { ...after, ...continuation("throw-in", offense, before.restart || "sideline") };
+		} else if (scene.kind === "period") {
+			const start = action.subType === "start";
+			const jump = action.period === 1 || action.period > 4;
+			const team = openingTeam === null ? null : action.period === 4 ? openingTeam : opponent(openingTeam);
+			after = {
+				...continuation(
+					start ? jump ? "jump-ball" : "throw-in" : "period-end",
+					start && !jump ? team : null,
+					start ? jump ? "jump-ball" : "baseline" : null,
+				),
+				pendingFreeThrows: [],
+				resume: null,
+			};
+		} else if (scene.kind === "game") {
+			after = { ...continuation("game-end"), pendingFreeThrows: [], resume: null };
+		}
+		const buildupRestart = before.restart === "baseline" && before.entitledTeam !== offense ? null : before.restart;
+		scene.rules = {
+			before,
+			play,
+			after,
+			offense,
+			requiresPlay,
+			buildupRestart,
+			freeThrow: attempt,
+			defensiveThreeSeconds,
+		};
+		state = after;
+	}
+}
+
+// Body-center distances approximate arm's length; individual feet and guarding poses are not tracked.
+export function isDefensiveLaneCountActive(frame, defenderId, direction) {
+	const scene = frame.scene;
+	const offense = scene.attackTeam;
+	const player = frame.players.find((player) => player.id === defenderId);
+	if (
+		frame.gameState.ballStatus !== "live" || frame.gameState.phase !== "play" ||
+		frame.gameState.controlTeam !== offense || (frame.ball.x - 47) * direction <= 0 ||
+		!isInOffensiveLane(player, direction)
+	) {
+		return false;
+	}
+	const attackers = frame.players.filter((player) => scene.lineups[offense].includes(player.id));
+	if (attackers.some((other) => Math.hypot(player.x - other.x, player.y - other.y) <= 4.5)) {
+		return false;
+	}
+	const owner = attackers.find((player) => player.id === frame.ball.owner);
+	if (owner && (owner.x - 47) * direction <= 0) {
+		return false;
+	}
+	if (owner && scene.matchups[defenderId] === owner.id) {
+		return frame.players.some((other) =>
+			Number(other.id) !== defenderId &&
+			Object.hasOwn(scene.matchups, other.id) && Math.hypot(other.x - owner.x, other.y - owner.y) <= 4.5
+		);
+	}
+	return true;
+}
+
+export function scheduleGameStates(scene) {
+	scene.ruleTimeline = [];
+	if (scene.rules.requiresPlay) {
+		if (scene.inboundAt !== undefined) {
+			scene.ruleTimeline.push({
+				time: scene.inboundAt,
+				state: {
+					...scene.rules.play,
+					phase: "throw-in",
+					controlTeam: null,
+				},
+			});
+		}
+		scene.ruleTimeline.push({ time: scene.liveAt ?? scene.returnAt ?? 0, state: scene.rules.play });
+	}
+	if (scene.kind === "freethrow") {
+		scene.ruleTimeline.push({
+			time: scene.freeThrowAt,
+			state: {
+				...scene.rules.before,
+				ballStatus: "live",
+				phase: "free-throw",
+				entitledTeam: scene.action.teamId,
+				controlTeam: null,
+				restart: null,
+			},
+		});
+		scene.ruleTimeline.push({
+			time: scene.releaseAt,
+			state: {
+				...scene.rules.before,
+				ballStatus: scene.rules.freeThrow.live ? "live" : "dead",
+				phase: "free-throw-flight",
+				entitledTeam: null,
+				controlTeam: null,
+				restart: null,
+			},
+		});
+	} else if (scene.kind === "jumpball") {
+		scene.ruleTimeline.push({
+			time: scene.jumpBallPlan.tossAt,
+			state: {
+				...scene.rules.before,
+				ballStatus: "live",
+				phase: "jump-ball",
+				restart: null,
+			},
+		});
+	} else if (["2pt", "3pt", "heave"].includes(scene.kind)) {
+		scene.ruleTimeline.push({
+			time: scene.releaseAt,
+			state: {
+				...scene.rules.play,
+				phase: "shot",
+				entitledTeam: null,
+				controlTeam: null,
+			},
+		});
+	}
+	scene.ruleTimeline.push({ time: scene.eventAt, state: scene.rules.after });
+}
+
+export function getSceneGameState(scene, time) {
+	let state = scene.rules.before;
+	for (const entry of scene.ruleTimeline) {
+		if (entry.time > time + 1e-9) {
+			break;
+		}
+		state = entry.state;
+	}
+	return state;
+}

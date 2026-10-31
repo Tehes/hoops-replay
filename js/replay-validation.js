@@ -1,6 +1,6 @@
 import { attackDirection, compileReplay, getReplayFrame } from "./replay-engine.js";
 import { getLeague } from "./replay-leagues.js";
-import { getLaneWaitingPoint, isInOffensiveLane } from "./replay-rules.js";
+import { getLaneWaitingPoint, isDefensiveLaneCountActive, isInOffensiveLane } from "./replay-rules.js";
 
 export function checkReplay(data, replay = compileReplay(data)) {
 	const id = data.gameId;
@@ -117,6 +117,10 @@ export function checkReplay(data, replay = compileReplay(data)) {
 		for (const a of [scene.action, ...scene.related]) represented.add(a.actionNumber);
 		for (const frame of scene.frames) {
 			frames++;
+			check(frame.gameState.ballStatus !== "dead" || frame.gameState.controlTeam === null,
+				`${tag} dead ball cannot have team control`);
+			check(frame.gameState.pendingFreeThrows.length === 0 || frame.gameState.restart === null,
+				`${tag} pending free throws cannot start an inbound`);
 			check(
 				frame.players.every((p) => [p.x, p.y, p.opacity, p.angle, p.jump].every(Number.isFinite)),
 				`${tag} finite players`,
@@ -224,6 +228,7 @@ export function checkReplay(data, replay = compileReplay(data)) {
 		}
 	}
 	const offensiveLaneStays = [];
+	const defensiveLaneStays = [];
 	let laneScene = null;
 	let laneClock = null;
 	let frontcourtControl = false;
@@ -420,10 +425,32 @@ export function checkReplay(data, replay = compileReplay(data)) {
 			}
 		}
 		if (scene.technical) {
-			check(
-				scene.frames.at(-1).possession === replay.scenes[index - 1].frames.at(-1).possession,
-				`${id} technical possession`,
-			);
+			const { before, after } = scene.rules;
+			if (before.resume) {
+				const resumed = after.pendingFreeThrows.length ? after.resume : after;
+				check(resumed.entitledTeam === before.resume.entitledTeam && resumed.restart === before.resume.restart &&
+					resumed.phase === before.resume.phase, `${id} technical continuation`);
+			}
+		}
+		if (scene.rules.defensiveThreeSeconds) {
+			const plan = scene.defensiveThreeSeconds;
+			const report = { action: scene.action.actionNumber, player: scene.action.personId, seconds: 0 };
+			defensiveLaneStays.push(report);
+			if (!plan) {
+				report.reason = scene.liveSeconds <= 6 ? "insufficient-context-time" : "no-supported-help-context";
+				continue;
+			}
+			const direction = attackDirection(data, scene.attackTeam, scene.action.period);
+			const step = Math.min(0.05, (scene.eventAt - (scene.liveAt ?? 0)) / scene.liveSeconds * 0.05);
+			let previous = null;
+			for (let local = plan.settledAt; local < scene.eventAt; local += step) {
+				const frame = getReplayFrame(replay, scene.start + local);
+				const active = isDefensiveLaneCountActive(frame, plan.playerId, direction);
+				report.seconds = active && previous?.active
+					? report.seconds + previous.clock - frame.clock : 0;
+				previous = { active, clock: frame.clock };
+			}
+			check(report.seconds > 3, `${id}:${scene.action.actionNumber} recorded defensive three seconds before whistle`);
 		}
 	}
 	return {
@@ -437,6 +464,7 @@ export function checkReplay(data, replay = compileReplay(data)) {
 		profiles: [...profiles.keys()],
 		formations: formationCounts,
 		offensiveLaneStays,
+		defensiveLaneStays,
 		errors,
 	};
 }

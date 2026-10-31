@@ -1,91 +1,10 @@
-/*
- * CHOREOGRAPHY NORTH STAR
- *
- * Goal: Turn recorded events into rule-consistent, coherent and readable
- * basketball possessions, with purposeful movement by the ball and all players.
- * This is the enduring target, not a claim of complete implementation.
- * See PROJECT.md for current behavior and limits; work plans belong elsewhere.
- *
- * Evidence comes first. Preserve event order, participants, scores, recorded
- * clocks and available shot coordinates. Link related events without losing
- * their source identity. Formations, matchups, passes and movement between
- * anchors are schematic choices, never measured tracking.
- * Show specific screens, pick-and-rolls or pick-and-pops only with explicit
- * source evidence. A missing assist does not establish an isolation, and a
- * turnover alone does not establish a fast break.
- *
- * Rules define the legal space for choreography:
- * - Use the official NBA or WNBA rules applicable to the game's season.
- *   Account explicitly for the full rulebook: state transitions, constraints on
- *   generated movement, recorded officiating decisions, and rules outside the
- *   representation's scope. Keep coverage, exceptions and gaps inspectable.
- * - Derive live/dead ball, entitlement to possession, pending penalties and
- *   restarts from linked evidence and explicit game state. Keep that state
- *   separate from visual positions, poses and the current ball holder.
- * - Preserve recorded rulings and their consequences. Prevent violations
- *   introduced by schematic movement instead of inventing additional whistles.
- *   Evaluate time-based restrictions, including lane occupancy with its
- *   conditions and exceptions, in represented game time, not compressed
- *   animation time. Do not claim precision beyond the modeled detail.
- *
- * Keep responsibilities clear: evidence establishes what happened; rules
- * determine the permitted continuation; choreography selects a plausible plan;
- * motion turns the plan into feasible trajectories; rendering displays the
- * compiled state. Keep rules and planning testable without a browser.
- * Neither animation nor rendering may independently change game outcomes.
- *
- * Ground heuristic choices in established coaching principles from WABC,
- * USA Basketball and Jr. NBA, while league rules remain authoritative.
- * Make each major heuristic's principle, source, applicability and rationale
- * inspectable. Coaching knowledge justifies plausible additions; it does not
- * prove that a particular real-world play occurred.
- *
- * Plan connected possessions, not isolated animations:
- * - Use possession origin, game-clock gaps, interruptions, shot descriptors and
- *   linked rebounds to choose transition or half-court buildup.
- * - Work backward from recorded finishes, but stage the approach in time.
- *   Preserve positional continuity instead of parking the next shooter at the
- *   finish or in the lane. Lookahead may inform positioning; visible reactions
- *   must not anticipate exact rebound or interception points.
- * - Coordinate the ball, receivers and off-ball space. Time passes to arriving
- *   receivers; clear drive/pass corridors and fill useful vacant spots.
- *   Holding an open spot is purposeful; not everyone must move after every pass.
- * - Keep roles flexible, with recorded involvement taking priority. During
- *   normal PG-led advance, teammates fill their spots ahead of the ball.
- *   An inbounder or rebounder may trail until releasing it; do not force an
- *   evidenced outside shooter into the paint.
- * - Coordinate defensive assignments with the ball and danger: protect the rim
- *   in transition, provide help and recover or close out when appropriate.
- *   Avoid rigidly copying an attacker's path at a fixed offset.
- *
- * Combine reusable basketball actions with simple routes, acceleration and
- * braking. Resolve crossings through spacing, a detour or yielding, not repeated
- * weaving. Reject illegal or infeasible plans before comparing continuity,
- * travel time, spacing, pass-lane clearance and unnecessary movement.
- * Simplify when time or evidence is scarce. Keep important choices explainable.
- *
- * Compile choices deterministically into one replay timebase so play, pause,
- * speed changes and seeking agree. Game-clock gaps guide live-action budgets;
- * wall-clock timestamps must not turn stoppages into extra running time.
- *
- * Improvement must be reproducible across recorded games, focused scenarios
- * and systematic variants. Compare against the last accepted baseline with
- * stable criteria: evidence and rule correctness first, contextual motion
- * quality second, visual basketball plausibility as a complementary judgment.
- * Diagnose shared causes, improve general models and protect neighboring cases.
- * Metrics are diagnostics, not substitutes for basketball judgment. Preserve
- * concise accepted and rejected learnings rather than accumulating symptom
- * patches or optimizing a single score.
- *
- * Success means recorded anchors survive, generated play respects the rules,
- * each movement has a readable purpose and the next action follows naturally.
- */
+/* The replay north star and project concept are defined in PROJECT.md. */
 
 import { animateShot, flyBall, getDriveStart, getShotEntry, getShotStyle, landPlayers } from "./replay-shots.js";
 import { movePlayers } from "./replay-motion.js";
 import { getLeague } from "./replay-leagues.js";
 import { getInteriorScore, getMatchupCost, getPlayerRole } from "./replay-profiles.js";
-import { getLaneWaitingPoint, isInOffensiveLane } from "./replay-rules.js";
+import { getLaneWaitingPoint, getSceneGameState, isDefensiveLaneCountActive, isInOffensiveLane, planGameStates, scheduleGameStates } from "./replay-rules.js";
 
 const POSITION_ORDER = {
 	PG: 0,
@@ -120,20 +39,6 @@ export function attackDirection(data, teamId, period) {
 			(evidence.period <= 2 ? 1 : -1)
 		: 1;
 	return homeFirstHalfDirection * ((teamId === homeId) === (period <= 2) ? 1 : -1);
-}
-
-function eventOffense(scene, fallback, data) {
-	const action = scene.action;
-	if (["2pt", "3pt", "heave", "freethrow", "turnover"].includes(scene.kind)) {
-		return action.teamId;
-	}
-	if (scene.kind === "foul") {
-		if (action.subType === "offensive") {
-			return action.teamId;
-		}
-		return action.possession || fallback || otherTeam(data, action.teamId);
-	}
-	return fallback;
 }
 
 function buildScenes(actions) {
@@ -351,10 +256,7 @@ function linkRebounds(scenes) {
 		}
 		let liveFreeThrow = true;
 		if (shot.kind === "freethrow") {
-			const sequence = shot.action.subType.match(/(\d) of (\d)/);
-			liveFreeThrow = !shot.flagrantFreeThrow && shot.action.descriptor !== "technical" &&
-				!shot.action.qualifiers?.includes("technical") &&
-				(!sequence || sequence[1] === sequence[2]);
+			liveFreeThrow = shot.rules.freeThrow.live;
 		}
 		const between = scenes.slice(shotIndex + 1, index);
 		if (between.some((item) => ["2pt", "3pt", "heave", "freethrow", "rebound", "period"].includes(item.kind))) {
@@ -443,7 +345,7 @@ function planMatchups(scenes, index, offense, state, data) {
 		if (
 			(scene.kind === "rebound" && action.teamId !== offense) ||
 			(scene.kind === "period" && action.subType === "end") ||
-			eventOffense(scene, offense, data) !== offense
+			(scene.rules.offense ?? offense) !== offense
 		) {
 			break;
 		}
@@ -1092,12 +994,190 @@ function reactDefense(state, scene, matchups, contacts, direction, delay) {
 	}
 }
 
+// WABC Level 1, Team 1.1.7–1.1.8: help depends on the ball, the matchup and the basket.
+function planDefensiveHelp(state, scene, direction) {
+	if (!scene.rules.defensiveThreeSeconds || scene.liveSeconds <= 6 || !state.ball.owner) {
+		return null;
+	}
+	const playerId = scene.action.personId;
+	const opponentId = scene.matchups[playerId];
+	const opponent = state.positions[opponentId];
+	const handlerId = state.ball.owner;
+	const handler = state.positions[handlerId];
+	const hoop = { x: direction === 1 ? 88.75 : 5.25, y: 25 };
+	const attackers = state.lineups[scene.attackTeam];
+	const insideCourt = (point) => point.x >= 2 && point.x <= 92 && point.y >= 3 && point.y <= 47 &&
+		(point.x - 47) * direction > 2;
+	const clear = (point, excluded, distance) => attackers.filter((id) => !excluded.includes(id))
+		.every((id) => Math.hypot(point.x - state.positions[id].x, point.y - state.positions[id].y) >= distance);
+	const weakSide = (opponent.y - 25) * (handler.y - 25) < -12;
+	const radius = Math.hypot(opponent.x - hoop.x, opponent.y - hoop.y);
+	const target = { x: opponent.x + (hoop.x - opponent.x) / (radius || 1) * 4.2,
+		y: opponent.y + (hoop.y - opponent.y) / (radius || 1) * 4.2 };
+	if (opponentId !== handlerId && weakSide && radius <= 19 && isInOffensiveLane(target, direction) &&
+		clear(target, [opponentId], 6)) {
+		const side = Math.sign(opponent.y - 25) || 1;
+		const relocation = [
+			{ x: opponent.x + (opponent.x - hoop.x) / radius * 6,
+				y: opponent.y + (opponent.y - hoop.y) / radius * 6 },
+			{ x: opponent.x - direction * 4, y: opponent.y + side * 5 },
+			{ x: opponent.x, y: opponent.y + side * 6 },
+		].find((point) => insideCourt(point) && !isInOffensiveLane(point, direction) &&
+			Math.hypot(point.x - target.x, point.y - target.y) >= 7 &&
+			[0.25, 0.5, 0.75, 1].every((u) => clear({ x: opponent.x + (point.x - opponent.x) * u,
+				y: opponent.y + (point.y - opponent.y) * u }, [opponentId], 4)));
+		if (relocation) {
+			return { kind: "missed-follow", playerId, opponentId, handlerId, target, relocation,
+				exchange: canConnectHelpPass(state, scene, handlerId, opponentId) };
+		}
+	}
+	const drivers = opponentId === handlerId
+		? attackers.filter((id) => id !== handlerId &&
+			(state.positions[id].y - 25) * (handler.y - 25) < -12 && canConnectHelpPass(state, scene, handlerId, id))
+		: [handlerId];
+	for (const driverId of drivers) {
+		const origin = state.positions[driverId];
+		const preferredSide = origin.y < 25 ? 1 : -1;
+		for (const side of [preferredSide, -preferredSide]) {
+			const probe = { x: origin.x + direction, y: Math.max(8, Math.min(42, origin.y + side * 7)) };
+			const depth = direction === 1 ? origin.x : 94 - origin.x;
+			const drive = { x: direction === 1 ? Math.min(81.75, Math.max(depth + 5, 75.75))
+				: 94 - Math.min(81.75, Math.max(depth + 5, 75.75)), y: Math.max(15, Math.min(35, probe.y)) };
+			const help = { x: (drive.x + hoop.x) / 2, y: (drive.y + hoop.y) / 2 };
+			if (!insideCourt(probe) || !insideCourt(drive) || (drive.x - probe.x) * direction < 3 ||
+				!isInOffensiveLane(help, direction) || Math.hypot(help.x - origin.x, help.y - origin.y) < 6 ||
+				!clear(help, [driverId], 6) ||
+				![[origin, probe], [probe, drive]].every(([from, to]) => [0.25, 0.5, 0.75, 1].every((u) =>
+					clear({ x: from.x + (to.x - from.x) * u, y: from.y + (to.y - from.y) * u }, [driverId], 4)))) {
+				continue;
+			}
+			const defender = state.positions[playerId];
+			const helpPrep = (defender.x - probe.x) * direction > 0 ? null : {
+				x: probe.x + direction * 2,
+				y: probe.y + (probe.y < 25 ? 4 : -4),
+			};
+			if (helpPrep && (!insideCourt(helpPrep) ||
+				![0.25, 0.5, 0.75, 1].every((u) => clear({
+					x: defender.x + (helpPrep.x - defender.x) * u,
+					y: defender.y + (helpPrep.y - defender.y) * u,
+				}, [driverId], 3.2)))) {
+				continue;
+			}
+			return { kind: opponentId === handlerId ? "pass-and-help" : "help-and-recover", playerId, opponentId,
+				handlerId, driverId, origin: { x: origin.x, y: origin.y }, probe, drive, target: help, helpPrep };
+		}
+	}
+	return null;
+}
+
+function canConnectHelpPass(state, scene, fromId, toId) {
+	const from = state.positions[fromId];
+	const to = state.positions[toId];
+	const dx = to.x - from.x;
+	const dy = to.y - from.y;
+	const distance = Math.hypot(dx, dy);
+	return distance >= 6 && distance <= 35 && Object.keys(scene.matchups).every((id) => {
+		const defender = state.positions[id];
+		const u = ((defender.x - from.x) * dx + (defender.y - from.y) * dy) / distance ** 2;
+		return u <= 0.1 || u >= 0.9 || Math.hypot(defender.x - from.x - dx * u, defender.y - from.y - dy * u) >= 2.5;
+	});
+}
+
+function prepareDefensiveHelp(state, scene, plan, direction, record, recordMovement) {
+	const now = () => scene.frames.at(-1).time;
+	const phase = (kind, targets) => {
+		const start = now();
+		let duration = 0.45;
+		for (const [id, point] of Object.entries(targets)) {
+			const player = state.positions[id];
+			duration = Math.max(duration, Math.hypot(point.x - player.x, point.y - player.y) * 1.5 / 12);
+			Object.assign(player, point);
+		}
+		recordMovement(duration);
+		plan.phases.push({ kind, start, end: now() });
+	};
+	const pass = (toId) => {
+		const fromId = state.ball.owner;
+		const start = now();
+		const to = state.positions[toId];
+		releaseBall(state);
+		record(0.01);
+		flyBall(state, record, { x: to.x + 1, y: to.y + 0.8, z: 0.5 }, 0.6,
+			Math.max(0.4, Math.hypot(to.x + 1 - state.ball.x, to.y + 0.8 - state.ball.y) / 45));
+		state.ball.owner = toId;
+		state.ball.dribble = false;
+		record(0.01);
+		plan.phases.push({ kind: "pass", from: fromId, to: toId, start, end: now() });
+	};
+	plan.settledAt = now();
+	plan.phases = [];
+	scene.defensiveThreeSeconds = plan;
+	scene.preparationAt = now();
+	if (plan.kind === "missed-follow") {
+		phase("weak-side-position", { [plan.playerId]: plan.target });
+		if (plan.exchange) {
+			pass(plan.opponentId);
+			pass(plan.handlerId);
+		}
+		plan.failureAt = now();
+		phase("receiver-relocates", { [plan.opponentId]: plan.relocation });
+	} else {
+		if (plan.driverId !== plan.handlerId) {
+			pass(plan.driverId);
+		}
+		const guardId = Number(Object.keys(scene.matchups).find((id) => scene.matchups[id] === plan.driverId));
+		const guard = state.positions[guardId];
+		const side = plan.probe.y > plan.origin.y ? 1 : -1;
+		state.ball.dribble = true;
+		const probeTargets = { [plan.driverId]: plan.probe,
+			[guardId]: { x: guard.x, y: guard.y + (plan.probe.y - plan.origin.y) * 0.3 } };
+		if (plan.helpPrep) {
+			probeTargets[plan.playerId] = plan.helpPrep;
+		}
+		phase("probe-gap", probeTargets);
+		plan.triggerAt = now();
+		phase("penetration-and-help", { [plan.driverId]: plan.drive, [plan.playerId]: plan.target,
+			[guardId]: { x: plan.drive.x - direction * 3, y: plan.drive.y - side * 3 } });
+		plan.failureAt = now();
+		const dx = (direction === 1 ? 88.75 : 5.25) - plan.origin.x;
+		const dy = 25 - plan.origin.y;
+		const distance = Math.hypot(dx, dy) || 1;
+		phase("retreat-and-recover", { [plan.driverId]: plan.origin,
+			[guardId]: { x: plan.origin.x + dx / distance * 3.2, y: plan.origin.y + dy / distance * 3.2 } });
+	}
+	// Measure the last continuous count on the generated paths, then fit the remaining clock gap.
+	scene.eventAt = now();
+	scene.lineups = state.lineups;
+	scheduleGameStates(scene);
+	const fragment = { scenes: [scene], duration: scene.start + now(), markers: [] };
+	let countFrom = null;
+	for (let time = plan.settledAt; time < now(); time += 0.025) {
+		const frame = getReplayFrame(fragment, scene.start + time);
+		if (isDefensiveLaneCountActive(frame, plan.playerId, direction)) {
+			countFrom ??= time;
+		} else {
+			countFrom = null;
+		}
+	}
+	plan.countFrom = countFrom;
+	const liveAt = scene.liveAt ?? 0;
+	const eventElapsed = countFrom === null ? now() - liveAt
+		: (countFrom - liveAt) * scene.liveSeconds / (scene.liveSeconds - 3.5);
+	const hold = Math.max(0, eventElapsed - (now() - liveAt));
+	state.ball.dribble = false;
+	if (hold > 0) {
+		record(hold);
+	}
+	plan.phases.push({ kind: "late-recovery", start: now() - hold, end: now() });
+	scene.preparationWait = now() - scene.preparationAt;
+}
+
 function advanceFormation(state, scene, offense, direction, targets, record, duration, inbounder = null) {
 	const lineup = state.lineups[offense];
 	const origins = Object.fromEntries(Object.entries(state.positions).map(([id, point]) => [id, { ...point }]));
 	// A live foul may interrupt the advance before either team reaches its set positions.
 	if (scene.kind === "foul" && scene.action.descriptor !== "shooting" && scene.liveSeconds > 0) {
-		const progress = Math.min(1, scene.liveSeconds / 8);
+		const progress = scene.rules.defensiveThreeSeconds ? 1 : Math.min(1, scene.liveSeconds / 8);
 		scene.foulAdvance = { progress, ballHandler: lineup[0] };
 		for (const id of Object.values(state.lineups).flat()) {
 			const fraction = id === lineup[0] ? progress : Math.min(1, progress * 1.25);
@@ -1164,7 +1244,12 @@ function advanceFormation(state, scene, offense, direction, targets, record, dur
 				}
 				if (scene.shotEntry && scene.liveSeconds > 3 && !scene.formation.backcourt) {
 					// Clear an initial inside position before continuing toward another waiting spot.
-					point = getLaneWaitingPoint(stage === 0 && isInOffensiveLane(from, direction) ? from : point, direction);
+					if (stage === 0 && !isInOffensiveLane(from, direction) && isInOffensiveLane(point, direction)) {
+						// Keep advancing while passing the lane on the target's side.
+						point.y = target.y < 25 ? 15.5 : 34.5;
+					} else {
+						point = getLaneWaitingPoint(stage === 0 && isInOffensiveLane(from, direction) ? from : point, direction);
+					}
 				}
 			} else {
 				const inside = retreat[id];
@@ -1226,10 +1311,6 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 	const pg = lineup[0];
 	const advanceScale = scene.liveSeconds > 0 ? Math.max(0.65, Math.min(1.8, scene.liveSeconds / 8)) : 1;
 	const changed = state.possession !== offense;
-	// A made basket can be followed by an and-one or a retained-possession penalty.
-	if (state.restart === "baseline" && !changed) {
-		state.restart = null;
-	}
 	const restart = state.restart;
 	const carrier = state.ball.owner;
 	const origin = carrier ? { ...state.positions[carrier] } : { ...state.ball };
@@ -1301,8 +1382,9 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 	if (restart) {
 		const inboundPoint = restart === "baseline"
 			? { x: direction === 1 ? -1.5 : 95.5, y: 30 }
-			: restart === "flagrant"
-			? { x: direction === 1 ? 75 : 19, y: 51.5 }
+			: restart === "flagrant" || restart === "free-throw-line"
+			? { x: direction === 1 ? 75 : 19,
+				y: restart === "free-throw-line" && state.restartOrigin.y < 25 ? -1.5 : 51.5 }
 			: { x: state.formation.backcourt ? direction === 1 ? 34 : 60 : 47, y: 51.5 };
 		const inbounder = lineup.filter((id) => id !== pg).reduce((closest, id) =>
 			Math.hypot(origins[id].x - inboundPoint.x, origins[id].y - inboundPoint.y) <
@@ -1327,6 +1409,7 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 		);
 		state.ball.owner = inbounder;
 		record(0.85);
+		scene.inboundAt = scene.frames.at(-1).time;
 		state.ball.owner = pg;
 		record(0.45);
 		// Inbound setup takes replay time without consuming the game clock.
@@ -2331,10 +2414,11 @@ function positionTipOff(plan, state, data, period) {
 
 function compileScene(replay, scene, index, state, data) {
 	const action = scene.action;
-	const liveFoul = scene.kind === "foul" && action.subType !== "technical" && scene.liveSeconds > 0;
-	const pendingOffense = liveFoul && state.restart === "baseline"
-		? otherTeam(data, state.possession) : state.possession;
-	const offense = eventOffense(scene, pendingOffense, data);
+	const liveFoul = scene.kind === "foul" && scene.rules.requiresPlay;
+	const offense = scene.rules.offense ?? state.possession;
+	if (scene.rules.requiresPlay) {
+		state.restart = scene.rules.buildupRestart;
+	}
 	const direction = attackDirection(data, offense, action.period);
 	const hoop = { x: direction === 1 ? 88.75 : 5.25, y: 25 };
 	const matchups = {};
@@ -2353,7 +2437,7 @@ function compileScene(replay, scene, index, state, data) {
 		if (arrival && scene.approachAt === undefined) {
 			Object.assign(state.positions[arrival.id], preparationPosition(state, scene, arrival.id, time + delay));
 		}
-		if (scene.releaseAt === undefined) {
+		if (scene.releaseAt === undefined && scene.stoppedAt === undefined) {
 			for (const move of spacingMoves) {
 				const position = state.positions[move.id];
 				const distance = Math.hypot(move.x - position.x, move.y - position.y);
@@ -2372,7 +2456,7 @@ function compileScene(replay, scene, index, state, data) {
 			Object.assign(state.positions[scene.reboundMove.id],
 				preparationPosition(state, scene, scene.reboundMove.id, time + delay));
 		}
-		if (scene.releaseAt === undefined) {
+		if (scene.releaseAt === undefined && scene.stoppedAt === undefined) {
 			for (const move of scene.laneExits ?? []) {
 				if (move.startAt !== null && time < move.startAt + move.duration &&
 					(move.id !== action.personId || scene.approachAt === undefined)) {
@@ -2416,7 +2500,8 @@ function compileScene(replay, scene, index, state, data) {
 	if (
 		state.breakPositions &&
 		(["2pt", "3pt", "heave", "freethrow", "rebound", "foul", "turnover", "steal", "jumpball", "violation"]
-			.includes(scene.kind) || (scene.kind === "period" && action.subType === "start"))
+			.includes(scene.kind) || (scene.kind === "timeout" && scene.rules.requiresPlay) ||
+			(scene.kind === "period" && action.subType === "start"))
 	) {
 		returnToCourt(state, record);
 		scene.returnAt = time;
@@ -2544,7 +2629,6 @@ function compileScene(replay, scene, index, state, data) {
 		addMarker(replay, scene, time, made ? "made" : "miss", shot, made ? `+${scene.kind === "3pt" ? 3 : 2}` : "");
 		if (made) {
 			setScore(state, action);
-			state.restart = scene.andOneFoul ? null : "baseline";
 			state.ball = { ...hoop, z: 0, owner: null };
 		} else {
 			const reboundPoint = {
@@ -2587,9 +2671,6 @@ function compileScene(replay, scene, index, state, data) {
 		} else {
 			// Team rebounds identify possession, not an individual ball winner.
 			state.ball.owner = null;
-			if (state.restart !== "flagrant") {
-				state.restart = "sideline";
-			}
 			record(0.45);
 			addMarker(replay, scene, time, "rebound", state.ball);
 		}
@@ -2606,22 +2687,21 @@ function compileScene(replay, scene, index, state, data) {
 		}
 		record(0.35);
 	} else if (scene.kind === "freethrow") {
-		const technical = action.descriptor === "technical" || action.qualifiers?.includes("technical");
-		const retainedPossession = state.possession;
+		const technical = scene.rules.freeThrow.technical;
 		const previousPositions = technical
 			? Object.fromEntries(Object.entries(state.positions).map(([id, position]) => [id, { ...position }]))
 			: null;
 		scene.technical = technical;
 		state.possession = action.teamId;
-		state.restart = null;
 		const shooter = state.positions[action.personId];
-		const sequence = action.subType.match(/(\d) of (\d)/);
-		const final = !sequence || sequence[1] === sequence[2];
+		const final = scene.rules.freeThrow.attempt === scene.rules.freeThrow.total;
 		scene.finalFreeThrow = final;
-		prepareFreeThrow(state, scene, direction, technical || scene.flagrantFreeThrow);
+		prepareFreeThrow(state, scene, direction, technical || scene.flagrantFreeThrow || (final && !scene.rules.freeThrow.live));
 		state.ball.owner = action.personId;
 		state.ball.dribble = false;
 		record(0.75);
+		scene.freeThrowAt = time;
+		record(0.15);
 		if (technical) {
 			addMarker(replay, scene, time, "technical", shooter, "", 0.65);
 		}
@@ -2647,17 +2727,9 @@ function compileScene(replay, scene, index, state, data) {
 		const made = action.shotResult === "Made";
 		setScore(state, action);
 		addMarker(replay, scene, time, made ? "made" : "miss", shooter, made ? "+1" : "");
-		if (technical) {
-			state.possession = retainedPossession;
-			state.restart = "sideline";
-		} else if (final && scene.flagrantFreeThrow) {
-			state.restart = "flagrant";
-			state.needsAdvance = true;
-		} else if (final && made) {
-			state.restart = "baseline";
-		} else if (!final) {
+		if (!final && !technical) {
 			state.ball.owner = action.personId;
-		} else if (!made) {
+		} else if (!made && !technical && !scene.flagrantFreeThrow) {
 			const reboundPoint = { x: state.ball.x - direction * 3, y: 28, z: 3.1 };
 			if (namedRebound) {
 				const player = state.positions[namedRebound];
@@ -2685,6 +2757,11 @@ function compileScene(replay, scene, index, state, data) {
 		record(0.7);
 	} else if (scene.kind === "foul" && action.subType === "technical" && !state.positions[action.personId]) {
 		// Unlisted people can receive technical fouls; keep the action without inventing a court player.
+		if (scene.rules.requiresPlay) {
+			followAttackers = true;
+			prepareAttack(state, scene, offense, direction, matchups, recordMovement, data, replay, index);
+			pacePreparation(state, scene, time, 0.8, record, direction);
+		}
 		scene.eventAt = time;
 		record(0.7);
 	} else if (scene.kind === "foul" || scene.kind === "turnover" || scene.kind === "steal") {
@@ -2694,17 +2771,25 @@ function compileScene(replay, scene, index, state, data) {
 			!action.descriptor && Boolean(state.positions[action.foulDrawnPersonId]);
 		const onBall = scene.kind === "turnover" || offensive || personalOnBall ||
 			["shooting", "take", "transition take"].includes(action.descriptor);
-		if (onBall || liveFoul) {
+		if (scene.rules.requiresPlay) {
 			if (liveFoul && (state.restart || state.possession !== offense || state.needsAdvance)) {
 				replay.attacks.push(scene.start);
 			}
 			followAttackers = true;
 			prepareAttack(state, scene, offense, direction, matchups, recordMovement, data, replay, index);
-			pacePreparation(state, scene, time, scene.action.descriptor === "shooting" ? 2 : 0.8, record, direction);
+			const help = planDefensiveHelp(state, scene, direction);
+			if (help) {
+				contacts.add(help.playerId);
+				prepareDefensiveHelp(state, scene, help, direction, record, recordMovement);
+			} else {
+				pacePreparation(state, scene, time, scene.action.descriptor === "shooting" ? 2 : 0.8, record, direction);
+			}
 		}
 		if (onBall) {
 			if (scene.kind === "foul" && action.descriptor === "shooting") {
-				prepareShootingFoul(state, scene, replay, index, hoop, direction, record);
+				if (scene.rules.requiresPlay) {
+					prepareShootingFoul(state, scene, replay, index, hoop, direction, record);
+				}
 			} else {
 				const receiverId = personalOnBall ? action.foulDrawnPersonId
 					: scene.looseBallFoulIndex !== undefined ? action.personId : null;
@@ -2755,7 +2840,7 @@ function compileScene(replay, scene, index, state, data) {
 			actor.angle = direction * 0.2;
 			record(0.4);
 		}
-		if (action.subType === "technical" && actor) {
+		if (action.subType === "technical" && actor && !scene.defensiveThreeSeconds) {
 			actor.angle = 0.3;
 			record(0.18);
 			actor.angle = -0.3;
@@ -2807,16 +2892,17 @@ function compileScene(replay, scene, index, state, data) {
 			? "foul"
 			: "turnover";
 		addMarker(replay, scene, scene.eventAt, markerKind, victim || actor || state.ball);
+		if (scene.rules.defensiveThreeSeconds) {
+			state.restartOrigin = { x: actor.x, y: actor.y };
+			followAttackers = false;
+		}
 		if (action.stealPersonId || scene.kind === "steal") {
 			const stealer = action.stealPersonId || action.personId;
-			state.possession = state.players.find((player) => player.id === stealer).teamId;
-			state.restart = null;
 			state.needsAdvance = true;
 			addMarker(replay, scene, time, "steal", state.positions[stealer]);
 			replay.attacks.push(scene.start + time);
 		} else if (scene.looseBallPlan) {
 			// The following whistle resolves the loose ball; no intervening catch or inbound is implied.
-			state.restart = null;
 		} else if (scene.kind === "turnover" || offensive) {
 			releaseBall(state);
 			if (action.subType === "out-of-bounds" && !scene.missedPass) {
@@ -2834,16 +2920,12 @@ function compileScene(replay, scene, index, state, data) {
 			} else if (action.subType === "lost ball") {
 				flyBall(state, record, { x: state.ball.x + direction * 3, y: state.ball.y + 2, z: 0 }, 0.2, 0.3);
 			}
-			state.possession = otherTeam(data, offense);
-			state.restart = "sideline";
 			replay.attacks.push(scene.start + time);
 		} else if (scene.kind === "foul") {
 			releaseBall(state);
 			if (scene.looseBallTurnoverIndex !== undefined && replay.scenes[scene.looseBallTurnoverIndex].looseBallPlan) {
-				state.possession = offense;
 				replay.attacks.push(scene.start + time);
 			}
-			state.restart = "foul";
 		}
 		landPlayers(state);
 		record(scene.looseBallPlan ? 0.12 : 0.7);
@@ -2893,7 +2975,6 @@ function compileScene(replay, scene, index, state, data) {
 				}
 				if (state.ball.owner === outId) {
 					state.ball = { x: previous.x + 1, y: previous.y + 0.8, z: 0.5, owner: null, dribble: false };
-					state.restart = "sideline";
 				}
 			});
 		}
@@ -2953,7 +3034,6 @@ function compileScene(replay, scene, index, state, data) {
 			});
 		state.ball.owner = receiverId;
 		state.possession = action.teamId;
-		state.restart = null;
 		state.needsAdvance = true;
 		record(0.01);
 		scene.eventAt = time;
@@ -2961,13 +3041,15 @@ function compileScene(replay, scene, index, state, data) {
 		replay.attacks.push(scene.start);
 		record(0.5);
 	} else {
+		if (scene.rules.requiresPlay) {
+			followAttackers = true;
+			prepareAttack(state, scene, offense, direction, matchups, recordMovement, data, replay, index);
+			pacePreparation(state, scene, time, 0.8, record, direction);
+		}
 		scene.eventAt = time + 0.3;
 		if (scene.kind === "period") {
 			const periodLabel = action.period > 4 ? `OT${action.period - 4}` : `Q${action.period}`;
 			scene.banner = action.subType === "end" ? `${periodLabel} · 0:00` : periodLabel;
-			if (action.subType === "start" && action.period > 1) {
-				state.restart = "sideline";
-			}
 		} else if (scene.kind === "game") {
 			scene.banner = "FINAL";
 			setScore(state, action);
@@ -2977,10 +3059,11 @@ function compileScene(replay, scene, index, state, data) {
 			if (scene.kind === "violation" && action.subType === "kicked ball") {
 				releaseBall(state);
 				flyBall(state, record, { x: state.ball.x + 2, y: state.ball.y + 3, z: 0 }, 0.3, 0.35);
-				state.restart = "sideline";
 			}
 		}
 		if (scene.kind === "timeout" || (scene.kind === "period" && action.subType === "end")) {
+			followAttackers = false;
+			scene.stoppedAt = time;
 			leaveCourt(state, data, record);
 		} else {
 			record(0.9);
@@ -2988,6 +3071,15 @@ function compileScene(replay, scene, index, state, data) {
 	}
 	if (scene.eventAt === undefined) {
 		scene.eventAt = Math.max(0.01, time - 0.4);
+	}
+	scheduleGameStates(scene);
+	state.possession = scene.rules.after.entitledTeam ?? state.possession;
+	state.restart = scene.rules.after.restart === "jump-ball" ? null : scene.rules.after.restart;
+	for (const frame of scene.frames) {
+		frame.gameState = getSceneGameState(scene, frame.time);
+		if (frame.time >= scene.eventAt && scene.rules.after.entitledTeam !== null) {
+			frame.possession = scene.rules.after.entitledTeam;
+		}
 	}
 	scene.end = Number((scene.start + time).toFixed(3));
 	scene.lineups = Object.fromEntries(Object.entries(state.lineups).map(([id, lineup]) => [id, lineup.slice()]));
@@ -3035,6 +3127,7 @@ export function compileReplay(data) {
 		score: [0, 0],
 		possession: data.teams.find((team) => team.home).id,
 		restart: null,
+		restartOrigin: null,
 		needsAdvance: false,
 		formation: null,
 		matchups: null,
@@ -3078,14 +3171,9 @@ export function compileReplay(data) {
 	};
 	orderSameClockSubstitutions(replay.scenes, data);
 	linkAndOneFouls(replay.scenes);
-	linkRebounds(replay.scenes);
 	linkLooseBallFouls(replay.scenes, data);
-	planShotClockPressure(replay.scenes);
 	replay.scenes.forEach((scene, index) => {
 		const previous = replay.scenes[index - 1];
-		scene.start = replay.duration;
-		scene.frames = [];
-		scene.swaps = [];
 		scene.clockTo = clockSeconds(scene.action.clock);
 		scene.clockFrom = previous?.action.period === scene.action.period
 			? previous.clockTo
@@ -3093,6 +3181,14 @@ export function compileReplay(data) {
 			? 300
 			: replay.league.periodSeconds;
 		scene.liveSeconds = Math.max(0, scene.clockFrom - scene.clockTo);
+	});
+	planGameStates(replay.scenes, data);
+	linkRebounds(replay.scenes);
+	planShotClockPressure(replay.scenes);
+	replay.scenes.forEach((scene, index) => {
+		scene.start = replay.duration;
+		scene.frames = [];
+		scene.swaps = [];
 		if (scene.kind === "period" && scene.action.subType === "start") {
 			replay.quarters.push({ period: scene.action.period, time: scene.start });
 		}
@@ -3162,6 +3258,7 @@ export function getReplayFrame(replay, time) {
 		},
 		score: fraction === 1 ? to.score : from.score,
 		possession: fraction === 1 ? to.possession : from.possession,
+		gameState: getSceneGameState(scene, local),
 		period: scene.action.period,
 		clock: scene.clockFrom + (scene.clockTo - scene.clockFrom) *
 				Math.max(0, Math.min(1, (local - (scene.liveAt ?? 0)) / (scene.eventAt - (scene.liveAt ?? 0) || 1))),
