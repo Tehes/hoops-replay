@@ -119,7 +119,6 @@ Akzeptanz verlangt eine verständliche freie Ballphase vor dem Kontakt und unver
 Folgen; kürzere Laufwege oder bestandene Invarianten allein reichen nicht. Das Ergebnis kann verworfen
 werden. Hypothese, Evidenz, Entscheidung und offene Grenzen anschließend im Learning festhalten.
 
-
 ## Bestandsaufnahme vom 31. Oktober 2026
 
 Der zeitlich gestreute Standardbatch (zehn Spiele je Liga, einschließlich Vor-/Nachsaison)
@@ -179,7 +178,6 @@ Die Diagnostik lag nur im temporären Arbeitsbereich; diese Aufbereitung bewahrt
 | `1022600311` | `ce249f984abaa1104079a7a54416c2c0dc44b5e051483d734bac334848fce18f` |
 | `1042600306` | `3393885ab16b2bd1755fdaae3edd0dbbd1d73bf5715b6d24c32f99bfc3317ac5` |
 | `0022600002` | `0d0a0e371e1d26d8b528260e46c8c3f5a3ed70e914ff0484ee4f815f906a39a5` |
-
 
 ## Kandidat und Ergebnis
 

@@ -233,7 +233,6 @@ Körpermittelpunkte, keine Füße. Ein laufender Spieler erhält keine pauschale
   Einwurf- und Zonenangriffssysteme werden dadurch nicht als tatsächlich gespielte Abläufe behauptet.
   Die Raumgrenzen und Auswahlgewichte sind eigene Heuristiken und keine Formeln der Literatur.
 
-
 ## Inaktiver Abgänger in einer aufgezeichneten Auswechslung
 
 - **Ursache:** Ein nicht aktiver `out`-Spieler ergab `lineup.indexOf(...) === -1`. Die Zuweisung
