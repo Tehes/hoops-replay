@@ -447,7 +447,7 @@ Deno.test("an explicit ID always loads both backend feeds", async () => {
 		const game = await loadReplayData("0022600094");
 		assert(game.gameId === "0022600094", "wrong backend game");
 		assert(
-			requests.length === 2 && requests.every((url) => url.startsWith("https://nba-spielplan.tehes.deno.net/")),
+			requests.length === 2 && requests.every((url) => url.startsWith("https://hoops-replay.tehes.deno.net/")),
 			"explicit ID must use the backend only",
 		);
 		assert(checkReplay(game).errors.length === 0, "normalized backend feeds failed validation");

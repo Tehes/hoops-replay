@@ -111,6 +111,21 @@ next shooter can move toward the receiving position during the preceding action.
 
 ## Development checks
 
+### Backend
+
+`api/main.js` provides the following GET endpoints on Deno Deploy. NBA is the default;
+all endpoints also accept `?league=wnba`. Profile seasons use `YYYY-YY` for NBA and `YYYY` for WNBA.
+
+| Endpoint | Purpose | Parameters |
+| --- | --- | --- |
+| `/schedule` | League schedule | Optional `region=de` (default) or `region=us` for broadcast labels. |
+| `/boxscore/:gameId` | Teams, players, starting lineups and game statistics | Ten-digit Game ID. |
+| `/playbyplay/:gameId` | Recorded events, scores, game clocks and available shot coordinates | Ten-digit Game ID. |
+| `/roster/:teamId` | League roster with player IDs, positions, heights and available weights | Required `season`. |
+| `/players/:teamId` | Per-game player statistics, including shooting, assists and rebounds | Required `season`; optional `seasonType=Regular Season` (default), `Playoffs` or `Pre Season`. |
+
+### Replay checks
+
 Serve this directory with a local static server for browser development.
 All game data comes from the server; there are no bundled games or local fallbacks.
 Automatic selection tries up to three recent completed games if their feeds or replay validation fail.

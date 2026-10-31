@@ -503,7 +503,7 @@ in die URL geschrieben; weitere Kandidaten werden bei Fehlern mit Konsolenwarnun
 Fehler beim Laden eines Schedules, keine geeigneten Spiele oder drei gescheiterte Kandidaten
 ergeben den bestehenden Ladefehler. Es gibt keine lokale Demo und keinen lokalen Datenordner.
 Jede explizite zehnstellige `?game=GAME_ID` lädt Boxscore und Play-by-Play vom bestehenden Backend
-`https://nba-spielplan.tehes.deno.net`. Es gibt keine lokalen Ersatzspiele bei Fehlern.
+`https://hoops-replay.tehes.deno.net`. Es gibt keine lokalen Ersatzspiele bei Fehlern.
 IDs mit Präfix `10` verwenden WNBA und den Query `?league=wnba`; andere NBA.
 
 Normalisierung, Kompilierung und gemeinsame Prüfung müssen vor Freigabe des Replays erfolgreich sein.
@@ -517,7 +517,12 @@ Einzelprüfungen bleiben fachlich unverändert; ein benötigter Szenenausschnitt
 Serverfeed. Wiederholte Abrufe derselben Quelle werden innerhalb des Prozesses im Arbeitsspeicher
 wiederverwendet, niemals als Spiel-JSON gespeichert. Kopien schützen die Eingaben vor Szenenänderungen.
 
-Das Backend gehört zu `Tehes/nba-spielplan`; Änderungen daran sind ein eigener Arbeitsbereich.
+Das eigene Backend in [api/main.js](api/main.js) stellt Spieldaten, NBA-/WNBA-Roster und
+Spielerstatistiken bereit. Die Anwendung lädt ihre Spieldaten von diesem Backend;
+Spielerprofile sind noch nicht in die Choreografie eingebunden.
+Größe, Position und individuelle Spielprofile sollen Rollenverteilung, Spacing und defensive
+Zuordnungen in der Choreografie plausibler machen.
+
 Die lokale Vorschau verwendet ausdrücklich `http://127.0.0.1:5500` wegen der Backend-CORS-Freigabe.
 `localhost` oder andere Ports sind kein gleichwertiger Ersatz. Den Origin-Header nicht im
 Browsercode setzen. Ein erfolgreicher CLI-Abruf ersetzt keine Browser-CORS-Freigabe.
@@ -526,8 +531,8 @@ Custom-Domain und weitere Spielplan-Integration sind kein eingerichteter Produkt
 ### API-Endpunkte und Auswahl von Game IDs
 
 Maßgebliche Serverlogik:
-[Tehes/nba-spielplan: api/main.js](https://github.com/Tehes/nba-spielplan/blob/master/api/main.js).
-Basis-URL: `https://nba-spielplan.tehes.deno.net`. Die folgenden Abrufe verwenden `GET`.
+[api/main.js](api/main.js).
+Basis-URL: `https://hoops-replay.tehes.deno.net`. Die folgenden Abrufe verwenden `GET`.
 
 | Daten | NBA | WNBA | Relevante Antwortfelder |
 | --- | --- | --- | --- |
@@ -537,12 +542,12 @@ Basis-URL: `https://nba-spielplan.tehes.deno.net`. Die folgenden Abrufe verwende
 
 Beispiel-URLs:
 
-- `https://nba-spielplan.tehes.deno.net/schedule`
-- `https://nba-spielplan.tehes.deno.net/schedule?league=wnba`
-- `https://nba-spielplan.tehes.deno.net/boxscore/0022600007`
-- `https://nba-spielplan.tehes.deno.net/playbyplay/0022600007`
-- `https://nba-spielplan.tehes.deno.net/boxscore/1042600304?league=wnba`
-- `https://nba-spielplan.tehes.deno.net/playbyplay/1042600304?league=wnba`
+- `https://hoops-replay.tehes.deno.net/schedule`
+- `https://hoops-replay.tehes.deno.net/schedule?league=wnba`
+- `https://hoops-replay.tehes.deno.net/boxscore/0022600007`
+- `https://hoops-replay.tehes.deno.net/playbyplay/0022600007`
+- `https://hoops-replay.tehes.deno.net/boxscore/1042600304?league=wnba`
+- `https://hoops-replay.tehes.deno.net/playbyplay/1042600304?league=wnba`
 
 Der Server wählt die Liga ausschließlich über `league=nba|wnba`; ohne Parameter gilt NBA.
 Anders als der Replay-Client leitet er WNBA nicht aus der GameID ab.

@@ -1,7 +1,7 @@
 import { getTeamColors } from "./replay-teams.js";
 import { getLeague } from "./replay-leagues.js";
 
-export const API_BASE = "https://nba-spielplan.tehes.deno.net";
+export const API_BASE = "https://hoops-replay.tehes.deno.net";
 const SLOTS = ["PG", "SG", "SF", "PF", "C"];
 
 function normalizeTeam(team, home, league) {
