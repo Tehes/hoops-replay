@@ -13,12 +13,8 @@ and boxscore data. Player movements are schematic estimates, not a reconstructio
 
 ## Try It Out
 
-Open [TOR at WAS in Hoops Replay](https://tehes.github.io/hoops-replay/?game=0022600097)
-to try a completed NBA game directly in your browser.
-For a WNBA example, open [Golden State at Atlanta](https://tehes.github.io/hoops-replay/?game=1042600304).
-
-Without a Game ID in the URL, the app opens the latest completed NBA or WNBA game from the schedules.
-Preseason and All-Star games are excluded. The selected Game ID is added to the URL for sharing.
+Open [Hoops Replay](https://tehes.github.io/hoops-replay/) to watch the latest completed NBA or WNBA game.
+To choose a specific game, see [Load Another Game](#load-another-game) under How to Use.
 
 ---
 
@@ -178,4 +174,3 @@ See [LICENSE.txt](LICENSE.txt) for the terms.
 NBA and WNBA game data, team names, logos, and player photos belong to their respective owners.
 Player photos load from the respective league's CDN; team logos are stored locally.
 Hoops Replay is an independent, unofficial project.
-
