@@ -493,14 +493,23 @@ werden weiterhin nicht geprüft. Grundlage: NBA/WNBA Rule 10, Section VI.
 ### Laden und Wiederverwenden
 
 Öffentliche Anwendung: [Hoops Replay](https://tehes.github.io/hoops-replay/).
-Ohne GameID wird der lokale DEN–OKC-Snapshot `0022600007` geladen.
+Ohne GameID werden beide Liga-Schedules geladen und bis zu drei abgeschlossene Spiele nach
+`gameDateTimeUTC` absteigend ausgewählt; bei gleicher Zeit entscheidet die GameID absteigend.
+Zugelassen sind NBA-Regular-Season, Playoffs, Play-in und Cup-Finale (Präfixe `002/004/005/006`)
+sowie WNBA-Regular-Season, Playoffs und Cup-Finale (`102/104/105`), keine Preseason oder All-Star-Spiele.
+Fehlende oder ungültige Spielzeiten werden nicht zur Auswahl verwendet. Doppelte IDs werden entfernt.
+Das erste erfolgreich normalisierte, kompilierte und geprüfte Spiel wird geöffnet und seine GameID
+in die URL geschrieben; weitere Kandidaten werden bei Fehlern mit Konsolenwarnung versucht.
+Fehler beim Laden eines Schedules, keine geeigneten Spiele oder drei gescheiterte Kandidaten
+ergeben den bestehenden Ladefehler. Es gibt keine lokale Demo und keinen lokalen Datenordner.
 Jede explizite zehnstellige `?game=GAME_ID` lädt Boxscore und Play-by-Play vom bestehenden Backend
 `https://nba-spielplan.tehes.deno.net`. Es gibt keine lokalen Ersatzspiele bei Fehlern.
 IDs mit Präfix `10` verwenden WNBA und den Query `?league=wnba`; andere NBA.
 
 Normalisierung, Kompilierung und gemeinsame Prüfung müssen vor Freigabe des Replays erfolgreich sein.
 Unfertige Spiele, falsche IDs, HTTP-Fehler und inkonsistente Daten ergeben einen Fehler, kein
-stilles Ersatzspiel. Es gibt weder Polling noch automatische Aktualisierung oder lokale Spielspeicherung.
+stilles Ersatzspiel bei expliziter GameID. Es gibt weder Polling noch automatische Aktualisierung
+oder lokale Spielspeicherung.
 
 Auch Entwicklungs- und Einzelprüfungen laden reale Spiele vom Server. Der frühere Importer und
 seine lokalen Rohdaten, Vollspiel-Snapshots und Szenen-JSONs sind entfernt. Die vorhandenen
@@ -625,8 +634,6 @@ Wichtige Datenregeln:
   besitzen keinen Adapter und dürfen nicht ungeprüft beigemischt werden.
 - Unbekannte Personen sind grundsätzlich ein Fehler. Die eng begrenzte Ausnahme für technische
   Fouls bei bekanntem Team erfindet weder Spieler noch eine Trainerrolle.
-- Die lokale DEN–OKC-Demo besitzt kein vollständiges Roharchiv.
-  Ihre Herkunft nicht nachträglich vollständiger darstellen als vorhanden.
 
 ## Oberfläche und Darstellung
 
@@ -692,8 +699,7 @@ Server; [replay-motion_test.js](scripts/replay-motion_test.js) und
 Ausführung steht in [README.md](README.md). Es werden keine neuen festen Einzeltests als
 Voraussetzung des Iterationsverfahrens eingeführt.
 
-Die lokale Demo ist DEN–OKC `0022600007` mit dem Endstand 84–96 (auswärts–heim).
-Alle anderen realen Vergleichsfälle hängen vom aktuellen Serverfeed ab. Es gibt keine automatische
+Alle realen Vergleichsfälle hängen vom aktuellen Serverfeed ab. Es gibt keine automatische
 Übernahme früherer Prüfergebnisse auf nachträglich korrigierte Daten.
 
 Dauerhaft wichtige Gegenbeispiele und Grenzen:

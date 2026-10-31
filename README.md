@@ -17,7 +17,8 @@ Open [TOR at WAS in Hoops Replay](https://tehes.github.io/hoops-replay/?game=002
 to try a completed NBA game directly in your browser.
 For a WNBA example, open [Golden State at Atlanta](https://tehes.github.io/hoops-replay/?game=1042600304).
 
-Without a Game ID in the URL, the app opens the bundled DEN–OKC example.
+Without a Game ID in the URL, the app opens the latest completed NBA or WNBA game from the schedules.
+Preseason and All-Star games are excluded. The selected Game ID is added to the URL for sharing.
 
 ---
 
@@ -74,7 +75,6 @@ The link starts at the event itself. Scrub back a few seconds before pressing Pl
 The number is the event's `actionNumber` from the NBA or WNBA play-by-play data.
 It is an event ID, not its position in the event list,
 a quarter, or a replay timestamp. Include `game` when sharing links to identify the correct game.
-For the bundled default game, `?action=17` works without a `game` parameter.
 
 Events combined into one replay scene, such as a shot and its block or simultaneous substitutions,
 jump to the same scene's event time; the display shows the main event's description.
@@ -112,8 +112,10 @@ next shooter can move toward the receiving position during the preceding action.
 ## Development checks
 
 Serve this directory with a local static server for browser development.
-With a Game ID, the app loads both feeds from the server. Only the default demo
-is stored locally; there is no local fallback when a requested game fails.
+All game data comes from the server; there are no bundled games or local fallbacks.
+Automatic selection tries up to three recent completed games if their feeds or replay validation fail.
+A schedule failure, no eligible games, or failure of all candidates shows a loading error.
+An explicit Game ID always requests that game only.
 
 Run the server batch with Deno:
 

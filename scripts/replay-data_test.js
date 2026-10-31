@@ -1,4 +1,4 @@
-import { loadReplayData, normalizeGame } from "../js/replay-data.js";
+import { loadRecentGameIds, loadReplayData, normalizeGame } from "../js/replay-data.js";
 import { attackDirection, clockSeconds, compileReplay, getReplayFrame } from "../js/replay-engine.js";
 import { checkReplay } from "../js/replay-validation.js";
 import { getTeamColors, getTeamLogo, getTeamName } from "../js/replay-teams.js";
@@ -372,25 +372,78 @@ Deno.test("Burton's Q4 6:27 and-one leads to the missed free throw and Hillmon's
 	}
 });
 
-Deno.test("default uses the local example; an explicit ID always loads both backend feeds", async () => {
-	const example = await loadGame("0022600007");
+Deno.test("automatic selection orders completed games across leagues and excludes exhibitions", async () => {
+	const originalFetch = globalThis.fetch;
+	const requests = [];
+	const entry = (gameId, gameDateTimeUTC, gameStatus = 3) => ({ gameId, gameDateTimeUTC, gameStatus });
+	let nba = [
+		entry("0022600001", "2026-10-20T19:00:00Z"),
+		entry("0012600001", "2026-10-30T19:00:00Z"),
+		entry("0032600001", "2026-10-30T19:00:00Z"),
+		entry("0022600002", "2026-10-30T19:00:00Z", 2),
+		entry("0022600003", "2026-10-30T19:00:00Z", 1),
+		entry("0042600001", "2026-10-22T19:00:00Z"),
+		entry("0052600001", "2026-10-23T19:00:00Z"),
+		entry("0062600001", "2026-10-24T19:00:00Z"),
+		entry("0022600004", "invalid"),
+	];
+	let wnba = [
+		entry("1012600001", "2026-10-30T19:00:00Z"),
+		entry("1032600001", "2026-10-30T19:00:00Z"),
+		entry("1022600001", "2026-10-24T19:00:00Z"),
+		entry("1042600001", "2026-10-25T19:00:00Z"),
+		entry("1042600001", "2026-10-25T19:00:00Z"),
+		entry("1052600001", "2026-10-21T19:00:00Z"),
+	];
+	globalThis.fetch = (url) => {
+		requests.push(String(url));
+		const games = String(url).endsWith("league=wnba") ? wnba : nba;
+		return Promise.resolve(Response.json({ leagueSchedule: { gameDates: [{ games }] } }));
+	};
+	try {
+		assert(JSON.stringify(await loadRecentGameIds()) === '["1042600001","1022600001","0062600001"]',
+			"wrong chronology, eligibility, tie break or candidate limit");
+		assert(requests.length === 2 && requests.every((url) => url.includes("/schedule?league=")),
+			"both schedules must be requested");
+		wnba = [];
+		assert(JSON.stringify(await loadRecentGameIds()) === '["0062600001","0052600001","0042600001"]',
+			"NBA postseason games were excluded");
+		nba = [];
+		wnba = [entry("1052600001", "2026-10-21T19:00:00Z")];
+		assert(JSON.stringify(await loadRecentGameIds()) === '["1052600001"]', "WNBA cup was excluded");
+		wnba = [];
+		let failed = false;
+		try {
+			await loadRecentGameIds();
+		} catch (error) {
+			failed = error.message.includes("No completed");
+		}
+		assert(failed, "empty schedules must fail without a local demo");
+		for (const response of [new Response("unavailable", { status: 503 }), Response.json({})]) {
+			globalThis.fetch = () => Promise.resolve(response.clone());
+			failed = false;
+			try {
+				await loadRecentGameIds();
+			} catch (error) {
+				failed = /HTTP 503|missing games/.test(error.message);
+			}
+			assert(failed, "schedule failures must not use a fallback");
+		}
+	} finally {
+		globalThis.fetch = originalFetch;
+	}
+});
+
+Deno.test("an explicit ID always loads both backend feeds", async () => {
 	const boxscore = await loadFeed("boxscore/0022600094");
 	const playByPlay = await loadFeed("playbyplay/0022600094");
 	const originalFetch = globalThis.fetch;
 	const requests = [];
 	globalThis.fetch = (url) => {
 		requests.push(String(url));
-		const data = String(url).includes("boxscore/")
-			? boxscore
-			: String(url).includes("playbyplay/")
-			? playByPlay
-			: example;
-		return Promise.resolve(Response.json(data));
+		return Promise.resolve(Response.json(String(url).includes("boxscore/") ? boxscore : playByPlay));
 	};
 	try {
-		assert((await loadReplayData(null)).gameId === example.gameId, "wrong default example");
-		assert(requests.length === 1 && requests[0].startsWith("./data/"), "default must stay local");
-		requests.length = 0;
 		const game = await loadReplayData("0022600094");
 		assert(game.gameId === "0022600094", "wrong backend game");
 		assert(

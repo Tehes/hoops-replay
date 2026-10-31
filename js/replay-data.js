@@ -2,7 +2,6 @@ import { getTeamColors } from "./replay-teams.js";
 import { getLeague } from "./replay-leagues.js";
 
 export const API_BASE = "https://nba-spielplan.tehes.deno.net";
-const DEFAULT_GAME = "0022600007";
 const SLOTS = ["PG", "SG", "SF", "PF", "C"];
 
 function normalizeTeam(team, home, league) {
@@ -104,14 +103,35 @@ export function normalizeGame(gameId, boxscore, playByPlay) {
 	};
 }
 
-export async function loadReplayData(gameId) {
-	if (gameId === null) {
-		const response = await fetch(`./data/replay-${DEFAULT_GAME}.json`);
+export async function loadRecentGameIds() {
+	const schedules = await Promise.all(["nba", "wnba"].map(async (league) => {
+		const response = await fetch(`${API_BASE}/schedule?league=${league}`);
 		if (!response.ok) {
-			throw new Error(`Example replay data: HTTP ${response.status}`);
+			throw new Error(`${league.toUpperCase()} schedule: HTTP ${response.status}`);
 		}
-		return await response.json();
+		const schedule = await response.json();
+		const dates = schedule.leagueSchedule?.gameDates;
+		if (!Array.isArray(dates) || dates.some((date) => !Array.isArray(date.games))) {
+			throw new Error(`${league.toUpperCase()} schedule: missing games.`);
+		}
+		return dates.flatMap((date) => date.games).filter((game) => {
+			// Regular season, playoffs, play-in and cup finals; exclude preseason and exhibitions.
+			const eligible = league === "nba" ? /^00[2456]\d{7}$/ : /^10[245]\d{7}$/;
+			return game.gameStatus === 3 && eligible.test(game.gameId) &&
+				Number.isFinite(Date.parse(game.gameDateTimeUTC));
+		});
+	}));
+	const games = schedules.flat().sort((a, b) =>
+		Date.parse(b.gameDateTimeUTC) - Date.parse(a.gameDateTimeUTC) || b.gameId.localeCompare(a.gameId)
+	);
+	const ids = [...new Set(games.map((game) => game.gameId))].slice(0, 3);
+	if (!ids.length) {
+		throw new Error("No completed NBA or WNBA games available.");
 	}
+	return ids;
+}
+
+export async function loadReplayData(gameId) {
 	const league = getLeague(gameId).id;
 	const query = league === "wnba" ? "?league=wnba" : "";
 	const feeds = await Promise.all(["boxscore", "playbyplay"].map(async (endpoint) => {

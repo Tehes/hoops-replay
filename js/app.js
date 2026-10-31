@@ -2,7 +2,7 @@
 Imports
 ---------------------------------------------------------------------------------------------------*/
 
-import { loadReplayData } from "./replay-data.js";
+import { loadRecentGameIds, loadReplayData } from "./replay-data.js";
 import { checkReplay } from "./replay-validation.js";
 import { compileReplay, getReplayFrame } from "./replay-engine.js";
 import { getJerseyColors, getTeamColors, getTeamLogo, getTeamName } from "./replay-teams.js";
@@ -624,15 +624,31 @@ async function init() {
 		if (requestedGame !== null && !/^\d{10}$/.test(requestedGame)) {
 			throw new Error("Game ID must contain ten digits.");
 		}
-		const loadedGame = await loadReplayData(requestedGame);
-		const compiledReplay = compileReplay(loadedGame);
-		const report = checkReplay(loadedGame, compiledReplay);
-		if (report.errors.length) {
-			console.error("Replay validation failed:", report.errors);
-			throw new Error(`Replay data is inconsistent (${report.errors.length} validation errors).`);
+		const candidates = requestedGame === null ? await loadRecentGameIds() : [requestedGame];
+		for (const [index, gameId] of candidates.entries()) {
+			try {
+				const loadedGame = await loadReplayData(gameId);
+				const compiledReplay = compileReplay(loadedGame);
+				const report = checkReplay(loadedGame, compiledReplay);
+				if (report.errors.length) {
+					console.error("Replay validation failed:", report.errors);
+					throw new Error(`Replay data is inconsistent (${report.errors.length} validation errors).`);
+				}
+				game = loadedGame;
+				replay = compiledReplay;
+				break;
+			} catch (error) {
+				if (index === candidates.length - 1) {
+					throw error;
+				}
+				console.warn(`Replay ${gameId} unavailable; trying the next completed game.`, error);
+			}
 		}
-		game = loadedGame;
-		replay = compiledReplay;
+		if (requestedGame === null) {
+			const url = new URL(globalThis.location.href);
+			url.searchParams.set("game", game.gameId);
+			globalThis.history.replaceState(null, "", url);
+		}
 		actionEvents = replay.scenes.filter((scene) => scene.action.description).map((scene) => ({
 			time: scene.start + scene.eventAt,
 			label: scene.banner || "",
