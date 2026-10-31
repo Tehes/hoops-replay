@@ -5,6 +5,20 @@ import { getTeamColors, getTeamLogo, getTeamName } from "../js/replay-teams.js";
 import { loadFeed, loadGame } from "./replay-source.js";
 import { getLaneWaitingPoint, isInOffensiveLane } from "../js/replay-rules.js";
 
+Deno.test("a turnover reserves the following same-clock loose-ball foul contact", async () => {
+	const data = await loadGame("0022600002");
+	const replay = compileReplay(data);
+	const turnover = replay.scenes.find((scene) => scene.action.actionNumber === 271);
+	const foul = replay.scenes.find((scene) => scene.action.actionNumber === 272);
+	const fouler = foul.action.personId;
+	const victim = foul.action.foulDrawnPersonId;
+	assert(turnover.matchups[victim] === fouler, "turnover did not reserve the recorded contact pair");
+	const from = foul.frames[0].players.find((player) => player.id === fouler);
+	const to = foul.frames.find((frame) => frame.time === foul.eventAt).players.find((player) => player.id === fouler);
+	assert(Math.hypot(to.x - from.x, to.y - from.y) < 3, "fouler sprints across the court to create contact");
+	assert(checkReplay(data, replay).errors.length === 0, "loose-ball foul replay failed validation");
+});
+
 Deno.test("recorded BKN-CLE flagrant penalties lead to a free-throw-line sideline inbound", async () => {
 	const data = await loadGame("0022600105");
 	const replay = compileReplay(data);

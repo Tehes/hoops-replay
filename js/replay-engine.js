@@ -410,7 +410,12 @@ function planMatchups(scenes, index, offense, state, data) {
 	for (let i = index; i < scenes.length; i++) {
 		const scene = scenes[i];
 		const action = scene.action;
-		const foul = scene.kind === "foul" ? action : scene.andOneFoul;
+		const next = scenes[i + 1];
+		// A same-clock loose-ball foul belongs to the turnover contest, before possession changes.
+		const turnoverFoul = scene.kind === "turnover" && next?.kind === "foul" &&
+			next.action.descriptor === "loose ball" && next.action.period === action.period &&
+			next.action.clock === action.clock ? next.action : null;
+		const foul = scene.kind === "foul" ? action : scene.andOneFoul ?? turnoverFoul;
 		if (scene.kind === "rebound" && action.teamId !== offense) {
 			rebounderId = defense.includes(action.personId) ? action.personId : null;
 		}
@@ -427,8 +432,9 @@ function planMatchups(scenes, index, offense, state, data) {
 			attacker = action.personId;
 			defender = action.blockPersonId;
 		} else if (foul) {
-			attacker = foul.subType === "offensive" ? foul.personId : foul.foulDrawnPersonId;
-			defender = foul.subType === "offensive" ? foul.foulDrawnPersonId : foul.personId;
+			const attackingFouler = foul.subType === "offensive" || (turnoverFoul && attack.includes(foul.personId));
+			attacker = attackingFouler ? foul.personId : foul.foulDrawnPersonId;
+			defender = attackingFouler ? foul.foulDrawnPersonId : foul.personId;
 		} else if (action.stealPersonId) {
 			attacker = action.personId;
 			defender = action.stealPersonId;

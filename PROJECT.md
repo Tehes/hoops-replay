@@ -657,6 +657,8 @@ Motion-Offense. Automatische Spielzugabläufe wie Horns, Flex oder Triangle sind
 `formation.roles` hält Profilwerte und vorhandene Maße für die Entscheidung nachvollziehbar fest.
 
 Belegte Kontakte und die bestehende begrenzte Reboundzuordnung werden zuerst reserviert.
+Ein unmittelbar auf einen Turnover folgendes Loose-Ball-Foul bei gleicher Periode und Spieluhr
+reserviert das Kontaktpaar bereits im vorausgehenden Angriff, bevor dessen Ballbesitz wechselt.
 Für übrige Matchups vergleicht der Planer alle verbleibenden Zuordnungen gemeinsam nach
 Mischrollen, Außen-/Aufbauprofil, Größen- und Gewichtsdifferenz. Bestehende Zuordnungen erhalten
 einen kleinen Kontinuitätsvorteil. Die Wahl gilt für den Angriff; Wechsel behalten die vorhandene
