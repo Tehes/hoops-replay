@@ -151,7 +151,9 @@ function moveRoutes(scene, index, fraction, players) {
 	const to = scene.frames[index + 1] ?? from;
 	const duration = to.time - from.time;
 	const steal = scene.stealPlan;
+	const loose = scene.looseBallPlan;
 	if ((steal && from.time >= steal.approachAt - 1e-8 && to.time <= steal.catchAt + 1e-8) ||
+		(loose && from.time >= loose.releaseAt - 1e-8 && to.time <= loose.endAt + 1e-8) ||
 		(scene.driveAt !== undefined && from.time >= scene.driveAt - 1e-8 && to.time <= scene.gatherAt + 1e-8)) {
 		return players.map((player, i) => !steal || player.id === steal.stealerId ? {
 			...player,

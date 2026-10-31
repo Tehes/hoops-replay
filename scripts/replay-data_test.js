@@ -5,18 +5,87 @@ import { getTeamColors, getTeamLogo, getTeamName } from "../js/replay-teams.js";
 import { loadFeed, loadGame } from "./replay-source.js";
 import { getLaneWaitingPoint, isInOffensiveLane } from "../js/replay-rules.js";
 
-Deno.test("a turnover reserves the following same-clock loose-ball foul contact", async () => {
+Deno.test("linked turnovers show a free ball before the recorded foul in either court direction", async () => {
 	const data = await loadGame("0022600002");
-	const replay = compileReplay(data);
-	const turnover = replay.scenes.find((scene) => scene.action.actionNumber === 271);
-	const foul = replay.scenes.find((scene) => scene.action.actionNumber === 272);
-	const fouler = foul.action.personId;
-	const victim = foul.action.foulDrawnPersonId;
-	assert(turnover.matchups[victim] === fouler, "turnover did not reserve the recorded contact pair");
-	const from = foul.frames[0].players.find((player) => player.id === fouler);
-	const to = foul.frames.find((frame) => frame.time === foul.eventAt).players.find((player) => player.id === fouler);
-	assert(Math.hypot(to.x - from.x, to.y - from.y) < 3, "fouler sprints across the court to create contact");
-	assert(checkReplay(data, replay).errors.length === 0, "loose-ball foul replay failed validation");
+	for (const mirrored of [false, true]) {
+		for (const subtype of ["bad pass", "lost ball"]) {
+			const input = structuredClone(data);
+			input.actions.find((action) => action.actionNumber === 271).subType = subtype;
+			if (mirrored) {
+				for (const action of input.actions) {
+					if (["left", "right"].includes(action.side)) {
+						action.side = action.side === "left" ? "right" : "left";
+					}
+					if (action.isFieldGoal) {
+						action.x = 100 - action.x;
+					}
+				}
+			}
+			const source = JSON.stringify(input);
+			const replay = compileReplay(input);
+			const turnover = replay.scenes.find((scene) => scene.action.actionNumber === 271);
+			const foul = replay.scenes.find((scene) => scene.action.actionNumber === 272);
+			const plan = turnover.looseBallPlan;
+			assert(plan && replay.scenes[foul.looseBallTurnoverIndex] === turnover, "missing causal link");
+			assert(turnover.matchups[plan.victimId] === plan.foulerId, "missing recorded contact pair");
+			assert(Boolean(plan.receiverId) === (subtype === "bad pass"), "lost ball invented a pass recipient");
+			assert(plan.releaseAt < plan.looseAt && plan.looseAt < plan.endAt, "missing pass and pursuit phases");
+			const tipped = turnover.frames.find((frame) => frame.time === plan.looseAt);
+			const deflector = tipped.players.find((player) => player.id === plan.deflectorId);
+			assert(Math.hypot(tipped.ball.x - deflector.x - 1, tipped.ball.y - deflector.y - 0.8) < 0.00001,
+				"team control ended without the planned defensive touch");
+			const free = turnover.frames.filter((frame) => frame.time >= plan.releaseAt);
+			assert(free.every((frame) => frame.ball.owner === null && !frame.ball.dribble), "free ball was caught");
+			assert(foul.frames.every((frame) => frame.ball.owner === null), "foul invented a controlled catch");
+			const end = free.at(-1);
+			const start = foul.frames[0];
+			assert(Math.hypot(end.ball.x - start.ball.x, end.ball.y - start.ball.y) < 0.00001,
+				"ball jumped at the scene boundary");
+			assert(foul.frames.every((frame) => frame.ball.x === start.ball.x && frame.ball.y === start.ball.y),
+				"foul pose displaced the loose ball");
+			let previous = getReplayFrame(replay, turnover.start + plan.releaseAt + 0.001);
+			for (let local = plan.releaseAt + 1 / 60; local < plan.endAt; local += 1 / 60) {
+				const frame = getReplayFrame(replay, turnover.start + local);
+				assert(frame.ball.owner === null, "interpolation restored control during pursuit");
+				const actor = frame.players.find((player) => player.id === plan.foulerId);
+				const victim = frame.players.find((player) => player.id === plan.victimId);
+				assert(Math.hypot(actor.x - victim.x, actor.y - victim.y) >= 3.19,
+					"contact partners collided before the foul");
+				for (const id of [plan.foulerId, plan.victimId]) {
+					const a = previous.players.find((player) => player.id === id);
+					const b = frame.players.find((player) => player.id === id);
+					assert(Math.hypot(b.x - a.x, b.y - a.y) <= 8 / 60 + 0.001, "contact partner jumped to the ball");
+				}
+				previous = frame;
+			}
+			const time = turnover.start + (plan.releaseAt + plan.endAt) / 2;
+			const frame = JSON.stringify(getReplayFrame(replay, time));
+			getReplayFrame(replay, replay.duration);
+			assert(JSON.stringify(getReplayFrame(replay, time)) === frame, "seeking changed the loose ball");
+			assert(JSON.stringify(input) === source, "loose-ball planning mutated source events");
+			assert(checkReplay(input, replay).errors.length === 0, "loose-ball replay failed validation");
+		}
+	}
+});
+
+Deno.test("loose-ball links exclude steals, out-of-bounds passes and different clocks", async () => {
+	const data = await loadGame("0022600002");
+	for (const variant of ["steal", "out", "clock"]) {
+		const input = structuredClone(data);
+		const turnover = input.actions.find((action) => action.actionNumber === 271);
+		const foul = input.actions.find((action) => action.actionNumber === 272);
+		if (variant === "steal") {
+			turnover.stealPersonId = foul.foulDrawnPersonId;
+		} else if (variant === "out") {
+			turnover.subType = "out-of-bounds";
+			turnover.descriptor = "bad pass";
+		} else {
+			foul.clock = "PT07M02.00S";
+		}
+		const replay = compileReplay(input);
+		const scene = replay.scenes.find((scene) => scene.action.actionNumber === 271);
+		assert(scene.looseBallFoulIndex === undefined && !scene.looseBallPlan, `${variant} wrongly linked`);
+	}
 });
 
 Deno.test("recorded BKN-CLE flagrant penalties lead to a free-throw-line sideline inbound", async () => {

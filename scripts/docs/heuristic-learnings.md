@@ -3,6 +3,39 @@
 Dieses Dokument hält begrenzte fachliche Iterationen fest. PROJECT.md beschreibt das gültige Konzept.
 Reale Spiele kommen vom Server; IDs bezeichnen Vergleichsfälle, keine unveränderlichen Datenarchive.
 
+## Turnover und anschließendes Loose-Ball-Foul
+
+- **Hypothese und Hebel:** Das belegte Kontaktpaar bereits vor dem Turnover reservieren,
+  damit der Fouler im folgenden Foulbild keinen langen Weg zurücklegen muss.
+- **Evidenz:** `0022600002`, Aktionen 271/272 bei Q2 7:03: Der Weg zum Kontakt wird deutlich
+  kürzer. Der gezielte Test prüft Paarung und Weglänge; die bestandenen Spiel-Audits prüfen
+  keine verständliche Fehlpass-/Loose-Ball-Choreografie. Der Nutzer beurteilt die Darstellung
+  weiter als unplausibel; die anschließende Codeprüfung bestätigt die fehlende Ballsequenz.
+- **Entscheidung:** Als Lösung der Zielursache nicht akzeptiert. Die Paarreservierung steht
+  im aktuellen Code, ist aber nur eine Teilkorrektur. Nähe allein erzeugt keinen sichtbaren
+  Kontrollverlust und keine gemeinsame räumliche Ursache für den Kontakt.
+- **Bedingung für den nächsten Versuch:** Einen durchgängigen Ballweg und eine aus ihm
+  entwickelte Kontaktbewegung planen; Ereignisidentität, freie Ballphase und Folgefreiwürfe
+  erhalten. [Aufbereitung der nächsten Iteration](loose-ball-iteration.md) trennt Befund,
+  Hypothese, geschützte Fälle und Abnahmekriterien.
+- **Neuer Kandidat:** Direkte zeitgleiche Bad-pass-/Lost-ball-Folgen ohne Steal oder Aus werden
+  vorab verknüpft. Eine sichtbare gegnerische Ablenkung beendet schematisch die Teamkontrolle,
+  ohne einen Fang oder zusätzlichen Steal zu erzeugen. Der freie Ball bewegt sich weiter;
+  die belegten Kontaktpartner reagieren nach der Abgabe und erreichen denselben Ballbereich.
+  Der Foulzweig hält den Ballort und ergänzt nur den kurzen Kontakt. Herkunft und Strafe bleiben erhalten.
+- **Grundlage und Grenze:** NBA Rule 4, Sections IV/XVI, Rule 12B, Section VIII, sowie dieselben
+  Abschnitte des WNBA-Regelwerks 2026. Das NBA Video Rulebook zeigt unterschiedliche Kontaktformen;
+  ein bestimmtes Festhalten, Hechten oder Fallen wird deshalb nicht geraten. Quellen, Vergleich
+  und Grenzen stehen im verlinkten Iterationsbericht. Die Ablenkung ist eine schematische Annahme,
+  keine zusätzliche gemessene Spieleraktion. Ein allgemeines Teamkontrollmodell fehlt weiterhin.
+- **Vergleich und Entscheidung:** Baseline und Kandidat auf denselben einmal geladenen 23
+  NBA-/WNBA-Eingaben: keine neuen Audit- oder Vergleichsfehler, sieben gemeinsame Abläufe,
+  zwei belegte Steal-Folgen ausgeschlossen. Die festen Innenzuspiel-, Rebound- und And-one-Fälle
+  bleiben unverändert. Eine vorzeitige Überlappung bei der Ballberührung wurde durch gemeinsame
+  Zwischenpositionen korrigiert. Chrome MCP vergleicht Hart 271/272, Conwell 524/525 in `0012600009`
+  und 471/472 in `1042600306` aus jeweils derselben Eingabe. Als begrenzten lokalen Kandidaten
+  beibehalten; Nutzerabnahme offen. Nicht direkt verknüpfbare und Rebound-/Wurf-Fälle bleiben offen.
+
 ## Seitlicher Outlet nach kontrolliertem Defensivrebound
 
 - **Ursache:** Der erste Ballführer wurde bei der Outlet-Übergabe grundsätzlich auf y = 25 gestellt.

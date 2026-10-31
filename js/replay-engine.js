@@ -368,6 +368,27 @@ function linkRebounds(scenes) {
 	});
 }
 
+function linkLooseBallFouls(scenes, data) {
+	for (let index = 0; index < scenes.length - 1; index++) {
+		const scene = scenes[index];
+		const foul = scenes[index + 1];
+		const action = scene.action;
+		if (scene.kind !== "turnover" || action.stealPersonId ||
+			!["bad pass", "lost ball"].includes(action.subType) || foul.kind !== "foul" ||
+			foul.action.descriptor !== "loose ball" || foul.action.period !== action.period ||
+			foul.action.clock !== action.clock) {
+			continue;
+		}
+		const foulingTeam = data.teams.find((team) => team.id === foul.action.teamId);
+		const opponent = data.teams.find((team) => team.id !== foul.action.teamId);
+		if (foulingTeam.players.some((player) => player.id === foul.action.personId) &&
+			opponent.players.some((player) => player.id === foul.action.foulDrawnPersonId)) {
+			scene.looseBallFoulIndex = index + 1;
+			foul.looseBallTurnoverIndex = index;
+		}
+	}
+}
+
 function planShotClockPressure(scenes) {
 	scenes.forEach((scene, index) => {
 		if (scene.kind !== "turnover" || scene.action.subType !== "shot clock") {
@@ -1573,6 +1594,96 @@ function circulateBall(state, scene, duration, record) {
 	return true;
 }
 
+function animateLooseBallTurnover(state, scene, foul, direction, record) {
+	const fouler = state.positions[foul.action.personId];
+	const victim = state.positions[foul.action.foulDrawnPersonId];
+	const passer = state.positions[scene.action.personId];
+	const origin = { x: passer.x + 1, y: passer.y + 0.8, z: 0.5 };
+	const badPass = scene.action.subType === "bad pass";
+	const deflectingVictim = foul.action.teamId === scene.attackTeam;
+	const candidates = (badPass ? state.lineups[scene.attackTeam].filter((id) => id !== scene.action.personId) : [null])
+		.map((id) => {
+			const receiver = id ? state.positions[id] : { x: origin.x + direction * 6 - 1, y: origin.y - 0.8 };
+			const dx = receiver.x + 1 - origin.x;
+			const dy = receiver.y + 0.8 - origin.y;
+			const length = Math.hypot(dx, dy) || 1;
+			const fraction = Math.max(0.25, Math.min(0.75,
+				(((fouler.x + victim.x) / 2 - origin.x) * dx +
+					((fouler.y + victim.y) / 2 - origin.y) * dy) / length ** 2));
+			const distance = badPass ? Math.max(6, Math.min(18, length * fraction)) : 4;
+			const target = { x: origin.x + dx / length * (distance + 3), y: origin.y + dy / length * (distance + 3), z: 0 };
+			const landing = { x: origin.x + dx / length * distance, y: origin.y + dy / length * distance, z: 0.5 };
+			const touch = { x: landing.x - 1, y: landing.y - 0.8 };
+			const ux = (victim.x - fouler.x) / (Math.hypot(victim.x - fouler.x, victim.y - fouler.y) || 1);
+			const uy = (victim.y - fouler.y) / (Math.hypot(victim.x - fouler.x, victim.y - fouler.y) || 1);
+			const actorTarget = { x: target.x - ux * 1.6, y: target.y - uy * 1.6 };
+			const victimTarget = { x: target.x + ux * 1.6, y: target.y + uy * 1.6 };
+			const actorTouch = { x: touch.x - (deflectingVictim ? ux * 3.2 : 0),
+				y: touch.y - (deflectingVictim ? uy * 3.2 : 0) };
+			const victimTouch = { x: touch.x + (deflectingVictim ? 0 : ux * 3.2),
+				y: touch.y + (deflectingVictim ? 0 : uy * 3.2) };
+			const points = [target, actorTarget, victimTarget, actorTouch, victimTouch];
+			const legal = points.every((point) => point.x >= 1 && point.x <= 93 && point.y >= 2 && point.y <= 48) &&
+				(!badPass || distance + 3 <= length - 2.8) &&
+				((origin.x - 47) * direction < 0 || (target.x - 47) * direction >= 0);
+			const travel = Math.max(Math.hypot(actorTarget.x - fouler.x, actorTarget.y - fouler.y),
+				Math.hypot(victimTarget.x - victim.x, victimTarget.y - victim.y));
+			const crowding = Object.values(state.lineups).flat()
+				.filter((other) => ![foul.action.personId, foul.action.foulDrawnPersonId].includes(other))
+				.reduce((cost, other) => cost + Math.max(0, 4 - Math.hypot(
+					state.positions[other].x - target.x, state.positions[other].y - target.y)) ** 2, 0);
+			return { receiverId: id, target, landing, actorTouch, victimTouch, actorTarget, victimTarget, travel,
+				cost: legal ? travel + crowding + Math.max(0, 8 - length) * 4 : Infinity };
+		}).sort((a, b) => a.cost - b.cost);
+	const plan = candidates.find((candidate) => Number.isFinite(candidate.cost));
+	if (!plan) {
+		return false;
+	}
+	const fromActor = { ...fouler };
+	const fromVictim = { ...victim };
+	const length = Math.hypot(plan.target.x - origin.x, plan.target.y - origin.y);
+	const { landing, actorTouch, victimTouch } = plan;
+	const flight = Math.max(0.35, length / 36,
+		0.18 + Math.max(Math.hypot(actorTouch.x - fouler.x, actorTouch.y - fouler.y),
+			Math.hypot(victimTouch.x - victim.x, victimTouch.y - victim.y)) / 8);
+	const duration = flight + Math.max(0.45,
+		Math.hypot(plan.actorTarget.x - actorTouch.x, plan.actorTarget.y - actorTouch.y) / 8,
+		Math.hypot(plan.victimTarget.x - victimTouch.x, plan.victimTarget.y - victimTouch.y) / 8);
+	plan.foulerId = foul.action.personId;
+	plan.victimId = foul.action.foulDrawnPersonId;
+	plan.deflectorId = foul.action.teamId === scene.attackTeam ? foul.action.foulDrawnPersonId : foul.action.personId;
+	plan.origin = origin;
+	scene.looseBallPlan = plan;
+	state.ball.dribble = false;
+	releaseBall(state);
+	state.ball.z = origin.z;
+	record(0.01);
+	plan.releaseAt = scene.frames.at(-1).time;
+	const move = (elapsed) => {
+		const beforeTouch = elapsed <= flight;
+		const progress = beforeTouch ? Math.max(0, (elapsed - 0.18) / (flight - 0.18))
+			: (elapsed - flight) / (duration - flight);
+		for (const [player, from, to] of beforeTouch
+			? [[fouler, fromActor, actorTouch], [victim, fromVictim, victimTouch]]
+			: [[fouler, actorTouch, plan.actorTarget], [victim, victimTouch, plan.victimTarget]]) {
+			player.x = from.x + (to.x - from.x) * progress;
+			player.y = from.y + (to.y - from.y) * progress;
+		}
+	};
+	// An uncredited defensive touch ends team control without inventing a controlled steal.
+	flyBall(state, record, landing, badPass ? 0.65 : 0.2, flight, 0, (progress) => move(progress * flight));
+	plan.looseAt = scene.frames.at(-1).time;
+	const bounceDuration = duration - flight;
+	const floor = { x: landing.x + (plan.target.x - landing.x) * 0.4,
+		y: landing.y + (plan.target.y - landing.y) * 0.4, z: 0 };
+	flyBall(state, record, floor, 0, bounceDuration * 0.4, 0,
+		(progress) => move(flight + progress * bounceDuration * 0.4));
+	flyBall(state, record, plan.target, 0.45, bounceDuration * 0.6, 0,
+		(progress) => move(flight + (0.4 + progress * 0.6) * bounceDuration));
+	plan.endAt = scene.frames.at(-1).time;
+	return true;
+}
+
 function animateSteal(state, scene, stealerId, direction, record) {
 	const defender = state.positions[stealerId];
 	const passer = state.positions[state.ball.owner];
@@ -2595,11 +2706,15 @@ function compileScene(replay, scene, index, state, data) {
 			if (scene.kind === "foul" && action.descriptor === "shooting") {
 				prepareShootingFoul(state, scene, replay, index, hoop, direction, record);
 			} else {
-				if (personalOnBall && state.ball.owner !== action.foulDrawnPersonId) {
-					const receiver = state.positions[action.foulDrawnPersonId];
+				const receiverId = personalOnBall ? action.foulDrawnPersonId
+					: scene.looseBallFoulIndex !== undefined ? action.personId : null;
+				if (receiverId && state.ball.owner !== receiverId) {
+					const receiver = state.positions[receiverId];
 					releaseBall(state);
 					record(0.01);
-					flyBall(state, record, { x: receiver.x + 1, y: receiver.y + 0.8, z: 0.5 }, 0.6, 0.45);
+					const distance = Math.hypot(receiver.x + 1 - state.ball.x, receiver.y + 0.8 - state.ball.y);
+					flyBall(state, record, { x: receiver.x + 1, y: receiver.y + 0.8, z: 0.5 }, 0.6,
+						personalOnBall ? 0.45 : Math.max(0.35, distance / 45));
 				}
 				state.ball.owner = (scene.kind === "foul" && !offensive ? action.foulDrawnPersonId : action.personId) ||
 					state.ball.owner || state.lineups[offense][0];
@@ -2608,7 +2723,16 @@ function compileScene(replay, scene, index, state, data) {
 		}
 		const victim = state.positions[action.foulDrawnPersonId];
 		const actor = state.positions[action.personId];
-		if (scene.kind === "foul" && victim && actor && action.descriptor === "charge") {
+		if (scene.kind === "foul" && scene.looseBallTurnoverIndex !== undefined &&
+			replay.scenes[scene.looseBallTurnoverIndex].looseBallPlan) {
+			followAttackers = false;
+			const dx = victim.x - actor.x;
+			const dy = victim.y - actor.y;
+			actor.x += dx * 0.3;
+			actor.y += dy * 0.3;
+			actor.angle = direction * 0.2;
+			record(0.3);
+		} else if (scene.kind === "foul" && victim && actor && action.descriptor === "charge") {
 			contacts.add(action.foulDrawnPersonId);
 			Object.assign(actor, { x: victim.x - direction * 1.4, y: victim.y });
 			record(0.3);
@@ -2664,7 +2788,15 @@ function compileScene(replay, scene, index, state, data) {
 			contacts.add(stealer);
 			animateSteal(state, scene, stealer, direction, record);
 		}
-		scene.eventAt = time;
+		if (scene.looseBallFoulIndex !== undefined) {
+			const foul = replay.scenes[scene.looseBallFoulIndex];
+			const active = Object.values(state.lineups).flat();
+			if (active.includes(foul.action.personId) && active.includes(foul.action.foulDrawnPersonId)) {
+				followAttackers = false;
+				animateLooseBallTurnover(state, scene, foul, direction, record);
+			}
+		}
+		scene.eventAt = scene.looseBallPlan?.looseAt ?? time;
 		const markerKind = action.subType === "technical"
 			? "technical"
 			: action.subType === "shot clock"
@@ -2674,7 +2806,7 @@ function compileScene(replay, scene, index, state, data) {
 			: scene.kind === "foul"
 			? "foul"
 			: "turnover";
-		addMarker(replay, scene, time, markerKind, victim || actor || state.ball);
+		addMarker(replay, scene, scene.eventAt, markerKind, victim || actor || state.ball);
 		if (action.stealPersonId || scene.kind === "steal") {
 			const stealer = action.stealPersonId || action.personId;
 			state.possession = state.players.find((player) => player.id === stealer).teamId;
@@ -2682,6 +2814,9 @@ function compileScene(replay, scene, index, state, data) {
 			state.needsAdvance = true;
 			addMarker(replay, scene, time, "steal", state.positions[stealer]);
 			replay.attacks.push(scene.start + time);
+		} else if (scene.looseBallPlan) {
+			// The following whistle resolves the loose ball; no intervening catch or inbound is implied.
+			state.restart = null;
 		} else if (scene.kind === "turnover" || offensive) {
 			releaseBall(state);
 			if (action.subType === "out-of-bounds" && !scene.missedPass) {
@@ -2704,10 +2839,14 @@ function compileScene(replay, scene, index, state, data) {
 			replay.attacks.push(scene.start + time);
 		} else if (scene.kind === "foul") {
 			releaseBall(state);
+			if (scene.looseBallTurnoverIndex !== undefined && replay.scenes[scene.looseBallTurnoverIndex].looseBallPlan) {
+				state.possession = offense;
+				replay.attacks.push(scene.start + time);
+			}
 			state.restart = "foul";
 		}
 		landPlayers(state);
-		record(0.7);
+		record(scene.looseBallPlan ? 0.12 : 0.7);
 	} else if (scene.kind === "substitution") {
 		for (const team of data.teams) {
 			const outs = scene.related.filter((a) => a.teamId === team.id && a.subType === "out");
@@ -2940,6 +3079,7 @@ export function compileReplay(data) {
 	orderSameClockSubstitutions(replay.scenes, data);
 	linkAndOneFouls(replay.scenes);
 	linkRebounds(replay.scenes);
+	linkLooseBallFouls(replay.scenes, data);
 	planShotClockPressure(replay.scenes);
 	replay.scenes.forEach((scene, index) => {
 		const previous = replay.scenes[index - 1];

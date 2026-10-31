@@ -240,6 +240,11 @@ und belegten Ereignissen.
   Ausweichweg oder ein späterer Start sind wiederholtem Hin-und-her-Korrigieren vorzuziehen.
 - Bei wenig Zeit oder schwachen Belegen wird der Ablauf einfacher, statt zusätzliche Aktionen
   in das Fenster zu zwingen.
+- Zusammenhängende Ballverluste und Loose-Ball-Fouls benötigen einen durchgängigen Ballweg:
+  sichtbare Ballabgabe beziehungsweise Kontrollverlust, freie Ballphase und belegter Kontakt.
+  Der Foulort darf nicht durch nachträgliches Versetzen des Balls hergestellt werden.
+  Ballberechtigung nach dem Pfiff ist kein Nachweis einer vorherigen Ballkontrolle des gefoulten Teams.
+  Passziel, freie Ballbewegung und Kontaktort bleiben ohne Ortsbelege schematisch.
 
 Der Planer kann wenige Alternativen vergleichen. Regelwidrige und zeitlich unmögliche Kandidaten
 scheiden vor der Qualitätsbewertung aus. Erst danach entscheiden Kontinuität, Wege, Spacing,
@@ -506,6 +511,7 @@ nur Zonengeometrie, keinen allgemeinen Regelzustand.
 | Persönliches Foul mit `off-the-ball` | Kein pauschaler Balltransfer an den Gefoulten; Loose-ball- und technische Fouls behalten ihre Sonderbehandlung |
 | Wurffoul | Zwei-/Dreipunktbereich aus Qualifiers oder folgender regulärer Freiwurfserie; schematische Annahme vor dem Kontakt |
 | And-one | Gleiche Periode/Uhr, passender Schütze und gegnerisches Wurffoul verknüpfen Treffer und Kontakt; kein zweiter Aufbau oder Gegner-Einwurf |
+| Turnover mit folgendem Loose-Ball-Foul | Direkte zeitgleiche Bad-pass-/Lost-ball-Folgen ohne Steal oder Aus-Turnover können Ballabgabe, schematische gegnerische Ablenkung, freie Ballphase und Kontakt gemeinsam planen. Beide Ereignis-IDs bleiben erhalten. Nicht verknüpfbare Fälle und Fälle ohne zulässigen Weg behalten die bisherige Behandlung |
 | Reguläre Freiwürfe | Teamgerechte Lane-Aufstellung; Zwischenwurf und letzter Wurf unterschieden. Beim letzten Versuch beginnt schematisches Ausboxen ab Release, nach Fehlwurf folgt der belegte Live-Rebound |
 | Technischer Freiwurf | Vorheriger Team-Ballbesitz und Positionen werden grundsätzlich wiederhergestellt; keine normale Rebound-Vorabplanung |
 | Technisches Foul gegen Person außerhalb des Rosters | Bei bekanntem Team als Teamereignis ohne erfundenen Court-Spieler erhalten |
@@ -532,6 +538,22 @@ bei technischen und erkannten Flagrant-Freiwürfen bleiben die Lane-Plätze frei
 Einzelne Hände/Füße, vollständige Kontaktphysik, alle offensiven Ausweichwege und weitere
 Sonderstrafen sind nicht modelliert. Die gezielten Szenarien stehen in
 [scripts/replay-freethrows_test.js](scripts/replay-freethrows_test.js).
+
+Bei verknüpften Turnover-/Loose-Ball-Foul-Folgen wird der Ball sichtbar abgegeben, von einem
+gegnerischen Kontaktpartner schematisch abgelenkt und ohne kontrollierten Fang weiterbewegt.
+Nach dem Bodenkontakt hüpft er kurz in Bewegungsrichtung weiter, bevor er am Kontaktbereich liegen bleibt.
+Die Beteiligten reagieren nach der Abgabe; ihre begrenzten Wege führen zum selben Ballbereich.
+Die Foulpose verändert den Ballort nicht mehr. Ein kurzer Kontakt beendet den Ablauf, bevor die
+aufgezeichnete Strafe folgt. Die Ablenkung ist eine ergänzte Bewegung ohne zusätzlichen Steal.
+Ein unbekanntes tatsächliches Festhalten, Hechten oder Fallen wird nicht aus dem Descriptor abgeleitet.
+Grundlage sind NBA Rule 4, Sections IV und XVI, sowie Rule 12B, Section VIII, und
+[WNBA 2026 Rule 4, Sections IV/XVI, und Rule 12B, Section VIII](https://cdn.wnba.com/sites/4/2026/05/2026-WNBA-Official-Rule-Book.pdf).
+Ein fliegender Pass allein beendet Teamkontrolle nicht; die gegnerische Ablenkung kann sie beenden,
+ohne dass die Defense den Ball kontrolliert. `ball.owner === null` ist kein allgemeines Regelmodell
+für Teamkontrolle. Die bestehende Engine trennt diese Zustände weiterhin nicht vollständig.
+Die Auswahl von Passziel, Ablenkung und Kontaktbereich bleibt eine Replay-Heuristik.
+Für andere Loose-Ball-Fouls, insbesondere nach Würfen und Rebounds, ist kein solcher gemeinsamer
+Ablauf umgesetzt. Eine allgemeine Kontaktphysik oder vollständige Prüfung aller Pfiffbedingungen fehlt.
 
 Diese Zweige sind keine vollständige Regelabdeckung. Insbesondere sind Fortsetzungen nach
 verschachtelten technischen Strafen und alle Sonderfoul-Kombinationen nicht umfassend modelliert.
