@@ -520,6 +520,7 @@ function renderAction(frame) {
 		return;
 	}
 	displayedAction = active;
+	jerseyKey.hidden = active !== null;
 	const action = active?.action;
 	const player = action && playerById.get(action.personId);
 	const team = action && teamById.get(player?.teamId || action.teamId);
@@ -741,7 +742,6 @@ async function init() {
 			context.scale(12, 12);
 			drawJersey(context, jerseyByTeamId.get(team.id));
 		}
-		jerseyKey.hidden = false;
 		document.title = `Hoops Replay · ${game.teams[0].code} @ ${game.teams[1].code}`;
 		actionPhoto.addEventListener("error", () => {
 			if (/^https:\/\/cdn\.(nba|wnba)\.com\/headshots\//.test(actionPhoto.getAttribute("src") || "")) {
