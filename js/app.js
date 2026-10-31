@@ -788,7 +788,9 @@ async function init() {
 			}
 		});
 		document.addEventListener("visibilitychange", () => {
-			lastTimestamp = 0;
+			if (document.hidden) {
+				setPlaying(false);
+			}
 		});
 		loadState.hidden = true;
 		drawCourt();

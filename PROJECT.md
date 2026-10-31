@@ -1,18 +1,39 @@
 # Hoops Replay — Zielbild und Projektkonzept
 
-Diese Datei beschreibt das gültige Produkt- und Entwicklungskonzept. Sie ist der gemeinsame
-Ausgangspunkt für jede Weiterentwicklung, kein Entwicklungsprotokoll. Zielbild und vorhandene
+Diese Datei beschreibt das gültige fachliche Konzept des schematischen Basketballspiels. Sie ist der
+gemeinsame Ausgangspunkt für Änderungen an der Spiellogik. Zielbild und vorhandene
 Implementierung sind ausdrücklich getrennt: Eine Anforderung in dieser Datei ist kein Nachweis,
 dass sie bereits umgesetzt oder geprüft ist.
 
 ## Orientierung und Pflege
 
 - Der [Northstar im Kopf von js/replay-engine.js](js/replay-engine.js) beschreibt das dauerhafte
-  übergeordnete Ziel. Diese Datei konkretisiert Produkt, Verantwortlichkeiten und Bewertungsverfahren.
+  übergeordnete Ziel. Diese Datei konkretisiert Spiellogik, fachliche Verantwortlichkeiten und deren Bewertung.
 - [AGENTS.md](AGENTS.md) enthält die verbindlichen Arbeitsregeln.
 - [README.md](README.md) beschreibt Nutzung, lokale Ausführung und Prüfkommandos.
 - Code, vorhandene Prüfungen und Server-Batchberichte belegen den Implementierungsstand.
   Git hält die Änderungsgeschichte fest.
+
+### Was in diese Datei gehört
+
+- Verbindliche Quelldaten, ihre Interpretation und die Grenze zwischen belegten Ereignissen und
+  schematischen Ergänzungen.
+- Basketballregeln, taktische Prinzipien und ihre fachlichen Quellen sowie die daraus abgeleiteten
+  Strategien und Logiken für Ballbesitze, Aufstellungen, Positionierungen, Laufwege und Aktionen.
+- Fachliche Zustände und Zeitmodelle sowie die Verantwortlichkeiten der Module, soweit sie das
+  Spielmodell erklären.
+- Begründungen, Annahmen, bekannte Gegenbeispiele, Implementierungsgrenzen und offene fachliche
+  Lücken. Zielbild und nachgewiesener Stand müssen unterscheidbar bleiben.
+
+Nicht hierher gehören UI-Aufbau und Gestaltung, Bedienelemente, UI-Texte, Browser- und
+Fensterverhalten (etwa Tab-Pausen), Fokusbehandlung, technische Plattform- und Entwicklungsregeln,
+Setup, Deployment, Analytics oder allgemeine Arbeitsanweisungen. Nutzung, Setup und Prüfkommandos
+gehören in README.md; verbindliche Arbeitsregeln stehen in AGENTS.md. Änderungsverläufe,
+Testlauf-Protokolle und erledigte Aufgaben gehören ebenfalls nicht in diese Datei.
+
+Vor jeder Ergänzung prüfen: Erklärt sie, wie das Basketballspiel fachlich modelliert wird und warum?
+Nur dann hier aufnehmen. Eine reine UI-, Browser- oder Infrastrukturänderung erfordert keine
+Ergänzung in PROJECT.md. Bestehende fachfremde Abschnitte sind kein Vorbild für neue Einträge.
 
 ### Wie diese Datei gepflegt wird
 
@@ -29,8 +50,8 @@ dass sie bereits umgesetzt oder geprüft ist.
    aktualisieren. Eine Teilumsetzung bleibt als teilweise umgesetzt erkennbar.
    Relevante Module und Tests verlinken, statt flüchtige Testanzahlen, Framezahlen oder Laufzeiten
    abzuschreiben.
-5. Technische Details nur bewahren, wenn sie Dateninterpretation, Produktverhalten oder sichere
-   Weiterentwicklung erklären. Veraltete Experimente, lokale Rechnerpfade, Browserlauf-Protokolle
+5. Technische Details nur bewahren, wenn sie Dateninterpretation oder Spiellogik erklären.
+   Veraltete Experimente, lokale Rechnerpfade, Browserlauf-Protokolle
    und erledigte Arbeitsaufträge gehören nicht hierher.
 6. Gültige Einschränkungen und wichtige Gegenbeispiele erhalten, auch wenn die auslösende
    Fehlergeschichte entfällt. Reproduzierbare Fehlerfälle gehören möglichst in Tests oder Fixtures.
