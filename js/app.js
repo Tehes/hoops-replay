@@ -4,7 +4,7 @@ Imports
 
 import { loadRecentGameIds, loadReplayData } from "./replay-data.js";
 import { checkReplay } from "./replay-validation.js";
-import { compileReplay, getReplayFrame } from "./replay-engine.js";
+import { attackDirection, compileReplay, getReplayFrame } from "./replay-engine.js";
 import { getJerseyColors, getTeamColors, getTeamLogo, getTeamName } from "./replay-teams.js";
 import { getLeague } from "./replay-leagues.js";
 
@@ -418,28 +418,77 @@ function drawShotEffects(frame) {
 	}
 }
 
+function planBallRotations() {
+	let angle = -Math.PI / 6;
+	for (const scene of replay.scenes) {
+		const spinningShot = (scene.shotStyle && scene.shotStyle.family !== "dunk") || scene.kind === "freethrow";
+		const direction = attackDirection(game, scene.action.teamId, scene.action.period);
+		scene.ballRotations = [{ time: scene.frames[0].time, angle }];
+		let passer = null;
+		for (let index = 0; index < scene.frames.length - 1; index++) {
+			const from = scene.frames[index];
+			const to = scene.frames[index + 1];
+			if (from.ball.owner) {
+				passer = from;
+			}
+			const flight = to.ball.flight && !to.ball.owner;
+			let speed = 0;
+			if (flight && spinningShot && from.time >= scene.releaseAt && from.time < scene.eventAt) {
+				speed = -direction * 7;
+			} else if (flight && passer && scene.kind !== "jumpball" && from.time < (scene.releaseAt ?? Infinity)) {
+				const receiver = scene.frames.slice(index + 1).find((key) => key.ball.owner);
+				if (receiver) {
+					speed = (Math.sign(receiver.ball.x - passer.ball.x) || 1) * 2;
+				}
+			}
+			const wobble = !flight && from.ball.owner && from.ball.dribble;
+			scene.ballRotations.at(-1).wobble = Boolean(wobble);
+			angle += wobble
+				? (Math.sin((scene.start + to.time) * 6) - Math.sin((scene.start + from.time) * 6)) * 0.05
+				: speed * (to.time - from.time);
+			scene.ballRotations.push({ time: to.time, angle });
+		}
+	}
+}
+
 function drawBall(frame) {
 	const ball = frame.ball;
+	const scene = frame.scene;
 	const dribble = ball.owner && ball.dribble ? Math.abs(Math.sin(frame.time * 12)) * 0.4 : 0;
+	const local = frame.time - scene.start;
+	let index = 0;
+	while (index < scene.ballRotations.length - 2 && scene.ballRotations[index + 1].time <= local) {
+		index++;
+	}
+	const from = scene.ballRotations[index];
+	const to = scene.ballRotations[index + 1] || from;
+	const fraction = Math.max(0, Math.min(1, (local - from.time) / (to.time - from.time || 1)));
+	const angle = from.angle + (from.wobble
+		? (Math.sin(frame.time * 6) - Math.sin((scene.start + from.time) * 6)) * 0.05
+		: (to.angle - from.angle) * fraction);
 	const radius = Math.max(0.65, 3.2 / (scale / (globalThis.devicePixelRatio || 1)));
 	ctx.fillStyle = "#10182044";
 	ctx.beginPath();
 	ctx.ellipse(ball.x, ball.y + 0.7, radius * 1.1, radius * 0.45, 0, 0, Math.PI * 2);
 	ctx.fill();
 	const y = ball.y - ball.z * 0.6 - dribble;
+	ctx.save();
+	ctx.translate(ball.x, y);
+	ctx.rotate(angle);
 	ctx.fillStyle = "#ff9b30";
 	ctx.strokeStyle = "#572f14";
 	ctx.lineWidth = 0.12;
 	ctx.beginPath();
-	ctx.arc(ball.x, y, radius, 0, Math.PI * 2);
+	ctx.arc(0, 0, radius, 0, Math.PI * 2);
 	ctx.fill();
 	ctx.stroke();
 	ctx.beginPath();
-	ctx.moveTo(ball.x - radius, y);
-	ctx.lineTo(ball.x + radius, y);
-	ctx.moveTo(ball.x, y - radius);
-	ctx.lineTo(ball.x, y + radius);
+	ctx.moveTo(-radius, 0);
+	ctx.lineTo(radius, 0);
+	ctx.moveTo(0, -radius);
+	ctx.lineTo(0, radius);
 	ctx.stroke();
+	ctx.restore();
 }
 
 /* --------------------------------------------------------------------------------------------------
@@ -649,6 +698,7 @@ async function init() {
 			url.searchParams.set("game", game.gameId);
 			globalThis.history.replaceState(null, "", url);
 		}
+		planBallRotations();
 		actionEvents = replay.scenes.filter((scene) => scene.action.description).map((scene) => ({
 			time: scene.start + scene.eventAt,
 			label: scene.banner || "",

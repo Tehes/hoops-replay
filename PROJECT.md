@@ -775,6 +775,9 @@ Wichtige Datenregeln:
   NBA-/WNBA-CDN mit Teamlogo als Fallback. Fotos zeigen den aktuellen CDN-Stand.
 - Treffer erhalten grüne Punkte, Fehlwürfe rote Kreuze unter den Jerseys, dazu Punktewerte.
   Sichtbarkeit und Ausblenden laufen in Replay-Zeit; andere Ereignis-Icons bleiben vom Court fern.
+- Die schlichte Balldarstellung führt ihre Naht-Drehstellung über Fänge und Szenenwechsel fort.
+  Passrotation, Rückwärtsrotation bei Würfen und minimale Dribbelbewegung werden vorab auf der
+  Replay-Zeitachse geplant; Pause und Seeking verändern die Drehstellung eines Zeitpunkts nicht.
 - Play/Pause, 0,5×/1×/1,5×/2×/4×, Scrubbing, Perioden- und Angriffssprünge bleiben konsistent.
   Leertaste/Pfeile ergänzen die Steuerung. Play am Ende startet neu.
 - `?game=GAME_ID&action=ACTION_NUMBER` öffnet eine Szene am Ereignis pausiert.
