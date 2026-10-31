@@ -1,4 +1,4 @@
-import { loadRecentGameIds, loadReplayData, normalizeGame } from "../js/replay-data.js";
+import { loadRecentGameIds, loadReplayData, loadRosterPositions, normalizeGame } from "../js/replay-data.js";
 import { attackDirection, clockSeconds, compileReplay, getReplayFrame } from "../js/replay-engine.js";
 import { checkReplay } from "../js/replay-validation.js";
 import { getTeamColors, getTeamLogo, getTeamName } from "../js/replay-teams.js";
@@ -212,9 +212,9 @@ Deno.test("a live off-ball foul after a basket follows an inbound and advances o
 					const data = structuredClone(source);
 					const scoring = data.teams[scoringIndex];
 					const receiving = data.teams[1 - scoringIndex];
-					const shooter = scoring.players.find((p) => p.starter && p.position === "PG");
+					const shooter = scoring.players.find((p) => p.starter && p.boxscorePosition === "PG");
 					const actor = scoring.players.find((p) => p.starter && p.id !== shooter.id);
-					const guard = receiving.players.find((p) => p.starter && p.position === "PG");
+					const guard = receiving.players.find((p) => p.starter && p.boxscorePosition === "PG");
 					const victim = receiving.players.find((p) => p.starter && p.id !== guard.id);
 					const tip = source.actions.find((a) => a.actionType === "jumpball");
 					const common = { period, scoreAway: "0", scoreHome: "0" };
@@ -434,20 +434,82 @@ Deno.test("automatic selection orders completed games across leagues and exclude
 	}
 });
 
-Deno.test("an explicit ID always loads both backend feeds", async () => {
+Deno.test("roster positions preserve duplicate and hybrid roles without inventing missing positions", async () => {
+	const gameId = "0022600007";
+	const players = ["G", "G", "F-G", "C-F", ""].map((position, index) => ({
+		personId: index + 1,
+		position,
+		starter: "1",
+	}));
+	const boxscore = { game: {
+		gameId,
+		gameStatus: 3,
+		gameTimeUTC: "2026-10-25T00:00:00Z",
+		awayTeam: { teamId: 1610612743, teamTricode: "DEN", players },
+		homeTeam: { teamId: 1610612760, teamTricode: "OKC", players },
+	} };
+	const normalized = normalizeGame(gameId, boxscore, { game: { gameId, actions: [{ actionNumber: 1 }] } });
+	assert(JSON.stringify(normalized.teams[0].players.map((player) => player.position)) ===
+		'["G","G","F-G","C-F",""]', "normalization invented unique starter positions");
+	for (const [league, season] of [["nba", "2026-27"], ["wnba", "2026"]]) {
+		const data = {
+			league,
+			season,
+			teams: [{
+				id: 1610612738,
+				code: "BOS",
+				players: ["PG", "SG", "SF", "PF", "C", "", ""].map((position, index) => ({
+					id: index + 1,
+					position,
+					boxscorePosition: position,
+					positionSource: position ? "boxscore" : null,
+				})),
+			}],
+		};
+		const original = JSON.stringify(data);
+		const enriched = await loadRosterPositions(data, (path) => {
+			assert(path === `roster/1610612738?season=${season}&league=${league}`, "wrong roster season or league");
+			return Promise.resolve({ resultSets: [{
+				name: "CommonTeamRoster",
+				headers: ["POSITION", "PLAYER_ID"],
+				rowSet: [["G", 1], ["G", 2], ["F-G", 3], ["F", 4], ["C-F", 5], ["", 7], ["C", 99]],
+			}] });
+		});
+		assert(JSON.stringify(enriched.teams[0].players.map((player) => player.position)) ===
+			'["G","G","F-G","F","C-F","",""]', "roster positions were replaced by artificial slots");
+		assert(enriched.teams[0].players[0].positionSource === "roster", "missing roster provenance");
+		assert(enriched.teams[0].players[0].boxscorePosition === "PG", "game-specific position was lost");
+		assert(enriched.teams[0].players.length === 7, "season roster changed the game's participants");
+		assert(JSON.stringify(data) === original, "roster loading mutated its input");
+		for (const failure of [null, { resultSets: [] }]) {
+			const fallback = await loadRosterPositions(data, () => {
+				if (failure === null) {
+					throw new Error("HTTP 503");
+				}
+				return Promise.resolve(failure);
+			});
+			assert(JSON.stringify(fallback) === original, "unavailable roster invented player positions");
+		}
+	}
+});
+
+Deno.test("an explicit ID loads game feeds and both season rosters from the backend", async () => {
 	const boxscore = await loadFeed("boxscore/0022600094");
 	const playByPlay = await loadFeed("playbyplay/0022600094");
 	const originalFetch = globalThis.fetch;
 	const requests = [];
 	globalThis.fetch = (url) => {
 		requests.push(String(url));
+		if (/\/(roster|players)\//.test(String(url))) {
+			return loadFeed(String(url).split(".deno.net/")[1]).then((roster) => Response.json(roster));
+		}
 		return Promise.resolve(Response.json(String(url).includes("boxscore/") ? boxscore : playByPlay));
 	};
 	try {
 		const game = await loadReplayData("0022600094");
 		assert(game.gameId === "0022600094", "wrong backend game");
 		assert(
-			requests.length === 2 && requests.every((url) => url.startsWith("https://hoops-replay.tehes.deno.net/")),
+			requests.length === 6 && requests.every((url) => url.startsWith("https://hoops-replay.tehes.deno.net/")),
 			"explicit ID must use the backend only",
 		);
 		assert(checkReplay(game).errors.length === 0, "normalized backend feeds failed validation");
@@ -464,12 +526,15 @@ Deno.test("WNBA feeds use their league, teams, season and ten-minute quarters", 
 	const requests = [];
 	globalThis.fetch = (url) => {
 		requests.push(String(url));
+		if (/\/(roster|players)\//.test(String(url))) {
+			return loadFeed(String(url).split(".deno.net/")[1]).then((roster) => Response.json(roster));
+		}
 		return Promise.resolve(Response.json(String(url).includes("boxscore/") ? boxscore : playByPlay));
 	};
 	try {
 		const data = await loadReplayData("1042600304");
 		assert(
-			requests.length === 2 && requests.every((url) => url.endsWith("/1042600304?league=wnba")),
+			requests.length === 6 && requests.every((url) => new URL(url).searchParams.get("league") === "wnba"),
 			"wrong league endpoint",
 		);
 		assert(data.league === "wnba" && data.season === "2026", "wrong WNBA season");
@@ -665,6 +730,54 @@ Deno.test("synthetic overtime boundaries use five-minute clocks and OT labels, i
 			assert(endScene.banner === `OT${period - 4} · 0:00`, "incorrect overtime end label");
 		}
 		assert(checkReplay(data, replay).errors.length === 0, "synthetic overtime boundaries failed validation");
+	}
+});
+
+Deno.test("inactive substitution outs require unique same-period entry evidence and preserve the source", async () => {
+	const source = await loadGame("0012600033");
+	const original = JSON.stringify(source);
+	const replay = compileReplay(source);
+	const change = replay.scenes.find((scene) => scene.related.some((action) => action.actionNumber === 425));
+	const correction = change.substitutionCorrections?.[0];
+	assert(correction?.sourcePersonId === 1643633 && correction.personId === 1642502 &&
+		correction.evidenceActionNumber === 479, "inactive outgoing player was not resolved from the later entry");
+	assert(change.related.find((action) => action.actionNumber === 425).personId === 1643633,
+		"correction replaced the recorded outgoing player");
+	const shot = replay.scenes.find((scene) => scene.action.actionNumber === 447);
+	assert(shot.lineups[shot.attackTeam].includes(1642939), "Kelly is missing from the later shot lineup");
+	assert(!change.lineups[shot.attackTeam].includes(1642502), "resolved outgoing player stayed on court");
+	assert(checkReplay(source, replay).errors.length === 0, "resolved game failed replay validation");
+	assert(JSON.stringify(source) === original, "substitution correction mutated source data");
+	for (const variant of ["missing entry", "earlier participation", "ambiguous", "next period", "unbalanced", "duplicate"]) {
+		const data = structuredClone(source);
+		const outgoing = data.actions.find((action) => action.actionNumber === 425);
+		const incoming = data.actions.find((action) => action.actionNumber === 424);
+		if (variant === "missing entry") {
+			data.actions = data.actions.filter((action) => action.orderNumber <
+				source.actions.find((action) => action.actionNumber === 479).orderNumber);
+		} else if (variant === "unbalanced") {
+			data.actions = data.actions.filter((action) => action !== incoming);
+		} else if (variant === "duplicate") {
+			incoming.personId = 1631207;
+		} else if (variant === "next period") {
+			data.actions = data.actions.filter((action) => action.orderNumber <= incoming.orderNumber);
+			data.actions.push({ ...incoming, actionNumber: 90001, orderNumber: incoming.orderNumber + 1,
+				period: outgoing.period + 1, personId: 1642502 });
+		} else {
+			data.actions.push({ ...incoming, actionNumber: 90001, orderNumber: incoming.orderNumber + 0.5,
+				clock: "PT08M57.00S", personId: variant === "ambiguous" ? 1642954 : 1642502,
+				actionType: variant === "ambiguous" ? "substitution" : "rebound",
+				subType: variant === "ambiguous" ? "in" : "offensive" });
+		}
+		let rejected = false;
+		try {
+			compileReplay(data);
+		} catch (error) {
+			rejected = variant === "unbalanced" ? error.message.includes("Unbalanced substitutions")
+				: variant === "duplicate" ? error.message.includes("Duplicate active players")
+				: error.message.includes("Invalid substitution 425");
+		}
+		assert(rejected, `${variant}: unsupported substitution was accepted or failed later`);
 	}
 });
 
@@ -2452,6 +2565,42 @@ Deno.test("ball-aware defenders close out after passes without switching assignm
 		}
 	}
 	assert(closeouts > 0 && helpers > 0, "no defensive help or recovery was exercised");
+});
+
+Deno.test("two-post spacing supports high-low and double-low while preserving participants and lane exits", async () => {
+	const layouts = new Set();
+	for (const id of ["0012600062", "1022600147"]) {
+		const source = await loadGame(id);
+		for (const mirrored of [false, true]) {
+			const data = structuredClone(source);
+			if (mirrored) {
+				for (const action of data.actions.filter((action) => action.isFieldGoal)) {
+					action.x = 100 - action.x;
+					action.side = action.side === "left" ? "right" : "left";
+				}
+			}
+			const original = JSON.stringify(data);
+			const replay = compileReplay(data);
+			const formations = replay.formations.filter((formation) => formation.spacing === "three-out-two-in");
+			assert(formations.length > 0, `${id}: no two-post formations exercised`);
+			for (const formation of formations) {
+				layouts.add(formation.postLayout);
+				assert(formation.interiorIds.length === 2 && new Set(formation.interiorIds).size === 2,
+					"two-post formation duplicated a player");
+				assert(formation.interiorIds.every((id) => ![formation.shooterId, formation.assistId,
+					formation.continuation?.playerId].includes(id)), "post role displaced a recorded participant");
+				for (const slot of formation.interiorSlots) {
+					const [x, y] = formation.slots[slot];
+					assert(!isInOffensiveLane({ x, y }, 1), "post waited inside the lane");
+					assert(slot === formation.highPostSlot ? x >= 70 && x <= 74 && y >= 15 && y <= 35
+						: Math.hypot(x - 88.75, y - 25) <= 12, "post left its planned depth");
+				}
+			}
+			assert(checkReplay(data, replay).errors.length === 0, `${id}: two-post replay failed validation`);
+			assert(original === JSON.stringify(data), "two-post planning changed source events");
+		}
+	}
+	assert(layouts.has("high-low") && layouts.has("double-low"), "missing high-low or double-low coverage");
 });
 
 Deno.test("unanchored half-court possessions give an available center an interior spot", async () => {

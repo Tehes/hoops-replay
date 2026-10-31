@@ -31,6 +31,16 @@ export function checkReplay(data, replay = compileReplay(data)) {
 			const [x, y] = formation.slots[formation.interiorSlot];
 			check(Math.hypot(x - 88.75, y - 25) <= 12, `${id} retained inside option ${formation.id}`);
 		}
+		for (const slot of formation.interiorSlots) {
+			const [x, y] = formation.slots[slot];
+			check(slot === formation.highPostSlot
+				? x >= 70 && x <= 74 && y >= 15 && y <= 35
+				: Math.hypot(x - 88.75, y - 25) <= 12,
+				`${id} retained post role ${formation.id}:${slot}`);
+			check(!isInOffensiveLane({ x, y }, 1), `${id} post waiting spot outside lane ${formation.id}:${slot}`);
+		}
+		check(formation.interiorSlots.length <= 2 && new Set(formation.interiorSlots).size === formation.interiorSlots.length,
+			`${id} distinct post roles ${formation.id}`);
 		const evidence = data.actions.find((action) => action.actionNumber === formation.evidenceActionNumber);
 		check(
 			formation.evidenceActionNumber === null ||

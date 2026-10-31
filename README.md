@@ -81,7 +81,13 @@ An invalid or unknown action number leaves the replay at the beginning and logs 
 ## How It Works & Limitations
 
 Play-by-play supplies the events, their order, scores, and involved players. Recorded shot coordinates
-anchor field goals; boxscore data supplies players and starting lineups. The replay adds schematic
+anchor field goals; boxscore data supplies players and starting lineups. Season rosters supply
+player positions, including hybrid positions, and available height and weight. Season shooting and
+assist profiles help choose schematic spacing and defensive matchups; small samples receive less weight.
+Spacing can use five-out, four-out/one-in, or three-out/two-in with high-low or double-low post positions.
+These profiles describe tendencies, not recorded drives or defensive assignments.
+If a roster or player position is unavailable, the replay
+keeps the recorded boxscore position; missing positions remain unknown. The replay adds schematic
 formations, defensive matchups, passes, rebounds, and running paths to connect the events.
 Defensive assignments remain stable within an attack and follow substitutions. Where suitable, the buildup
 includes short dribble routes or connecting passes. These are schematic additions, not recorded pass

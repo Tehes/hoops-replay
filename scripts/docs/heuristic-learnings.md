@@ -149,3 +149,72 @@ Körpermittelpunkte, keine Füße. Ein laufender Spieler erhält keine pauschale
   belegt noch keine breit verbesserte Angriffschoreografie. Es handelt sich um einen kurzen
   Freilauf, keinen vollständigen Pass-and-Cut-/Give-and-Go-Ablauf. Statische Verteidigerpositionen,
   vier Planungsstichproben und ergänzende Abtastung ersetzen keine durchgängige Kollisionsprüfung.
+
+## Mischrollen und profilgestützte Aufstellungen
+
+- **Grundlage:** WABC Level 1, Team 2.1.1 und 2.1.3 (Spacing und zweckgerichtete Bewegung),
+  Player 2.8.2 (Postpositionen und Größenmismatches unabhängig vom Positionsetikett),
+  [offizielles Handbuch](https://assets.fiba.basketball/image/upload/documents-corporate-wabc-coaching-level-manuals-level-1-eng.pdf).
+  Daraus folgen flexible Rollen und freie Räume; Zahlengewichte stammen aus der Replay-Heuristik.
+- **Ursache und Hebel:** Einzelne Listen erkannten `G-F`, aber nicht `F-G` als Außenprofil.
+  Beide Positionsbestandteile fließen jetzt in eine gemeinsame Bewertung ein. Maße der aktiven
+  Fünf unterstützen die freie Innenrolle; belegte Kontakte behalten Vorrang vor Profilmatchups.
+  Die übrigen Matchups werden gemeinsam statt paarweise nach Aufstellungsslot gewählt.
+- **Statistische Grenze:** Dreieranteil, Quote und Versuchsstichprobe gewichten die Außenneigung.
+  Eine hohe Quote bei seltenen Versuchen begründet keinen Stretch-Spieler. Assists ergänzen das
+  Aufbauprofil; Zweipunktversuche liefern keine Drive-Häufigkeit. Saisonaggregate sind der aktuelle
+  Serverstand und keine historischen Scoutingberichte vor der Partie.
+- **Geschützt:** Ereignisse, Beteiligte, Wurforte, Uhren, Quellen und Seeking; Innenzuspiel
+  `0022600007`:45 und Rebound-Vorbereitung `0022600144`:56 bleiben Vergleichsfälle.
+  Eine zusätzliche körperbasierte Sperre gegen Five-out wurde verworfen: Sie erzwang trotz
+  Außenprofil eine Innenbesetzung und blockierte den geschützten Reboundanlauf. Maße helfen
+  bei der Wahl einer benötigten Innenrolle, schreiben aber keine feste Courtposition vor.
+- **Bewertung:** Baseline und Kandidat werden auf denselben einmal geladenen 20 NBA-/WNBA-Eingaben
+  verglichen. `0012600033` scheiterte in diesem Vergleich in beiden Compilern an einer fehlenden Passlinienposition;
+  dieser Fall belegt keine neue Regression und keine erfolgreiche Spielunterstützung.
+  Die übrigen Spiele werden auf unveränderte Ereignisanker, gemeinsame Replay-Invarianten,
+  Quelldaten und deterministisches Seeking geprüft. Geringere Profil-Zuordnungskosten sind
+  eine modellinterne Verbesserung und kein unabhängiger Beweis tatsächlicher Matchups.
+- **Grenze:** Five-out bezeichnet ergänztes Spacing, kein rekonstruiertes Spielsystem.
+  Körpermaße beweisen weder Geschwindigkeit noch Defensivqualität.
+  Fehlende Profile werden nicht durch geschätzte Körpermaße oder individuelle Spezialrollen ersetzt.
+
+## Zwei Post-Spieler in der Grundaufstellung
+
+- **Grundlage:** WABC Level 2, Team 2.1.2, „Receivers Principles with Post Players“, und Player
+  2.1.2, „Turn out cuts“ (Three-out/two-in mit gestaffelten hohen/tiefen Post-Spielern),
+  [Handbuch](https://assets.fiba.basketball/image/upload/documents-corporate-wabc-coaching-manual-level-2-eng.pdf).
+  Verwendet werden die räumlichen Prinzipien; daraus entstehen keine ergänzten Screens oder Set Plays.
+- **Ursache und Hebel:** Die Planung reservierte höchstens einen Post. Ein zweites freies Innenprofil
+  kann jetzt einen zweiten tiefen oder einen hohen Anspielraum erhalten. Mitspielerabstände und der
+  belegte Pass-/Abschlusskorridor begrenzen die Auswahl; Weglänge und Aufbauprofil bewerten Varianten.
+  Die erste Innenrolle und belegte Beteiligte bleiben erhalten. Ohne geeignete zweite Station bleibt
+  Four-out/one-in bestehen. Warteplätze liegen außerhalb der Zone.
+- **Vergleich:** Auf denselben einmal geladenen 20 NBA-/WNBA-Spielen werden 100 High-Low- und
+  103 Double-Low-Aufstellungen ergänzt. Bei den 19 unterstützten Spielen bleiben Ereignisanker,
+  Quelleingaben und Seeking unverändert, ohne neue Auditfehler. `0012600033` scheiterte in diesem Vergleich in
+  Baseline und Kandidat an derselben fehlenden Passlinienposition. Die unabhängigen Prüfgrenzen
+  werden dafür nicht abgeschaltet. Gezielte Varianten prüfen beide Korbrichtungen in NBA und WNBA.
+- **Entscheidung und Grenze:** Die drei Grundfamilien Five-out, Four-out/one-in und Three-out/two-in
+  stehen bereit. Double-Low und High-Low sind schematische Raumverteilungen. Horns, Flex, Triangle,
+  Einwurf- und Zonenangriffssysteme werden dadurch nicht als tatsächlich gespielte Abläufe behauptet.
+  Die Raumgrenzen und Auswahlgewichte sind eigene Heuristiken und keine Formeln der Literatur.
+
+
+## Inaktiver Abgänger in einer aufgezeichneten Auswechslung
+
+- **Ursache:** Ein nicht aktiver `out`-Spieler ergab `lineup.indexOf(...) === -1`. Die Zuweisung
+  schrieb dadurch eine Array-Eigenschaft statt eines der fünf Plätze. Der eingewechselte Spieler
+  fehlte später als Schütze; die fehlende Passlinienposition war nur der nachgelagerte Absturz.
+- **Beleg und Grenze:** In `0012600033` nennt Aktion 425 Graham Ike als Abgänger, obwohl er
+  bereits ausgewechselt ist. Miles Kelly wird laut Aktion 424 eingewechselt. Unter den aktiven
+  Spielern ist Malevy Leons der einzige, dessen nächste Erwähnung in derselben Periode ein
+  Einwechseln ist (479); die übrigen Spieler werden vorher durch Court-Ereignisse benötigt.
+  Das stützt eine eindeutige Konsistenzkorrektur, beweist den tatsächlichen Wechsel nicht unabhängig.
+- **Allgemeine Korrektur:** Nur bei genau einem solchen Kandidaten den Replay-Wechsel ableiten.
+  Vorherige Court-Beteiligung, fehlende/mehrdeutige Folgebelege und Periodengrenzen schließen die
+  Ableitung aus. Originaldaten bleiben unverändert; die Szene dokumentiert die Korrektur und
+  ihr Belegereignis. Unausgeglichene Wechsel und doppelte aktive Spieler werden ausdrücklich abgelehnt.
+- **Prüfung:** Der reale Fehlerfall sowie Varianten mit fehlender, früher widersprechender,
+  mehrdeutiger oder periodenfremder Evidenz sichern die Begrenzung. Die vorhandenen Prüfungen für
+  zeitgleiche Wechselketten, aktive Aufstellungen, Ereignisanker und Seeking bleiben bestehen.

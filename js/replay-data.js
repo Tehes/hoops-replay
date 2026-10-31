@@ -2,7 +2,6 @@ import { getTeamColors } from "./replay-teams.js";
 import { getLeague } from "./replay-leagues.js";
 
 export const API_BASE = "https://hoops-replay.tehes.deno.net";
-const SLOTS = ["PG", "SG", "SF", "PF", "C"];
 
 function normalizeTeam(team, home, league) {
 	if (!getTeamColors({ code: team.teamTricode, league }) || !Array.isArray(team.players)) {
@@ -13,29 +12,14 @@ function normalizeTeam(team, home, league) {
 		name: player.name,
 		number: player.jerseyNum,
 		position: player.position || "",
+		boxscorePosition: player.position || "",
+		positionSource: player.position ? "boxscore" : null,
 		starter: player.starter === "1",
 		minutes: player.statistics?.minutes || "PT00M00.00S",
 	}));
 	const starters = players.filter((player) => player.starter);
 	if (starters.length !== 5) {
 		throw new Error(`${team.teamTricode}: expected five starters.`);
-	}
-	const available = new Set(SLOTS);
-	const unresolved = [];
-	for (const player of starters) {
-		if (available.has(player.position)) {
-			available.delete(player.position);
-		} else {
-			unresolved.push(player);
-		}
-	}
-	// A formation needs five unique slots; these are schematic roles, not tracking facts.
-	for (const player of unresolved) {
-		player.sourcePosition = player.position;
-		player.position = available.values().next().value;
-		player.positionSource = "schematic";
-		available.delete(player.position);
-		console.warn(`${team.teamTricode}: schematic ${player.position} slot for ${player.name}.`);
 	}
 	return {
 		id: team.teamId,
@@ -46,6 +30,112 @@ function normalizeTeam(team, home, league) {
 		score: team.score,
 		players,
 	};
+}
+
+export async function loadRosterPositions(data, loadFeed) {
+	const teams = await Promise.all(data.teams.map(async (team) => {
+		const params = new URLSearchParams({ season: data.season, league: data.league });
+		const path = `roster/${team.id}?${params}`;
+		try {
+			const roster = await loadFeed(path);
+			const rows = roster.resultSets?.find((set) => set.name === "CommonTeamRoster");
+			if (
+				!Array.isArray(rows?.headers) || !Array.isArray(rows.rowSet) ||
+				!rows.headers.includes("PLAYER_ID") || !rows.headers.includes("POSITION")
+			) {
+				throw new Error("Missing roster player IDs or positions.");
+			}
+			const idIndex = rows.headers.indexOf("PLAYER_ID");
+			const positionIndex = rows.headers.indexOf("POSITION");
+			const heightIndex = rows.headers.indexOf("HEIGHT");
+			const weightIndex = rows.headers.indexOf("WEIGHT");
+			const positions = new Map();
+			for (const row of rows.rowSet) {
+				if (!Number.isInteger(row[idIndex]) || typeof row[positionIndex] !== "string") {
+					throw new Error("Invalid roster player ID or position.");
+				}
+				const height = typeof row[heightIndex] === "string" ? /^(\d)-(\d{1,2})$/.exec(row[heightIndex]) : null;
+				const weight = Number(row[weightIndex]);
+				positions.set(row[idIndex], {
+					position: row[positionIndex],
+					heightCm: height && Number(height[2]) < 12
+						? (Number(height[1]) * 12 + Number(height[2])) * 2.54
+						: null,
+					weightKg: Number.isFinite(weight) && weight > 0 ? weight * 0.45359237 : null,
+				});
+			}
+			return {
+				...team,
+				rosterSource: `${API_BASE}/${path}`,
+				players: team.players.map((player) =>
+					positions.has(player.id)
+						? {
+							...player,
+							...positions.get(player.id),
+							position: positions.get(player.id).position || player.position,
+							positionSource: positions.get(player.id).position ? "roster" : player.positionSource,
+						}
+						: player
+				),
+			};
+		} catch (error) {
+			console.warn(`${team.code}: roster unavailable; retaining recorded boxscore positions.`, error);
+			return team;
+		}
+	}));
+	return { ...data, teams };
+}
+
+export async function loadPlayerStatistics(data, loadFeed) {
+	const seasonType = data.gameId[2] === "1" ? "Pre Season" : data.gameId[2] === "4" ? "Playoffs" : "Regular Season";
+	const teams = await Promise.all(data.teams.map(async (team) => {
+		const params = new URLSearchParams({ season: data.season, league: data.league, seasonType });
+		const path = `players/${team.id}?${params}`;
+		try {
+			const feed = await loadFeed(path);
+			const rows = feed.resultSets?.find((set) => set.name === "PlayersSeasonTotals");
+			const fields = {
+				id: "PLAYER_ID",
+				games: "GP",
+				fieldGoalAttempts: "FGA",
+				threePointAttempts: "FG3A",
+				threePointPercentage: "FG3_PCT",
+				assists: "AST",
+				rebounds: "REB",
+			};
+			if (
+				!Array.isArray(rows?.headers) || !Array.isArray(rows.rowSet) ||
+				Object.values(fields).some((field) => !rows.headers.includes(field))
+			) {
+				throw new Error("Missing player statistics fields.");
+			}
+			const statistics = new Map();
+			for (const row of rows.rowSet) {
+				const stats = Object.fromEntries(
+					Object.entries(fields).map(([key, field]) => [key, row[rows.headers.indexOf(field)]]),
+				);
+				if (
+					!Object.values(stats).every((value) => Number.isFinite(value) && value >= 0) ||
+					!Number.isInteger(stats.id) || stats.threePointAttempts > stats.fieldGoalAttempts ||
+					stats.threePointPercentage > 1
+				) {
+					throw new Error("Invalid player statistics.");
+				}
+				statistics.set(stats.id, stats);
+			}
+			return {
+				...team,
+				statisticsSource: `${API_BASE}/${path}`,
+				players: team.players.map((player) =>
+					statistics.has(player.id) ? { ...player, seasonStatistics: statistics.get(player.id) } : player
+				),
+			};
+		} catch (error) {
+			console.warn(`${team.code}: player statistics unavailable; retaining roster-based roles.`, error);
+			return team;
+		}
+	}));
+	return { ...data, teams };
 }
 
 function normalizeShotCoordinates(action) {
@@ -134,20 +224,26 @@ export async function loadRecentGameIds() {
 export async function loadReplayData(gameId) {
 	const league = getLeague(gameId).id;
 	const query = league === "wnba" ? "?league=wnba" : "";
-	const feeds = await Promise.all(["boxscore", "playbyplay"].map(async (endpoint) => {
+	const loadFeed = async (path) => {
 		let response;
 		try {
-			response = await fetch(`${API_BASE}/${endpoint}/${gameId}${query}`);
+			response = await fetch(`${API_BASE}/${path}`);
 		} catch (error) {
-			console.warn(`Replay ${endpoint} request failed:`, error);
+			console.warn(`Replay ${path} request failed:`, error);
 			throw new Error(
 				`${league.toUpperCase()} data could not be reached. Check the connection and the backend CORS permission for this site's origin.`,
 			);
 		}
 		if (!response.ok) {
-			throw new Error(`${league.toUpperCase()} ${endpoint}: HTTP ${response.status}`);
+			throw new Error(`${league.toUpperCase()} ${path}: HTTP ${response.status}`);
 		}
 		return await response.json();
-	}));
-	return normalizeGame(gameId, feeds[0], feeds[1]);
+	};
+	const feeds = await Promise.all(
+		["boxscore", "playbyplay"].map((endpoint) => loadFeed(`${endpoint}/${gameId}${query}`)),
+	);
+	return loadPlayerStatistics(
+		await loadRosterPositions(normalizeGame(gameId, feeds[0], feeds[1]), loadFeed),
+		loadFeed,
+	);
 }

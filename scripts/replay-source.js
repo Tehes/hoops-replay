@@ -1,4 +1,4 @@
-import { API_BASE, normalizeGame } from "../js/replay-data.js";
+import { API_BASE, loadPlayerStatistics, loadRosterPositions, normalizeGame } from "../js/replay-data.js";
 import { getLeague } from "../js/replay-leagues.js";
 
 const responses = new Map();
@@ -32,7 +32,10 @@ export async function loadGame(gameId) {
 		loadFeed(`boxscore/${gameId}${query}`),
 		loadFeed(`playbyplay/${gameId}${query}`),
 	]);
-	return normalizeGame(gameId, boxscore, playByPlay);
+	return loadPlayerStatistics(
+		await loadRosterPositions(normalizeGame(gameId, boxscore, playByPlay), loadFeed),
+		loadFeed,
+	);
 }
 
 export async function selectGames(league, limit) {

@@ -84,9 +84,22 @@
 import { animateShot, flyBall, getDriveStart, getShotEntry, getShotStyle, landPlayers } from "./replay-shots.js";
 import { movePlayers } from "./replay-motion.js";
 import { getLeague } from "./replay-leagues.js";
+import { getInteriorScore, getMatchupCost, getPlayerRole } from "./replay-profiles.js";
 import { getLaneWaitingPoint, isInOffensiveLane } from "./replay-rules.js";
 
-const SLOT_ORDER = ["PG", "SG", "SF", "PF", "C"];
+const POSITION_ORDER = {
+	PG: 0,
+	G: 0.5,
+	SG: 1,
+	"G-F": 1.5,
+	"F-G": 1.5,
+	SF: 2,
+	F: 2.5,
+	PF: 3,
+	"F-C": 3.5,
+	"C-F": 3.5,
+	C: 4,
+};
 const FALLBACK_SPACING = [[62, 25], [70, 10], [73, 40], [79, 17], [83, 31]];
 
 export function clockSeconds(clock) {
@@ -242,6 +255,51 @@ function orderSameClockSubstitutions(scenes, data) {
 		}
 		start = end;
 	}
+}
+
+function resolveSubstitutionOut(scenes, index, lineup, outs, ins, action) {
+	if (lineup.includes(action.personId)) {
+		return action.personId;
+	}
+	const candidates = [];
+	for (const id of lineup) {
+		if ([...outs, ...ins].some((change) => change.personId === id)) {
+			continue;
+		}
+		// A later entry proves this player was on the bench, provided no earlier court event requires them.
+		for (let i = index + 1; i < scenes.length; i++) {
+			const next = scenes[i];
+			if (next.action.period !== scenes[index].action.period) {
+				break;
+			}
+			if (next.kind === "substitution") {
+				const change = next.related.find((change) => change.personId === id);
+				if (change) {
+					if (change.subType === "in") {
+						candidates.push({ id, evidenceActionNumber: change.actionNumber });
+					}
+					break;
+				}
+			} else if (next.participants.includes(id) &&
+				!(next.kind === "foul" && next.action.subType === "technical")) {
+				break;
+			}
+		}
+	}
+	if (candidates.length !== 1) {
+		throw new Error(`Invalid substitution ${action.actionNumber}: outgoing player ${action.personId} is not active; no unique replacement.`);
+	}
+	const correction = {
+		actionNumber: action.actionNumber,
+		sourcePersonId: action.personId,
+		personId: candidates[0].id,
+		evidenceActionNumber: candidates[0].evidenceActionNumber,
+		reason: "inactive-out-next-entry",
+	};
+	const scene = scenes[index];
+	scene.substitutionCorrections ??= [];
+	scene.substitutionCorrections.push(correction);
+	return correction.personId;
 }
 
 function linkAndOneFouls(scenes) {
@@ -410,13 +468,30 @@ function planMatchups(scenes, index, offense, state, data) {
 		}
 		reboundMatchup = { defender: rebounderId, attacker: assignments[rebounderId], constrained };
 	}
-	defense.forEach((id, slot) => {
-		if (!assignments[id]) {
-			const attacker = !assigned.has(attack[slot]) ? attack[slot] : attack.find((item) => !assigned.has(item));
-			assignments[id] = attacker;
-			assigned.add(attacker);
+	// Compare the remaining pairings together; a greedy choice can leave a guard on the largest post.
+	const remaining = defense.filter((id) => !assignments[id]);
+	let bestCost = Infinity;
+	let best = {};
+	const search = (slot, available, pairs, cost) => {
+		if (slot === remaining.length) {
+			if (cost < bestCost) {
+				bestCost = cost;
+				best = { ...pairs };
+			}
+			return;
 		}
-	});
+		const defender = remaining[slot];
+		for (const attacker of available) {
+			const profileCost = getMatchupCost(
+				state.players.find((player) => player.id === defender),
+				state.players.find((player) => player.id === attacker),
+			);
+			const continuity = state.matchups?.[defender] === attacker ? -0.15 : 0;
+			search(slot + 1, available.filter((id) => id !== attacker), { ...pairs, [defender]: attacker }, cost + profileCost + continuity);
+		}
+	};
+	search(0, attack.filter((id) => !assigned.has(id)), {}, 0);
+	Object.assign(assignments, best);
 	return { assignments, contacts, reboundMatchup };
 }
 
@@ -424,6 +499,11 @@ function planMatchups(scenes, index, offense, state, data) {
 function findOpenSpace(origin, occupied, lane = null, interior = false, guard = false, backcourt = false) {
 	const score = ([x, y]) => {
 		if (!backcourt && isInOffensiveLane({ x, y }, 1)) {
+			return Infinity;
+		}
+		if (interior && (interior === "high"
+			? x < 70 || x > 74 || y < 15 || y > 35
+			: Math.hypot(x - 88.75, y - 25) > 12)) {
 			return Infinity;
 		}
 		let cost = Math.hypot(x - origin[0], y - origin[1]) ** 2 * 0.045;
@@ -441,10 +521,10 @@ function findOpenSpace(origin, occupied, lane = null, interior = false, guard = 
 	};
 	let best = origin.slice();
 	const radius = Math.hypot(best[0] - 88.75, best[1] - 25);
-	let bestScore = (interior && radius > 12) || (guard && radius < 22) ? Infinity : score(best);
+	let bestScore = guard && radius < 22 ? Infinity : score(best);
 	for (let x = backcourt ? 8 : 58; x <= (backcourt ? 43 : 88); x += 5) {
 		for (let y = 5; y <= 45; y += 5) {
-			if ((interior && Math.hypot(x - 88.75, y - 25) > 12) || (guard && Math.hypot(x - 88.75, y - 25) < 22)) {
+			if (guard && Math.hypot(x - 88.75, y - 25) < 22) {
 				continue;
 			}
 			const candidate = [x, y];
@@ -539,6 +619,9 @@ function planFormation(replay, index, offense, direction, lineup, state) {
 	const foul = replay.scenes[foulIndex]?.action;
 	const shooterId = evidence?.personId ?? foul?.foulDrawnPersonId ?? null;
 	const shooterSlot = lineup.indexOf(shooterId);
+	if (shooterId && shooterSlot < 0) {
+		throw new Error(`Recorded shooter ${shooterId} is not active for formation at action ${replay.scenes[index].action.actionNumber}.`);
+	}
 	const foulPlan = foul
 		? planShootingFoul(
 			replay.scenes,
@@ -564,6 +647,8 @@ function planFormation(replay, index, offense, direction, lineup, state) {
 	const backcourt = Boolean(shot && shot.x < 47);
 	const continuation = evidence ? planContinuation(replay, replay.scenes[evidenceIndex], lineup, direction) : null;
 	const continuationSlot = continuation ? lineup.indexOf(continuation.playerId) : -1;
+	const teammates = lineup.map((id) => state.players.find((player) => player.id === id));
+	const fiveOut = teammates.every((player) => getPlayerRole(player).perimeter >= 0.6);
 	let interiorSlot = -1;
 	// Plan only the space needed by the recorded finish; no template implies a real set play.
 	if (shot && !backcourt) {
@@ -582,6 +667,7 @@ function planFormation(replay, index, offense, direction, lineup, state) {
 					action: evidence,
 					shotStyle: style,
 					shooterPosition: state.players.find((player) => player.id === shooterId).position,
+					shooterRole: getPlayerRole(state.players.find((player) => player.id === shooterId)),
 					threePointRadius: replay.league.threePointRadius,
 				}, { x: direction === 1 ? shot.x : 94 - shot.x, y: shot.y },
 				{ x: direction === 1 ? 88.75 : 5.25, y: 25 }, direction);
@@ -600,8 +686,8 @@ function planFormation(replay, index, offense, direction, lineup, state) {
 				Math.max(56, Math.min(84, shot.x + (distance > 0.1 ? dx / distance : -1) * length)),
 				Math.max(5, Math.min(45, shot.y + (distance > 0.1 ? dy / distance : -side * 0.5) * length)),
 			];
-			const position = state.players.find((player) => player.id === lineup[assistSlot]).position;
-			if (["PG", "SG", "G", "G-F"].includes(position) &&
+			const player = state.players.find((player) => player.id === lineup[assistSlot]);
+			if (getPlayerRole(player).perimeter >= 0.6 &&
 				Math.hypot(slots[assistSlot][0] - 88.75, slots[assistSlot][1] - 25) < 22) {
 				slots[assistSlot] = [66, Math.max(13, Math.min(37, y))];
 			}
@@ -620,22 +706,17 @@ function planFormation(replay, index, offense, direction, lineup, state) {
 		const available = lineup.map((_, slot) => slot).filter((slot) =>
 			slot !== shooterSlot && slot !== assistSlot && slot !== continuationSlot
 		);
-		const bigs = available.filter((slot) =>
-			["C", "PF", "F-C", "C-F"].includes(state.players.find((player) => player.id === lineup[slot]).position)
+		const insideCandidates = available.filter((slot) => getInteriorScore(teammates[slot], teammates) > 0.25).sort((a, b) =>
+			getInteriorScore(teammates[b], teammates) - getInteriorScore(teammates[a], teammates)
 		);
-		const centers = bigs.filter((slot) =>
-			["C", "C-F", "F-C"].includes(state.players.find((player) => player.id === lineup[slot]).position)
-		);
-		const insideCandidates = centers.length ? centers : bigs.length ? bigs : available;
-		interiorSlot = insideCandidates.includes(rebounderSlot)
-			? rebounderSlot
-			: insideCandidates.reduce((best, slot) =>
-				Math.hypot(slots[slot][0] - 88.75, slots[slot][1] - 25) <
-						Math.hypot(slots[best][0] - 88.75, slots[best][1] - 25)
-					? slot
-					: best
-			);
-		if (Math.hypot(slots[interiorSlot][0] - 88.75, slots[interiorSlot][1] - 25) > 12) {
+		if (!fiveOut && insideCandidates.length) {
+			interiorSlot = insideCandidates[0];
+			if (insideCandidates.includes(rebounderSlot) &&
+				getInteriorScore(teammates[rebounderSlot], teammates) >= getInteriorScore(teammates[interiorSlot], teammates) - 0.15) {
+				interiorSlot = rebounderSlot;
+			}
+		}
+		if (interiorSlot >= 0 && Math.hypot(slots[interiorSlot][0] - 88.75, slots[interiorSlot][1] - 25) > 12) {
 			slots[interiorSlot] = [81 + (slots[interiorSlot][0] - 81) * 0.2, 25 - side * 7];
 		}
 		if (style.driving || style.cutting || style.running || style.family === "layup" || style.alleyOop) {
@@ -653,14 +734,57 @@ function planFormation(replay, index, offense, direction, lineup, state) {
 			}
 		}
 	}
-	if (!shot && !backcourt) {
-		const bigs = lineup.map((id, slot) => ({ slot, position: state.players.find((player) => player.id === id).position }))
-			.filter(({ slot, position }) => slot !== 0 && ["C", "C-F", "F-C", "PF"].includes(position));
-		const interior = bigs.find(({ position }) => ["C", "C-F", "F-C"].includes(position)) ?? bigs[0];
-		if (interior) {
-			interiorSlot = interior.slot;
+	if (!shot && !backcourt && !fiveOut) {
+		const candidates = teammates.map((player, slot) => ({ slot, score: getInteriorScore(player, teammates) }))
+			.filter(({ slot, score }) => slot !== 0 && score > 0.25).sort((a, b) => b.score - a.score);
+		if (candidates.length) {
+			interiorSlot = candidates[0].slot;
 			if (Math.hypot(slots[interiorSlot][0] - 88.75, slots[interiorSlot][1] - 25) > 12) {
 				slots[interiorSlot] = [82, slots[interiorSlot][1] < 25 ? 18 : 32];
+			}
+		}
+	}
+	const interiorSlots = interiorSlot >= 0 ? [interiorSlot] : [];
+	let highPostSlot = -1;
+	// WABC Level 2, Team 2.1.2: use two post roles only when the lineup and free receiving space support them.
+	if (interiorSlot >= 0 && !backcourt) {
+		const candidates = teammates.map((player, slot) => ({ slot, score: getInteriorScore(player, teammates) }))
+			.filter(({ slot, score }) => slot !== 0 && slot !== interiorSlot &&
+				![shooterSlot, assistSlot, continuationSlot].includes(slot) && score > 0.45 &&
+				getPlayerRole(teammates[slot]).interior > 0.3)
+			.sort((a, b) => b.score - a.score);
+		const second = candidates[0];
+		if (second) {
+			const occupied = slots.filter((_, slot) => slot !== second.slot);
+			if (shot) {
+				occupied.push([shot.x, shot.y]);
+			}
+			const lane = shot && shooterSlot >= 0
+				? [assistSlot >= 0 ? slots[assistSlot] : slots[shooterSlot], [shot.x, shot.y]] : null;
+			const options = [
+				{ point: [83, 15.5], level: "low" }, { point: [83, 34.5], level: "low" },
+				{ point: [73.5, 18], level: "high" }, { point: [73.5, 32], level: "high" },
+			].filter(({ point: [x, y] }) => {
+				if (occupied.some(([otherX, otherY]) => Math.hypot(x - otherX, y - otherY) < 6)) {
+					return false;
+				}
+				if (!lane) {
+					return true;
+				}
+				const [[ax, ay], [bx, by]] = lane;
+				const dx = bx - ax;
+				const dy = by - ay;
+				const fraction = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy || 1)));
+				return Math.hypot(x - ax - dx * fraction, y - ay - dy * fraction) >= 5;
+			}).map((option) => ({
+				...option,
+				cost: Math.hypot(option.point[0] - origins[second.slot][0], option.point[1] - origins[second.slot][1]) +
+					(option.level === "high" ? -getPlayerRole(teammates[second.slot]).handling * 2 : 0),
+			})).sort((a, b) => a.cost - b.cost);
+			if (options.length) {
+				slots[second.slot] = options[0].point;
+				interiorSlots.push(second.slot);
+				highPostSlot = options[0].level === "high" ? second.slot : -1;
 			}
 		}
 	}
@@ -676,12 +800,12 @@ function planFormation(replay, index, offense, direction, lineup, state) {
 			slots[assistSlot] = [Math.max(4, Math.min(40, shot.x - 9)), shot.y < 25 ? 34 : 16];
 		}
 	}
-	if (!backcourt && shooterSlot !== 0 && assistSlot !== 0 && interiorSlot !== 0) {
+	if (!backcourt && shooterSlot !== 0 && assistSlot !== 0 && !interiorSlots.includes(0)) {
 		slots[0] = [Math.min(67, slots[0][0]), Math.max(13, Math.min(37, slots[0][1]))];
 	}
 	const priority = [
 		...new Set(
-			[shooterSlot, assistSlot, continuationSlot, interiorSlot, 0, 1, 2, 3, 4].filter((slot) => slot >= 0),
+			[shooterSlot, assistSlot, continuationSlot, ...interiorSlots, 0, 1, 2, 3, 4].filter((slot) => slot >= 0),
 		),
 	];
 	// Resolve local overlaps, giving the shooter and passer priority.
@@ -715,9 +839,9 @@ function planFormation(replay, index, offense, direction, lineup, state) {
 				slots[slot],
 				occupied,
 				lane,
-				slot === interiorSlot,
-				!backcourt && slot !== interiorSlot &&
-					["PG", "SG", "G", "G-F"].includes(state.players.find((player) => player.id === lineup[slot]).position),
+				slot === highPostSlot ? "high" : interiorSlots.includes(slot),
+				!backcourt && !interiorSlots.includes(slot) &&
+					getPlayerRole(state.players.find((player) => player.id === lineup[slot])).perimeter >= 0.6,
 				backcourt,
 			);
 		}
@@ -726,7 +850,8 @@ function planFormation(replay, index, offense, direction, lineup, state) {
 		for (const slot of priority) {
 			const [x, y] = slots[slot];
 			if (isInOffensiveLane({ x, y }, 1) && !(foulPlan && slot === shooterSlot)) {
-				slots[slot] = findOpenSpace([x, y], slots.filter((_, other) => other !== slot), lane, slot === interiorSlot);
+				slots[slot] = findOpenSpace([x, y], slots.filter((_, other) => other !== slot), lane,
+					slot === highPostSlot ? "high" : interiorSlots.includes(slot));
 			}
 		}
 	}
@@ -744,6 +869,19 @@ function planFormation(replay, index, offense, direction, lineup, state) {
 			? "continuity"
 			: "fallback",
 		backcourt,
+		spacing: backcourt ? "backcourt" : fiveOut ? "five-out" : interiorSlots.length === 2
+			? "three-out-two-in" : interiorSlot >= 0 ? "four-out-one-in" : "open",
+		postLayout: interiorSlots.length === 2 ? highPostSlot >= 0 ? "high-low" : "double-low"
+			: interiorSlot >= 0 ? "low" : null,
+		interiorSlots,
+		interiorIds: interiorSlots.map((slot) => lineup[slot]),
+		highPostSlot,
+		roles: Object.fromEntries(teammates.map((player) => [player.id, {
+			...getPlayerRole(player),
+			interiorScore: getInteriorScore(player, teammates),
+			heightCm: player.heightCm ?? null,
+			weightKg: player.weightKg ?? null,
+		}])),
 		evidenceActionNumber: evidence?.actionNumber ?? null,
 		shooterId,
 		foulActionNumber: foul?.actionNumber ?? null,
@@ -1245,8 +1383,10 @@ function preparationPosition(state, scene, id, time) {
 function relocatePasser(state, scene, id, receiver, time, remaining) {
 	const moves = scene.spacingMoves;
 	if (!["2pt", "3pt"].includes(scene.kind) || moves.length >= 2 || remaining < 1 ||
-		[scene.action.personId, scene.action.assistPersonId, scene.formation.interiorId,
-			scene.continuationMove?.playerId, scene.reboundMove?.id].includes(id) || moves.some((move) => move.id === id)) {
+		[scene.action.personId, scene.action.assistPersonId,
+			scene.continuationMove?.playerId, scene.reboundMove?.id].includes(id) ||
+		scene.formation.interiorSlots.includes(state.lineups[scene.attackTeam].indexOf(id)) ||
+		moves.some((move) => move.id === id)) {
 		return;
 	}
 	const direction = scene.hoop?.x < 47 ? -1 : 1;
@@ -1260,9 +1400,9 @@ function relocatePasser(state, scene, id, receiver, time, remaining) {
 	const dx = finish[0] - ball[0];
 	const dy = finish[1] - ball[1];
 	const lane = [ball, finish];
-	const position = state.players.find((player) => player.id === id).position;
+	const player = state.players.find((player) => player.id === id);
 	const target = findOpenSpace([x, y], occupied, lane, false,
-		["PG", "SG", "G", "G-F"].includes(position), scene.formation.backcourt);
+		getPlayerRole(player).perimeter >= 0.6, scene.formation.backcourt);
 	const defenders = Object.keys(scene.matchups).map((id) => local(state.positions[id]));
 	const routeSamples = [0.25, 0.5, 0.75, 1].map((fraction) => ({
 		fraction,
@@ -1651,6 +1791,11 @@ function pacePreparation(state, scene, time, finishDuration, record, direction) 
 		const carrier = state.positions[owner];
 		const origin = { ...carrier };
 		const defender = Number(Object.keys(scene.matchups).find((id) => scene.matchups[id] === owner));
+		// Let a trailing matchup arrive before adding an optional lateral probe.
+		if (Math.hypot(state.positions[defender].x - carrier.x, state.positions[defender].y - carrier.y) >= 4.5) {
+			record(remaining);
+			return;
+		}
 		const occupied = Object.entries(state.positions).filter(([id, position]) =>
 			position.opacity === 1 && Number(id) !== owner && Number(id) !== defender
 		).map(([, position]) => position);
@@ -2089,6 +2234,7 @@ function compileScene(replay, scene, index, state, data) {
 		scene.hoop = hoop;
 		scene.shotPoint = shot;
 		scene.shooterPosition = state.players.find((player) => player.id === action.personId).position;
+		scene.shooterRole = getPlayerRole(state.players.find((player) => player.id === action.personId));
 		scene.threePointRadius = replay.league.threePointRadius;
 		const previous = replay.scenes[index - 1];
 		scene.immediateReboundFinish = previous?.kind === "rebound" && previous.action.subType === "offensive" &&
@@ -2118,7 +2264,7 @@ function compileScene(replay, scene, index, state, data) {
 			lineup.forEach((id, slot) => {
 				if (
 					id === action.personId || id === action.assistPersonId || id === state.ball.owner ||
-					id === continuation?.playerId || id === scene.reboundMove?.id || slot === scene.formation.interiorSlot
+					id === continuation?.playerId || id === scene.reboundMove?.id || scene.formation.interiorSlots.includes(slot)
 				) {
 					return;
 				}
@@ -2142,7 +2288,7 @@ function compileScene(replay, scene, index, state, data) {
 					lane,
 					false,
 					!scene.formation.backcourt &&
-						["PG", "SG", "G", "G-F"].includes(state.players.find((player) => player.id === id).position),
+						getPlayerRole(state.players.find((player) => player.id === id)).perimeter >= 0.6,
 					scene.formation.backcourt,
 				);
 				const distance = Math.hypot(target[0] - points[slot][0], target[1] - points[slot][1]);
@@ -2154,6 +2300,12 @@ function compileScene(replay, scene, index, state, data) {
 				const x = points[slot][0] + (target[0] - points[slot][0]) * fraction;
 				const y = points[slot][1] + (target[1] - points[slot][1]) * fraction;
 				if (!scene.formation.backcourt && isInOffensiveLane({ x, y }, 1)) {
+					return;
+				}
+				// A later spacing adjustment must respect the already reserved rebounding spot.
+				if (scene.reboundMove && Math.hypot(
+					(direction === 1 ? x : 94 - x) - scene.reboundMove.x, y - scene.reboundMove.y,
+				) < 3) {
 					return;
 				}
 				spacingMoves.push({ id, x: direction === 1 ? x : 94 - x, y });
@@ -2466,8 +2618,15 @@ function compileScene(replay, scene, index, state, data) {
 			const ins = scene.related.filter((a) => a.teamId === team.id && a.subType === "in");
 			const lineup = state.lineups[team.id];
 			const previousLineup = lineup.slice();
+			if (outs.length !== ins.length) {
+				throw new Error(`Unbalanced substitutions at action ${action.actionNumber} for ${team.code}.`);
+			}
 			for (let i = 0; i < outs.length; i++) {
-				lineup[lineup.indexOf(outs[i].personId)] = ins[i].personId;
+				const outgoingId = resolveSubstitutionOut(replay.scenes, index, lineup, outs, ins, outs[i]);
+				lineup[lineup.indexOf(outgoingId)] = ins[i].personId;
+			}
+			if (new Set(lineup).size !== 5) {
+				throw new Error(`Duplicate active players after substitution ${action.actionNumber} for ${team.code}.`);
 			}
 			// Same-clock changes may bring a player back; animate only the final slot occupants.
 			previousLineup.forEach((outId, slot) => {
@@ -2618,9 +2777,11 @@ export function compileReplay(data) {
 		data.teams.map((team) => [
 			team.id,
 			team.players.filter((player) => player.starter)
-				.sort((a, b) => SLOT_ORDER.indexOf(a.position) - SLOT_ORDER.indexOf(b.position)).map((player) =>
-					player.id
-				),
+				// Lineup order assigns formation places without changing the recorded player positions.
+				.sort((a, b) =>
+					(POSITION_ORDER[a.boxscorePosition || a.position] ?? 5) -
+					(POSITION_ORDER[b.boxscorePosition || b.position] ?? 5)
+				).map((player) => player.id),
 		]),
 	);
 	if (Object.values(lineups).some((lineup) => lineup.length !== 5)) {

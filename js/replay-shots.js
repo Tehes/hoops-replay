@@ -1,3 +1,5 @@
+import { getPlayerRole } from "./replay-profiles.js";
+
 export function getShotStyle(action) {
 	const subtype = (action.subType || "").toLowerCase();
 	const description = (action.descriptor || "").toLowerCase().replaceAll("-", " ");
@@ -58,7 +60,7 @@ export function flyBall(state, record, target, height, duration, curve = 0, move
 
 export function getDriveStart(scene, shot, hoop, direction) {
 	const style = scene.shotStyle;
-	const guard = ["PG", "SG", "G", "G-F"].includes(scene.shooterPosition);
+	const guard = (scene.shooterRole ?? getPlayerRole({ position: scene.shooterPosition ?? "" })).perimeter >= 0.6;
 	const rimFinish = style.family === "layup" || style.family === "dunk";
 	if (!guard || scene.immediateReboundFinish || style.tip || style.putback || style.cutting || style.alleyOop ||
 		style.stepBack || style.fadeaway || style.family === "heave" ||

@@ -228,6 +228,35 @@ oder Verlust eines belegten Ereignisses ausgleichen.
 Wichtige Entscheidungen sollen erklärbar bleiben: verwendete Belege, gewählte Fortsetzung,
 Alternativen und Gründe für Auswahl oder Ablehnung.
 
+### Spielerprofile, Formationen und Matchups
+
+Die Formationsbildung berücksichtigt die tatsächlich aktive Fünf und deren verfügbare
+Rosterpositionen, Körpergrößen und Gewichte. Diese Merkmale unterstützen die Verteilung von
+Aufbau, Flügeln, Innenpräsenz und Korbschutz, ohne jedem Spieler eine eindeutige PG–C-Position
+zuzuweisen. Passende Formationen ergeben sich aus den
+Spielerprofilen und dem Ereigniskontext, nicht allein aus einem Positionsetikett. Die Grundordnungen
+Five-out, Four-out/one-in und Three-out/two-in stehen als Alternativen zur Verfügung; bei zwei
+Innenrollen werden tiefe und hohe Anspielräume passend kombiniert. Eine Grundordnung schreibt
+keinen konkreten Spielzug oder zusätzlichen Screen vor.
+
+Defensive Matchups berücksichtigen Position, Größe, Gewicht und das offensive Profil der
+Gegenspieler. Die Zuordnung bleibt innerhalb eines Angriffs stabil, soweit belegte Beteiligung
+oder die Fortsetzung keine Anpassung erfordern. Diese Merkmale begründen plausible Zuordnungen,
+beweisen aber keine tatsächlich gespielten Matchups.
+
+Wurfquoten, Wurfversuche und weitere verfügbare Spielerstatistiken beschreiben individuelle
+Tendenzen für die ergänzte Choreografie: etwa eher zum Korb ziehen, sich außen zum Wurf anbieten,
+den Ball verteilen oder innen für Rebounds bereitstehen. Trefferquote, Versuchshäufigkeit und
+Stichprobengröße werden gemeinsam betrachtet; eine hohe Quote allein belegt weder häufige
+Außenwürfe noch Drives. Fehlen passende Orts- oder Aktionsdaten, bleiben solche Tendenzen
+vorsichtige Annahmen. Die Profile beziehen sich auf die jeweilige Liga und Spielsaison.
+
+Spielerprofile steuern nur die plausiblen Ergänzungen zwischen belegten Ereignissen.
+Aufgezeichnete Beteiligte und Abschlussorte haben Vorrang vor statistischen Tendenzen.
+Fehlende Profildaten führen zu einer einfacheren Planung ohne erfundene Körpereigenschaften
+oder individuelle Spezialrollen. Formationen, Matchups und Bewegungstendenzen bleiben schematisch;
+sie gelten nicht als Nachweis eines tatsächlich gespielten Systems oder Spielzugs.
+
 ## Bewertung und Weiterentwicklung im Zielbild
 
 Als Vorbild dient der Verbesserungsprozess der
@@ -311,6 +340,7 @@ Bestehende Heuristiken und Tests sind eine Grundlage dafür, kein Nachweis volls
 | --- | --- |
 | [js/app.js](js/app.js) | Laden und Freigabe, Canvas, Darstellung, Playback, Controls und Resize |
 | [js/replay-data.js](js/replay-data.js) | Backend-Abruf und gemeinsame Feed-Normalisierung |
+| [js/replay-profiles.js](js/replay-profiles.js) | Mischrollen, Stichprobengewichtung sowie Profilbewertung für Innenrollen und Matchups |
 | [js/replay-engine.js](js/replay-engine.js) | Szenen, Lineups, Besitz, Matchups, Vorbereitung, Regelsonderfälle und Timeline |
 | [js/replay-motion.js](js/replay-motion.js) | Verbindende Routen, Halten, Reaktionszeiten und Kreuzungsreservierungen |
 | [js/replay-shots.js](js/replay-shots.js) | Wurfprofile, Abschlussbewegungen und Ballflug |
@@ -338,6 +368,15 @@ nur Zonengeometrie, keinen allgemeinen Regelzustand.
   Übrige Spielereignisse und Wechselgruppen behalten ihre relative Reihenfolge.
   Widersprüchliche Abhängigkeiten lassen die ursprüngliche Gruppe unverändert; es wird nicht über
   Uhr- oder Periodengrenzen umgeordnet. Originalfelder und Rohdaten bleiben erhalten.
+- Nennt eine Auswechslung einen bereits inaktiven Abgänger, darf der Replay-Plan nur dann einen
+  anderen aktiven Spieler zuordnen, wenn genau dessen nächste Erwähnung innerhalb derselben
+  Periode ein Einwechseln ist und vorher kein Court-Ereignis seinen Einsatz verlangt. Andere
+  genannte Ein-/Auswechselspieler derselben Gruppe bleiben ausgeschlossen. Die Ableitung ist
+  eine Konsistenzkorrektur, kein unabhängig gemessener Wechsel. Originalereignisse bleiben erhalten;
+  `scene.substitutionCorrections` nennt Quellperson, abgeleitete Person und belegendes Ereignis.
+  Ohne eindeutige Zuordnung, bei ungleichen Ein-/Auswechselzahlen oder doppelten aktiven Spielern
+  bricht die Kompilierung mit einer konkreten Wechselmeldung ab. Ein nicht aktiver Schütze wird
+  ebenfalls ausdrücklich gemeldet, statt mit einer undefinierten Passlinienposition weiterzuplanen.
 - Sprungbälle verwenden genannte Springer und Fänger. Fehlende Springer werden aus der aktiven
   Aufstellung ergänzt: bevorzugt Spieler mit C-Position, andernfalls der aktuelle C-Slot.
   Fehlt nur ein Springer, bestimmt der genannte Gegner die Teamzuordnung. Ein fehlender Fänger
@@ -379,7 +418,8 @@ nur Zonengeometrie, keinen allgemeinen Regelzustand.
 - Spätere Empfangswege, bewegte Fänge, kurze Passgeber-Relokationen und passende Folgeempfänger
   werden teilweise vorausgeplant. Passfolgen werden deterministisch verglichen. Ohne geeignete
   Verbindung bleibt eine kurze Dribbelsondierung mit Haltephase möglich; höchstens zwei freie
-  Angreifer korrigieren ihr Spacing in der Vorbereitung.
+  Angreifer korrigieren ihr Spacing in der Vorbereitung. Eine optionale Dribbelsondierung
+  entfällt, solange der zugeordnete Verteidiger noch nicht nah genug angekommen ist.
   Nach einem schematischen Pass kann ein freier Passgeber auch kurz diagonal Richtung Korb
   freilaufen. Die Auswahl behält die bestehende Grenze von sechs Fuß und das verfügbare Zeitfenster
   bei. Vier Zwischenpunkte prüfen geplante Mitspielerpositionen, aktuelle Verteidiger und die Zone;
@@ -397,6 +437,7 @@ nur Zonengeometrie, keinen allgemeinen Regelzustand.
   Ein freier Offensivrebounder kann während der Vorbereitung eine erreichbare Position 8–12 Fuß
   vom Korb anlaufen. Gerade Wege durch gehaltene Angreiferplätze und belegte Abschluss-/Empfangsorte
   sowie Ziele in der Passlinie werden verworfen; bestehende Innenpositionen dürfen gehalten werden.
+  Später geplante Spacing-Ziele halten mindestens drei Fuß Abstand zum reservierten Reboundplatz.
   Schütze, Assistent, Ballhalter und vorausgeplanter Folgeempfänger behalten ihre Aufgaben.
   Es gibt keinen erzwungenen Platztausch. Der Aufbau berücksichtigt den nötigen Lauf mit höchstens
   8 Fuß pro Replay-Sekunde; der laufende Rebounder wird nicht zusätzlich als Passoption verwendet.
@@ -518,10 +559,58 @@ Serverfeed. Wiederholte Abrufe derselben Quelle werden innerhalb des Prozesses i
 wiederverwendet, niemals als Spiel-JSON gespeichert. Kopien schützen die Eingaben vor Szenenänderungen.
 
 Das eigene Backend in [api/main.js](api/main.js) stellt Spieldaten, NBA-/WNBA-Roster und
-Spielerstatistiken bereit. Die Anwendung lädt ihre Spieldaten von diesem Backend;
-Spielerprofile sind noch nicht in die Choreografie eingebunden.
-Größe, Position und individuelle Spielprofile sollen Rollenverteilung, Spacing und defensive
-Zuordnungen in der Choreografie plausibler machen.
+Spielerstatistiken bereit. Die Anwendung lädt ihre Spieldaten von diesem Backend.
+Der Replay-Client lädt zusätzlich die beiden Roster der Spielsaison und übernimmt deren
+Spielerpositionen unverändert anhand der Player-ID. Diese Positionen stehen den bestehenden
+rollenabhängigen Entscheidungen zur Verfügung. Verfügbare Rostermaße werden als `heightCm` und
+`weightKg` normalisiert; fehlende Werte bleiben `null`. Zusätzlich lädt der Client pro Team
+Saisonstatistiken für Regular Season, Pre Season oder Playoffs entsprechend der GameID.
+`seasonStatistics` erhält Spiele, Feldwurf-/Dreierversuche pro Spiel, Dreierquote, Assists und Rebounds.
+Fehlt dieser Abruf oder ein Spieler darin, bleibt das Rosterprofil nutzbar; ein Abruffehler wird
+protokolliert. `statisticsSource` dokumentiert erfolgreiche Teamabrufe. Diese Profile sind aktuelle
+Aggregate der angefragten Saison und Wettbewerbsart, kein archivierter Stand vor dem Spiel.
+
+[replay-profiles.js](js/replay-profiles.js) gewichtet bei Mischpositionen beide Bestandteile mit
+70/30 zugunsten der ersten Angabe. Außen- und Innenneigung sind getrennte Werte; ein `F-G` bleibt
+auch als Forward für Außenpositionen und die Vorbereitung eines belegten Drives geeignet.
+Dreieranteil, Dreierquote und die aus Spielen und Versuchen angenäherte Stichprobe beeinflussen
+die Außenneigung; kleine Stichproben werden zur Positionsgrundlage zurückgewichtet.
+Assistwerte ergänzen das Aufbauprofil für den Rollenvergleich. Zweipunktversuche begründen keine
+Drive-Häufigkeit, Reboundwerte werden derzeit nur bereitgestellt und nicht zur Rollenwahl verwendet.
+
+Die Engine wählt eine freie Innenrolle nach dem Profil und den relativen Maßen der aktiven Fünf.
+Belegte Schützen, Assistenten und Folgeempfänger behalten Vorrang. Bei fünf ausreichend nach außen
+orientierten Profilen entfällt die erzwungene Innenrolle (`spacing: "five-out"`), andernfalls kommt
+bei geeigneter freier Innenrolle `four-out-one-in` zum Einsatz. Ohne geeignete Innenrolle bleibt die
+Verteilung `open`; Backcourt-Abschlüsse behalten ihre eigene Geometrie. Gibt es neben der ersten
+Innenrolle einen weiteren geeigneten freien Post-Spieler, kann `three-out-two-in` gewählt werden.
+Der zweite Post wird nach Innenprofil und relativen Maßen ausgewählt. Er belegt entweder einen
+zweiten tiefen Anspielraum (`postLayout: "double-low"`) oder einen hohen Anspielraum
+(`postLayout: "high-low"`). Verfügbare Plätze werden gegen Mitspieler und den belegten
+Abschluss-/Passkorridor geprüft. Weglänge aus der bisherigen Position und das Aufbauprofil
+entscheiden zwischen zulässigen Varianten. Ohne freie zweite Station bleibt eine Innenrolle.
+Hohe Warteplätze liegen vor der Zone, tiefe seitlich außerhalb. Beide Post-Rollen bleiben bei
+weiteren Spacing-Korrekturen geschützt; Auswechslungen übernehmen den zugehörigen Formationsplatz.
+`interiorSlots` und `interiorIds` dokumentieren die gewählten Rollen bei der Formationsplanung,
+`highPostSlot` die hohe Rolle. Die bisherigen Singularfelder bezeichnen weiter die erste tiefe Rolle.
+Dies sind schematische Spacing-Entscheidungen, kein Nachweis einer tatsächlich gespielten
+Motion-Offense. Automatische Spielzugabläufe wie Horns, Flex oder Triangle sind nicht umgesetzt.
+`formation.roles` hält Profilwerte und vorhandene Maße für die Entscheidung nachvollziehbar fest.
+
+Belegte Kontakte und die bestehende begrenzte Reboundzuordnung werden zuerst reserviert.
+Für übrige Matchups vergleicht der Planer alle verbleibenden Zuordnungen gemeinsam nach
+Mischrollen, Außen-/Aufbauprofil, Größen- und Gewichtsdifferenz. Bestehende Zuordnungen erhalten
+einen kleinen Kontinuitätsvorteil. Die Wahl gilt für den Angriff; Wechsel behalten die vorhandene
+Übergabelogik. Es wird keine gemessene defensive Fähigkeit oder tatsächliche Bewachung behauptet.
+
+Fachliche Grundlage sind WABC Level 1, Team 2.1.1 (Spacing) und 2.1.3 (zweckgerichtete Bewegung)
+sowie Player 2.8.2 (Postpositionen und Größenmismatches unabhängig vom Positionsetikett),
+[offizielles Handbuch](https://assets.fiba.basketball/image/upload/documents-corporate-wabc-coaching-level-manuals-level-1-eng.pdf).
+WABC Level 2, Team 2.1.2, „Receivers Principles with Post Players“, ergänzt die Grundlage für
+Grundordnungen mit einem oder zwei Post-Spielern
+([Handbuch](https://assets.fiba.basketball/image/upload/documents-corporate-wabc-coaching-manual-level-2-eng.pdf)).
+Die Gewichtungen, Raumgrenzen und Auswahlkosten sind eigene Replay-Heuristiken, keine Formeln aus den Handbüchern.
+Die Jugend-Trainingsabläufe werden nicht als NBA-/WNBA-Spielzug oder NBA-/WNBA-Regel übernommen.
 
 Die lokale Vorschau verwendet ausdrücklich `http://127.0.0.1:5500` wegen der Backend-CORS-Freigabe.
 `localhost` oder andere Ports sind kein gleichwertiger Ersatz. Den Origin-Header nicht im
@@ -539,6 +628,8 @@ Basis-URL: `https://hoops-replay.tehes.deno.net`. Die folgenden Abrufe verwenden
 | Schedule | `/schedule` | `/schedule?league=wnba` | `leagueSchedule.gameDates[].games[]` mit `gameId`, `gameStatus`, `gameDateTimeUTC`, `homeTeam` und `awayTeam` |
 | Boxscore | `/boxscore/GAME_ID` | `/boxscore/GAME_ID?league=wnba` | `game.gameId`, `game.gameStatus`, Teams, Spieler und Statistiken |
 | Play-by-Play | `/playbyplay/GAME_ID` | `/playbyplay/GAME_ID?league=wnba` | `game.gameId` und `game.actions[]` |
+| Roster | `/roster/TEAM_ID?season=YYYY-YY` | `/roster/TEAM_ID?season=YYYY&league=wnba` | `CommonTeamRoster` mit Player-ID, Position, Größe und verfügbarem Gewicht |
+| Spielerstatistiken | `/players/TEAM_ID?season=YYYY-YY` | `/players/TEAM_ID?season=YYYY&league=wnba` | `PlayersSeasonTotals`; `seasonType=Regular Season`, `Pre Season` oder `Playoffs` |
 
 Beispiel-URLs:
 
@@ -586,8 +677,11 @@ abgeschlossenen Spiele. Explizite zehnstellige GameIDs umgehen die Schedule-Ausw
 Eine explizite Liga muss zu diesen IDs passen. Kommandos stehen in README.md.
 
 Der Ablauf ist Schedule → abgeschlossene GameIDs (`gameStatus === 3`) → Boxscore und Play-by-Play →
-Normalisierung → Kompilierung → vorhandene gemeinsame Prüfung. Spiele werden nacheinander
-verarbeitet; nur die beiden Detailfeeds eines Spiels werden parallel geladen.
+Normalisierung → Rosteranreicherung → Kompilierung → vorhandene gemeinsame Prüfung. Spiele werden nacheinander
+verarbeitet; die beiden Detailfeeds werden parallel geladen, anschließend die beiden Saisonroster
+und die beiden Spielerstatistikantworten.
+Browser und Audit verwenden dieselbe Rosteranreicherung; der CLI-Lauf verwendet seinen bestehenden
+prozessinternen Antwortcache auch für Roster und Spielerstatistiken.
 
 Die JSONL-Ausgabe enthält Auswahlquelle, Saison, Anzahl verfügbarer abgeschlossener Spiele,
 ausgewählte IDs, Zeitpunkt, SHA-256-Fingerabdruck der normalisierten Eingaben ohne variable
@@ -613,12 +707,20 @@ explizit geprüft werden. Der Top-Excitement-Filter des Spielplans wird nicht ve
 | `gameId`, optional `league`, `date`, `arena`, `season` | Partie und Metadaten; Liga bei der Demo aus der ID ableitbar |
 | `sources` | Quell-URLs und Erfassungsangaben |
 | `teams` | Auswärts zuerst, Heimteam danach; ID, Code, Name, Heimstatus, Endstand und Spieler |
-| `players` | ID, Name, Nummer, Position, Starterstatus und Minuten |
+| `players` | ID, Name, Nummer, Quellposition `position`, Herkunft `positionSource`, ursprüngliche `boxscorePosition`, verfügbare `heightCm`/`weightKg` und `seasonStatistics`, Starterstatus und Minuten |
 | `actions` | Übernommene Ereignisfelder einschließlich IDs, Ordnung, Uhr, Typ, Beteiligten und optionaler Orts-/Wurf-/Besitzangaben |
 
 Neue Normalisierung leitet NBA-Saison aus dem Spieldatum und WNBA-Saison aus dem Kalenderjahr ab.
-Fünf Starter je Team sind erforderlich. Fehlende oder doppelte Starterpositionen bekommen eindeutige
-schematische PG–C-Slots mit `sourcePosition` und `positionSource: "schematic"`.
+Fünf Starter je Team sind erforderlich. Rosterpositionen wie `G`, `F-G` und `C-F` bleiben
+unverändert; doppelte Positionen sind zulässig. `positionSource` ist `roster`, `boxscore` oder
+bei fehlender Angabe `null`. Fehlt ein Spieler oder seine Position im Saisonroster, bleibt die
+Boxscoreposition erhalten; ohne beide Quellen bleibt die Position leer. Bei einem fehlerhaften
+Rosterabruf wird eine Warnung protokolliert und der Boxscore verwendet. Ein erfolgreicher Abruf
+ist am Team als `rosterSource` dokumentiert. Saisonroster ergänzen Positionen und verfügbare Maße;
+Teilnehmer, Nummern und Starterstatus bleiben aus dem konkreten Spiel.
+Die Engine ordnet ihre fünf Formationsplätze nach der Boxscoreposition, ersatzweise nach der
+Rosterposition; sie erfindet keine individuellen PG–C-Positionen. Unbekannte Positionen folgen
+am Ende, bei gleicher Sortierung bleibt die Quellreihenfolge erhalten.
 
 Wichtige Datenregeln:
 
