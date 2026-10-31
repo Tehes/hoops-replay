@@ -386,7 +386,24 @@ nur Zonengeometrie, keinen allgemeinen Regelzustand.
   verwenden den Mittelkreis. Andere Ereignisse verwenden den zum verfügbaren Ort nächstgelegenen
   Kreis (x 19, 47 oder 75, y 25); ohne Feed-Koordinaten dient die vorherige schematische Ballposition.
   Bei unbekanntem Descriptor ist diese Kreiswahl eine Annahme, keine rekonstruierte Entscheidung.
-  Beide Springer stellen sich auf, die übrigen Spieler bleiben vor dem Tipp außerhalb des Kreises.
+  Bei Eröffnungs- und Overtime-Tip-offs stehen die Nicht-Springer gestaffelt: Der belegte Fänger
+  steht zurückversetzt in seiner eigenen Hälfte, zwei Mitspieler seitlich am Kreis und einer
+  tiefer zur Absicherung. Ist der Fänger selbst Springer, übernimmt ein Nicht-Springer nur den
+  zurückversetzten Aufstellungsplatz; der belegte Fänger bleibt unverändert.
+  Drei Gegner stehen versetzt zu den Empfangs-/Kreispositionen, ein weiterer sichert ihre eigene
+  Hälfte. Die Aufstellung richtet sich nach der aus den Wurfdaten bestimmten Angriffsrichtung.
+  Spiel-ID, Periode und Fänger bestimmen reproduzierbare Varianten der seitlichen Orientierung,
+  Abstände und Rollenverteilung der übrigen Nicht-Springer. Fängerplatz, Kreisabstand und tiefe
+  Absicherung bleiben erhalten; Neuladen und Seeking erzeugen keine neue Zufallsaufstellung.
+  Positionen und Zuordnungen sind schematisch, keine gemessene NBA-Aufstellung oder ein belegter Spielzug.
+  Grundlage für Kreisnähe und Gegenspielerbezug: Basketball England, Level 2 Coach Manual,
+  Abschnitt 5.8, gedruckte Seite 133
+  ([Manual](https://www.sportstructures.com/media/bfljw1vf/level-2-coach-manual.pdf#page=130));
+  die tiefere Absicherung ist auch in [Coach’s Clipboard, Opening Tip Play](https://www.coachesclipboard.net/TipPlay.html)
+  beschrieben. Dessen konkreter Angriffsspielzug wird nicht übernommen; NBA-Platzansprüche am
+  Kreis haben Vorrang vor der dortigen Coaching-Variante.
+  Die Springer stehen auf der ihrem jeweiligen Zielkorb abgewandten Seite des Sprungkreises,
+  die übrigen Spieler bleiben vor dem Tipp außerhalb des Kreises.
   Hochwurf, Sprung, Tipp und Fang werden animiert; Aufbauzeit vor dem Tipp verbraucht keine
   zusätzliche Spielzeit. Ein als Fänger genannter Springer erhält vorher einen schematischen
   Bodenkontakt des Balls. Das Ergebnis bleibt beim im Feed belegten Team.

@@ -2118,6 +2118,7 @@ function planJumpBall(action, state, data) {
 		loserId,
 		receiverId,
 		center,
+		opening: start,
 		direction: attackDirection(data, winnerTeam, action.period),
 		winnerSource: action.jumpBallWonPersonId ? "recorded" : "schematic",
 		loserSource: action.jumpBallLostPersonId ? "recorded" : "schematic",
@@ -2126,6 +2127,46 @@ function planJumpBall(action, state, data) {
 			? recordedPosition ? "recorded-nearest-circle" : "schematic-nearest-circle"
 			: "center-circle",
 	};
+}
+
+function positionTipOff(plan, state, data, period) {
+	const receiverTeam = state.players.find((player) => player.id === plan.receiverId).teamId;
+	const direction = attackDirection(data, receiverTeam, period);
+	const receivers = state.lineups[receiverTeam].filter((id) => id !== plan.winnerId && id !== plan.loserId);
+	const receiverIndex = receivers.indexOf(plan.receiverId);
+	if (receiverIndex > 0) {
+		receivers.splice(receiverIndex, 1);
+		receivers.unshift(plan.receiverId);
+	}
+	const opponents = state.lineups[otherTeam(data, receiverTeam)]
+		.filter((id) => id !== plan.winnerId && id !== plan.loserId);
+	// Keep schematic variation stable across recompilation and seeking.
+	let seed = (Number(data.gameId) + period * 31 + plan.receiverId) >>> 0;
+	const vary = () => {
+		seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+		return seed / 4294967296;
+	};
+	const side = vary() < 0.5 ? -1 : 1;
+	receivers.push(...receivers.splice(1, Math.floor(vary() * 3)));
+	opponents.push(...opponents.splice(0, Math.floor(vary() * 4)));
+	// Stagger the receiving team around the circle, with one player protecting each backcourt.
+	const offsets = [
+		[-10 - vary() * 3, -2 - vary() * 3],
+		[-2 - vary() * 3, -8 - vary() * 2],
+		[2 + vary() * 3, 8 + vary() * 2],
+		[-16 - vary() * 5, 3 + vary() * 5],
+	];
+	receivers.forEach((id, slot) => {
+		const [x, y] = offsets[slot];
+		Object.assign(state.positions[id], { x: plan.center.x + x * direction, y: plan.center.y + y * side });
+	});
+	opponents.forEach((id, slot) => {
+		const [x, y] = slot < 3 ? offsets[slot] : [13 + vary() * 5, -2 - vary() * 4];
+		Object.assign(state.positions[id], {
+			x: plan.center.x + (x + 2.8 + vary() * 1.2) * direction,
+			y: plan.center.y + (y + (y < 0 ? -1 : 1) * (1.5 + vary() * 1.5)) * side,
+		});
+	});
 }
 
 function compileScene(replay, scene, index, state, data) {
@@ -2681,10 +2722,13 @@ function compileScene(replay, scene, index, state, data) {
 		const plan = planJumpBall(action, state, data);
 		scene.jumpBallPlan = plan;
 		const { center, winnerId, loserId, receiverId } = plan;
+		if (plan.opening) {
+			positionTipOff(plan, state, data, action.period);
+		}
 		for (const [slot, id] of Object.values(state.lineups).flat().entries()) {
 			const player = state.positions[id];
 			if (id === winnerId || id === loserId) {
-				Object.assign(player, { x: center.x + (id === winnerId ? 2 : -2) * plan.direction, y: center.y });
+				Object.assign(player, { x: center.x + (id === winnerId ? -2 : 2) * plan.direction, y: center.y });
 			} else {
 				const distance = Math.hypot(player.x - center.x, player.y - center.y);
 				if (distance < 7.5) {
@@ -2802,10 +2846,12 @@ export function compileReplay(data) {
 		matchups: null,
 		breakPositions: null,
 	};
+	const tip = data.actions.find((action) => action.actionType === "jumpball");
 	for (const team of data.teams) {
+		const direction = attackDirection(data, team.id, tip?.period ?? 1);
 		lineups[team.id].forEach((id, slot) => {
 			state.positions[id] = {
-				x: team.home ? 42 : 52,
+				x: 47 - direction * 5,
 				y: [10, 18, 32, 40, 25][slot],
 				opacity: 1,
 				angle: 0,
@@ -2813,11 +2859,13 @@ export function compileReplay(data) {
 			};
 		});
 	}
-	const tip = data.actions.find((action) => action.actionType === "jumpball");
 	if (tip) {
 		const plan = planJumpBall(tip, state, data);
-		Object.assign(state.positions[plan.winnerId], { x: 47 + plan.direction * 2, y: 25 });
-		Object.assign(state.positions[plan.loserId], { x: 47 - plan.direction * 2, y: 25 });
+		Object.assign(state.positions[plan.winnerId], { x: 47 - plan.direction * 2, y: 25 });
+		Object.assign(state.positions[plan.loserId], { x: 47 + plan.direction * 2, y: 25 });
+		if (plan.opening) {
+			positionTipOff(plan, state, data, tip.period);
+		}
 		for (const id of Object.values(lineups).flat()) {
 			if (id !== plan.winnerId && id !== plan.loserId && state.positions[id].y === 25) {
 				state.positions[id].y = 37;
