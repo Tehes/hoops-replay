@@ -506,11 +506,32 @@ nur Zonengeometrie, keinen allgemeinen Regelzustand.
 | Persönliches Foul mit `off-the-ball` | Kein pauschaler Balltransfer an den Gefoulten; Loose-ball- und technische Fouls behalten ihre Sonderbehandlung |
 | Wurffoul | Zwei-/Dreipunktbereich aus Qualifiers oder folgender regulärer Freiwurfserie; schematische Annahme vor dem Kontakt |
 | And-one | Gleiche Periode/Uhr, passender Schütze und gegnerisches Wurffoul verknüpfen Treffer und Kontakt; kein zweiter Aufbau oder Gegner-Einwurf |
-| Reguläre Freiwürfe | Zwischenwurf und letzter Wurf unterschieden; nach letztem Fehlwurf kann ein Live-Rebound folgen |
+| Reguläre Freiwürfe | Teamgerechte Lane-Aufstellung; Zwischenwurf und letzter Wurf unterschieden. Beim letzten Versuch beginnt schematisches Ausboxen ab Release, nach Fehlwurf folgt der belegte Live-Rebound |
 | Technischer Freiwurf | Vorheriger Team-Ballbesitz und Positionen werden grundsätzlich wiederhergestellt; keine normale Rebound-Vorabplanung |
 | Technisches Foul gegen Person außerhalb des Rosters | Bei bekanntem Team als Teamereignis ohne erfundenen Court-Spieler erhalten |
 | Freiwurf mit Descriptor `flagrant` | Nach Ende der Serie unabhängig vom Ergebnis Seiteneinwurf des gefoulten Teams an der verlängerten Freiwurflinie; Team-Rebound überschreibt den Ort nicht |
 | Weitere Ereignisse | Spezifische Zweige unter anderem für Charge, Loose-ball, Traveling, Shot-clock, Aus, Lost-ball, offensives Goaltending und Kicked Ball |
+
+Die Freiwurfaufstellung folgt NBA/WNBA Rule 9, Section I: zwei Verteidiger korbnah,
+zwei Angreifer auf den benachbarten Plätzen und ein weiterer Verteidiger auf einem dritten Platz.
+Die übrigen Spieler stehen oberhalb der verlängerten Freiwurflinie außerhalb des Dreierbogens.
+Innenprofile unterstützen die Platzverteilung unabhängig vom späteren Reboundgewinner.
+So bleiben die Plätze innerhalb einer Serie bei gleicher Aufstellung stabil. Dies ist eine plausible
+Aufstellung, keine rekonstruierte Positionierung.
+
+Beim letzten regulären Versuch bewegen sich die Lane-Spieler ab Release gemeinsam:
+zunächst Gegnerzugang sichern, dann zum Korb eindrehen. Verteidiger halten dabei die Innenposition,
+Angreifer versuchen einen seitlichen Zugang. Grundlage sind
+[WABC Level 1, Abschnitt 1.2.4 „Blocking out an offensive rebounder“](https://assets.fiba.basketball/image/upload/documents-corporate-wabc-coaching-level-manuals-level-1-eng.pdf)
+und [Jr. NBA „Rebounding“](https://jr.nba.com/faq/rebounding/).
+Die Vorbereitung hängt nicht vom Trefferergebnis ab und zielt nicht auf den künftigen Abprallpunkt.
+Der Schütze bleibt bis zum Korbausgang an der Linie. Nach einem Fehlwurf beginnt der bestehende,
+geschwindigkeitsbegrenzte Fangweg des belegten Rebounders; die übrigen Spieler halten ihre
+Ausboxpositionen. Team-Rebounds erfinden keinen Fänger. Zwischenwürfe erhalten kein Ausboxen;
+bei technischen und erkannten Flagrant-Freiwürfen bleiben die Lane-Plätze frei.
+Einzelne Hände/Füße, vollständige Kontaktphysik, alle offensiven Ausweichwege und weitere
+Sonderstrafen sind nicht modelliert. Die gezielten Szenarien stehen in
+[scripts/replay-freethrows_test.js](scripts/replay-freethrows_test.js).
 
 Diese Zweige sind keine vollständige Regelabdeckung. Insbesondere sind Fortsetzungen nach
 verschachtelten technischen Strafen und alle Sonderfoul-Kombinationen nicht umfassend modelliert.

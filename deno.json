@@ -3,7 +3,7 @@
         "audit": "deno run --allow-net=hoops-replay.tehes.deno.net scripts/audit-replays.js",
         "test": "deno test --allow-net=hoops-replay.tehes.deno.net scripts/",
         "test:data": "deno test --allow-net=hoops-replay.tehes.deno.net scripts/replay-data_test.js",
-        "test:local": "deno test scripts/replay-motion_test.js scripts/replay-colors_test.js scripts/replay-profiles_test.js"
+        "test:local": "deno test scripts/replay-freethrows_test.js scripts/replay-motion_test.js scripts/replay-colors_test.js scripts/replay-profiles_test.js"
     },
     "fmt": {
         "useTabs": true,

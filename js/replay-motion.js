@@ -186,7 +186,7 @@ export function movePlayers(scene, index, fraction, players) {
 	const to = scene.frames[index + 1] ?? from;
 	const time = from.time + (to.time - from.time) * fraction;
 	// Preserve a single speed profile across setup/catch snapshots, including the final hold.
-	for (const move of [scene.reboundMove, scene.reboundRun, ...scene.laneExits ?? []]) {
+	for (const move of [scene.reboundMove, scene.reboundRun, ...scene.laneExits ?? [], ...scene.freeThrowMoves ?? []]) {
 		if (!move || move.startAt === null) {
 			continue;
 		}

@@ -1928,6 +1928,49 @@ function planReboundSetup(state, scene, rebounderId, continuation, direction) {
 	}
 }
 
+function prepareFreeThrow(state, scene, direction, deadAfterSeries) {
+	const shooterId = scene.action.personId;
+	const ranked = (teamId) => {
+		const players = state.lineups[teamId].map((id) => state.players.find((player) => player.id === id));
+		return players.filter((player) => player.id !== shooterId).sort((a, b) =>
+			getInteriorScore(b, players) - getInteriorScore(a, players)
+		).map((player) => player.id);
+	};
+	const offense = ranked(scene.action.teamId);
+	const defense = ranked(Object.keys(state.lineups).map(Number).find((id) => id !== scene.action.teamId));
+	const lane = deadAfterSeries ? [] : [defense[0], defense[1], offense[0], offense[1], defense[2]];
+	const outside = [...offense, ...defense].filter((id) => !lane.includes(id));
+	const courtX = (x) => direction === 1 ? x : 94 - x;
+	Object.assign(state.positions[shooterId], { x: courtX(75), y: 25 });
+	scene.freeThrowLane = lane;
+	lane.forEach((id, slot) => {
+		Object.assign(state.positions[id], {
+			x: courtX(86.5 - Math.floor(slot / 2) * 3),
+			y: slot % 2 ? 34.5 : 15.5,
+		});
+	});
+	outside.forEach((id, slot) => {
+		Object.assign(state.positions[id], {
+			x: courtX(62 - Math.floor(slot / 4) * 4),
+			y: 7 + slot % 4 * 12,
+		});
+	});
+	// Find the opponent first, then turn inward; neither stage targets the future bounce.
+	scene.freeThrowMoves = [];
+	if (!deadAfterSeries && scene.finalFreeThrow) {
+		lane.forEach((id, slot) => {
+			const side = slot % 2 ? 1 : -1;
+			const depth = Math.floor(slot / 2);
+			const contact = { x: courtX(85.4 - depth * 2.4), y: 25 + side * (depth === 1 ? 7.2 : 6.5) };
+			const target = { x: courtX(85 - depth * 2.4), y: 25 + side * (depth === 1 ? 4.7 : 3.5) };
+			scene.freeThrowMoves.push(
+				{ id, from: { ...state.positions[id] }, ...contact, startAt: 0, duration: 0.4 },
+				{ id, from: contact, ...target, startAt: 0.4, duration: 0.4 },
+			);
+		});
+	}
+}
+
 function prepareRebound(replay, scene, index, state) {
 	const previous = replay.scenes[scene.reboundShotIndex];
 	const id = scene.action.personId;
@@ -2455,18 +2498,10 @@ function compileScene(replay, scene, index, state, data) {
 		state.possession = action.teamId;
 		state.restart = null;
 		const shooter = state.positions[action.personId];
-		Object.assign(shooter, { x: direction === 1 ? 75 : 19, y: 25 });
-		let slot = 0;
-		for (const player of state.players) {
-			if (state.positions[player.id].opacity && player.id !== action.personId) {
-				const x = technical ? 29 + slot % 2 * 3 : 7.5 + Math.floor(slot / 2) * 4;
-				Object.assign(state.positions[player.id], {
-					x: direction === 1 ? 94 - x : x,
-					y: technical ? 5 + slot * 4.8 : slot % 2 ? 35 : 15,
-				});
-				slot++;
-			}
-		}
+		const sequence = action.subType.match(/(\d) of (\d)/);
+		const final = !sequence || sequence[1] === sequence[2];
+		scene.finalFreeThrow = final;
+		prepareFreeThrow(state, scene, direction, technical || scene.flagrantFreeThrow);
 		state.ball.owner = action.personId;
 		state.ball.dribble = false;
 		record(0.75);
@@ -2474,13 +2509,27 @@ function compileScene(replay, scene, index, state, data) {
 			addMarker(replay, scene, time, "technical", shooter, "", 0.65);
 		}
 		scene.releaseAt = time;
-		flyBall(state, record, { ...hoop, z: 1 }, 6, 0.8);
+		for (const move of scene.freeThrowMoves) {
+			move.startAt += time;
+		}
+		flyBall(state, record, { ...hoop, z: 1 }, 6, 0.8, 0, (fraction) => {
+			const at = scene.releaseAt + fraction * 0.8;
+			for (const move of scene.freeThrowMoves) {
+				if (at < move.startAt) {
+					continue;
+				}
+				const u = Math.min(1, (at - move.startAt) / move.duration);
+				const progress = u * u * (3 - 2 * u);
+				Object.assign(state.positions[move.id], {
+					x: move.from.x + (move.x - move.from.x) * progress,
+					y: move.from.y + (move.y - move.from.y) * progress,
+				});
+			}
+		});
 		scene.eventAt = time;
 		const made = action.shotResult === "Made";
 		setScore(state, action);
 		addMarker(replay, scene, time, made ? "made" : "miss", shooter, made ? "+1" : "");
-		const sequence = action.subType.match(/(\d) of (\d)/);
-		const final = !sequence || sequence[1] === sequence[2];
 		if (technical) {
 			state.possession = retainedPossession;
 			state.restart = "sideline";
