@@ -1,8 +1,8 @@
 # Hoops Replay — Zielbild und Projektkonzept
 
-Diese Datei beschreibt ausschließlich das fachliche Zielbild von Hoops Replay: Produktziel,
-Spielmodell, fachliche Grenzen und Anforderungen an die Bewertung. Eine Anforderung ist kein
-Nachweis, dass sie bereits umgesetzt oder geprüft ist.
+Diese Datei beschreibt ausschließlich das fachliche Basketballmodell von Hoops Replay:
+Spielregeln, Spielzustände, Choreografie, die dafür maßgeblichen Quelldaten und Anforderungen
+an die Bewertung. Eine Anforderung ist kein Nachweis, dass sie bereits umgesetzt oder geprüft ist.
 
 ## Northstar
 
@@ -19,8 +19,11 @@ Code- und Prüfabläufe, API-Endpunkte, technische Konfiguration sowie Statuslis
 Änderungsverläufe, Testprotokolle, einzelne Fehlergeschichten und erledigte Aufgaben gehören
 nicht hierher. Das gilt auch dann, wenn ein Detail eine Umsetzung erklärt oder gerade geändert wurde.
 
-Hier stehen dauerhafte fachliche Anforderungen, ihre Begründungen und Quellen sowie der
-fachliche Datenvertrag. Regeln und Grenzen werden allgemein formuliert, nicht anhand einzelner
+Hier stehen ausschließlich Anforderungen daran, wie das Basketballspiel modelliert wird,
+ihre Begründungen und Quellen sowie der zugehörige fachliche Datenvertrag. Produktfunktionen,
+Darstellung und Bedienung gehören nicht hierher. Eine Ergänzung ist nur zulässig, wenn sie
+das Basketballmodell oder die Interpretation seiner Quelldaten fachlich verändert oder präzisiert.
+Regeln und Grenzen werden allgemein formuliert, nicht anhand einzelner
 Spiele oder Implementierungsfälle dokumentiert. Eine fachliche Erkenntnis wird direkt in den
 zuständigen Abschnitt eingearbeitet; Überholtes wird ersetzt, nichts chronologisch angehängt.
 Eine reine Implementierungsänderung ist kein Anlass, diese Datei zu erweitern.

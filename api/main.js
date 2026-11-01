@@ -17,9 +17,21 @@ const BASE_UPSTREAM_HEADERS = {
 };
 
 const ALLOWED_ORIGINS = new Set(["https://tehes.github.io", "http://127.0.0.1:5500"]);
+// Public website identifier; LockerVision combines it with the current UTC date.
+const LOCKER_VISION_REF = "71a3fa62-64c0-4edf-ad80-60e0772a7474";
 const LEAGUES = {
-	nba: { origin: "https://www.nba.com", cdn: "https://cdn.nba.com", leagueId: "00" },
-	wnba: { origin: "https://www.wnba.com", cdn: "https://cdn.wnba.com", leagueId: "10" },
+	nba: {
+		origin: "https://www.nba.com",
+		cdn: "https://cdn.nba.com",
+		leagueId: "00",
+		lockerVision: "https://lockervision.nba.com",
+	},
+	wnba: {
+		origin: "https://www.wnba.com",
+		cdn: "https://cdn.wnba.com",
+		leagueId: "10",
+		lockerVision: "https://lockervision.wnba.com",
+	},
 };
 /* --------------------------------------------------------------------------------------------------
 State
@@ -60,10 +72,10 @@ function getUpstreamHeaders(league, isStats = false) {
 	return headers;
 }
 
-async function fetchUpstreamResponse(url, league, isStats = false) {
+async function fetchUpstreamResponse(url, league, isStats = false, extraHeaders = {}) {
 	try {
 		const client = await getUpstreamClient();
-		const headers = getUpstreamHeaders(league, isStats);
+		const headers = { ...getUpstreamHeaders(league, isStats), ...extraHeaders };
 		// Keep the user agent and client hints consistent with the TLS browser profile.
 		delete headers["User-Agent"];
 		delete headers["Sec-CH-UA"];
@@ -72,8 +84,68 @@ async function fetchUpstreamResponse(url, league, isStats = false) {
 		return await client.fetch(url, { headers });
 	} catch (error) {
 		console.warn("Browser HTTP client failed; using native fetch:", error);
-		return fetch(url, { headers: getUpstreamHeaders(league, isStats) });
+		return fetch(url, { headers: { ...getUpstreamHeaders(league, isStats), ...extraHeaders } });
 	}
+}
+
+/* --------------------------------------------------------------------------------------------------
+LockerVision uniforms
+---------------------------------------------------------------------------------------------------*/
+
+function normalizeUniform(uniform) {
+	if (
+		!Number.isSafeInteger(uniform?.teamId) || !/^\d{10}$/.test(String(uniform.teamId)) ||
+		!/^#[\da-f]{6}$/i.test(uniform.bG_Color) || !/^#[\da-f]{6}$/i.test(uniform.text_Color)
+	) {
+		return null;
+	}
+	return {
+		teamId: uniform.teamId,
+		edition: typeof uniform.edition_Name === "string" ? uniform.edition_Name.trim() : null,
+		shirt: uniform.bG_Color.toLowerCase(),
+		ink: uniform.text_Color.toLowerCase(),
+	};
+}
+
+export async function loadLockerVisionUniforms(gameId, leagueId, fetchResponse = fetchUpstreamResponse) {
+	const origin = LEAGUES[leagueId].lockerVision;
+	const [year, month, day] = new Date().toISOString().slice(0, 10).split("-");
+	const res = await fetchResponse(
+		`${origin}/api/GetUniformDetails?game_Id=${gameId}`,
+		{ origin },
+		false,
+		{
+			"Referer": `${origin}/`,
+			"Sec-Fetch-Site": "same-origin",
+			"X-Requested-With": "XMLHttpRequest",
+			"refHeader": btoa(`${LOCKER_VISION_REF}_${day}/${month}/${year}`),
+		},
+	);
+	if (res.status === 204 || res.status === 404) {
+		await res.body?.cancel();
+		return null;
+	}
+	if (!res.ok) {
+		await res.body?.cancel();
+		throw new Error(`LockerVision returned HTTP ${res.status}`);
+	}
+	const data = await res.json();
+	// Unknown games can return HTTP 200 with null gameId and empty uniform records.
+	if (data === null || data.gameId === null) {
+		return null;
+	}
+	if (data.gameId !== gameId) {
+		throw new Error("LockerVision returned a different or missing gameId");
+	}
+	const home = normalizeUniform(data.homeTeamUniform);
+	const away = normalizeUniform(data.awayTeamUniform);
+	if (!home || !away) {
+		return null;
+	}
+	if (home.teamId === away.teamId) {
+		throw new Error("LockerVision returned duplicate team IDs");
+	}
+	return { gameId, league: leagueId, source: "lockervision", home, away };
 }
 
 /* --------------------------------------------------------------------------------------------------
@@ -150,6 +222,23 @@ export async function handleRequest(req) {
 				origin,
 				league,
 			);
+		}
+
+		// --- LockerVision uniforms ---
+		const uniformRoute = /^\/uniforms\/(.*)$/.exec(url.pathname);
+		if (uniformRoute) {
+			const gameId = uniformRoute[1];
+			if (!/^\d{10}$/.test(gameId) || !gameId.startsWith(league.leagueId)) {
+				return errorResponse("Invalid gameId for league", 400, origin);
+			}
+			const uniforms = await loadLockerVisionUniforms(gameId, leagueId);
+			const headers = corsHeaders(origin);
+			headers.set("Cache-Control", uniforms ? "public, max-age=3600" : "no-store");
+			if (!uniforms) {
+				return new Response(null, { status: 204, headers });
+			}
+			headers.set("Content-Type", "application/json; charset=utf-8");
+			return new Response(JSON.stringify(uniforms), { headers });
 		}
 
 		// --- Boxscore and play-by-play ---

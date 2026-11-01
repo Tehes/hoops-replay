@@ -3,10 +3,11 @@
 This file defines **how AI agents must work in this repository**.\
 It is binding. When in doubt, choose the most conservative option and change less, not more.
 
-Before making changes, read [PROJECT.md](PROJECT.md) for the product vision, domain requirements,
-and data contract. Use [README.md](README.md) for local setup and verification. Update PROJECT.md
-when enduring domain requirements or product decisions change, not for implementation changes alone.
-Do not add implementation details or implementation status to PROJECT.md.
+Before making changes, read [PROJECT.md](PROJECT.md) for the basketball model and its domain data
+contract. Use [README.md](README.md) for local setup and verification. Update PROJECT.md only when
+the basketball model or the domain interpretation of its source data changes or needs clarification.
+Product features, presentation, user interaction, implementation details, and implementation status
+do not belong in PROJECT.md.
 
 Before investigating or changing replay heuristics, read the relevant sections of
 [heuristic-learnings.md](scripts/docs/heuristic-learnings.md), including for choreography,
