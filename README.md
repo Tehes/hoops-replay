@@ -73,12 +73,12 @@ Replace the number after `?game=` in the replay link:
 
 ### Link to a Moment
 
-A link can open a replay paused at a specific recorded event:
+A link can open a replay paused at the start of a specific action:
 
 [DEN at OKC, action 17](https://tehes.github.io/hoops-replay/?game=0022600007&action=17)
 
 Add `&action=ACTION_NUMBER` to a game link, using the event’s `actionNumber` from the play-by-play data.
-Press **Play** to continue, or scrub back a few seconds to watch the buildup.
+Press **Play** to watch the action from its beginning.
 
 ## What the Replay Can—and Cannot—Show
 

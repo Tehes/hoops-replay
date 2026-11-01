@@ -712,7 +712,7 @@ async function init() {
 				scene.related.some((action) => action.actionNumber === actionNumber)
 			);
 			if (scene) {
-				currentTime = scene.start + scene.eventAt;
+				currentTime = scene.start;
 			} else {
 				console.warn(`Replay action not found: ${requestedAction}`);
 			}
