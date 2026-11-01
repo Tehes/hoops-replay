@@ -292,6 +292,30 @@ function linkLooseBallFouls(scenes, data) {
 	}
 }
 
+function planReboundPressure(scenes, data) {
+	for (const [index, rebound] of scenes.entries()) {
+		const foul = scenes[index + 1];
+		const shot = scenes[rebound.reboundShotIndex];
+		if (rebound.kind !== "rebound" || rebound.action.subType !== "defensive" || !rebound.reboundContinuous ||
+			!rebound.action.personId || rebound.action.qualifiers?.includes("deadball") ||
+			!["2pt", "3pt"].includes(shot?.kind) || foul?.kind !== "foul" ||
+			foul.action.subType !== "personal" || foul.action.descriptor ||
+			foul.action.period !== rebound.action.period || foul.clockTo > rebound.clockTo || foul.liveSeconds > 3 ||
+			foul.action.foulDrawnPersonId !== rebound.action.personId ||
+			foul.action.teamId === rebound.action.teamId || foul.rules.buildupRestart ||
+			!data.teams.find((team) => team.id === foul.action.teamId).players
+				.some((player) => player.id === foul.action.personId)) {
+			continue;
+		}
+		const plan = { defenderId: foul.action.personId, rebounderId: rebound.action.personId,
+			reboundActionNumber: rebound.action.actionNumber, foulActionNumber: foul.action.actionNumber,
+			source: "inferred-rebound-pressure" };
+		shot.reboundPressure = plan;
+		rebound.reboundPressure = plan;
+		foul.reboundPressure = plan;
+	}
+}
+
 function planShotClockPressure(scenes) {
 	scenes.forEach((scene, index) => {
 		if (scene.kind !== "turnover" || scene.action.subType !== "shot clock") {
@@ -1334,6 +1358,11 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 	scene.matchups = { ...matchups };
 	scene.matchupPlanId = state.formation.id;
 	scene.formation = state.formation;
+	if (scene.reboundPressure && scene.kind === "foul") {
+		state.possession = offense;
+		state.needsAdvance = false;
+		return;
+	}
 	planReceivingEntry(state, scene, direction);
 	const entry = scene.stagedEntry ?? scene.waitingEntry ?? scene.shotEntry;
 	if (!restart && !changed && !state.needsAdvance && carrier) {
@@ -2247,23 +2276,87 @@ function prepareRebound(replay, scene, index, state) {
 	const target = { x: state.ball.x, y: state.ball.y };
 	// The rim/block outcome starts the catch route; the buildup only established general position.
 	previous.reboundRun = { id, from: { ...origin }, x: target.x, y: target.y, startAt: start, duration: end - start };
+	const pressure = scene.reboundPressure;
+	if (pressure) {
+		const defender = startFrame.players.find((player) => player.id === pressure.defenderId);
+		const direction = previous.hoop.x > 47 ? -1 : 1;
+		const point = { x: target.x + direction * 3.4, y: target.y + (defender.y < target.y ? -1.6 : 1.6) };
+		const distance = Math.hypot(point.x - defender.x, point.y - defender.y);
+		const fraction = Math.min(1, (end - start) * 8 / 1.5 / (distance || 1));
+		// React to the rim outcome; never reserve the future catch point before the miss.
+		previous.pressureRun = { id: pressure.defenderId, from: { ...defender },
+			x: defender.x + (point.x - defender.x) * fraction,
+			y: defender.y + (point.y - defender.y) * fraction, startAt: start, duration: end - start };
+	}
 	for (const frame of previous.frames) {
 		if (frame.time <= start) {
 			continue;
 		}
 		const fraction = Math.min(1, (frame.time - start) / (end - start));
 		const smooth = fraction * fraction * (3 - 2 * fraction);
-		const player = frame.players.find((player) => player.id === id);
-		player.x = origin.x + (target.x - origin.x) * smooth;
-		player.y = origin.y + (target.y - origin.y) * smooth;
+		for (const move of [previous.reboundRun, previous.pressureRun].filter(Boolean)) {
+			const player = frame.players.find((player) => player.id === move.id);
+			player.x = move.from.x + (move.x - move.from.x) * smooth;
+			player.y = move.from.y + (move.y - move.from.y) * smooth;
+		}
 	}
 	for (const between of replay.scenes.slice(scene.reboundShotIndex + 1, index)) {
 		for (const frame of between.frames) {
 			Object.assign(frame.players.find((player) => player.id === id), target);
+			if (previous.pressureRun) {
+				const move = previous.pressureRun;
+				Object.assign(frame.players.find((player) => player.id === move.id), { x: move.x, y: move.y });
+			}
 		}
 	}
 	Object.assign(state.positions[id], target);
+	if (previous.pressureRun) {
+		const move = previous.pressureRun;
+		Object.assign(state.positions[move.id], { x: move.x, y: move.y });
+	}
 	scene.reboundApproach = { sceneIndex: scene.reboundShotIndex, start, end, playerId: id, target };
+}
+
+// WABC Level 1, Team 1.1.11 and 2.3.1: delay the outlet while the rebounder protects the ball.
+function prepareReboundPressure(state, scene, direction, record) {
+	const plan = scene.reboundPressure;
+	const lineup = state.lineups[scene.attackTeam];
+	const victim = state.positions[plan.rebounderId];
+	const defender = state.positions[plan.defenderId];
+	const origins = Object.fromEntries(Object.values(state.lineups).flat().map((id) => [id, { ...state.positions[id] }]));
+	const side = victim.y < 25 ? -1 : 1;
+	const targets = {};
+	targets[plan.rebounderId] = { x: victim.x, y: Math.max(3, Math.min(47, victim.y + side * 2)) };
+	targets[plan.defenderId] = { x: victim.x + direction * 3.4,
+		y: targets[plan.rebounderId].y + (defender.y < victim.y ? -1.6 : 1.6) };
+	const outletId = lineup.find((id) => id !== plan.rebounderId);
+	for (const id of lineup.filter((id) => id !== plan.rebounderId)) {
+		const from = origins[id];
+		const point = id === outletId
+			? { x: Math.max(8, Math.min(86, victim.x + direction * 9)), y: side < 0 ? 8 : 42 }
+			: { x: Math.max(3, Math.min(91, from.x + direction * 8)), y: from.y };
+		const fraction = Math.min(1, 12 / (Math.hypot(point.x - from.x, point.y - from.y) || 1));
+		targets[id] = { x: from.x + (point.x - from.x) * fraction, y: from.y + (point.y - from.y) * fraction };
+	}
+	const defenders = Object.keys(scene.matchups).map(Number).filter((id) => id !== plan.defenderId);
+	const safety = defenders.reduce((best, id) => origins[id].x * direction > origins[best].x * direction ? id : best);
+	for (const id of defenders) {
+		const from = origins[id];
+		const opponent = targets[scene.matchups[id]];
+		const point = id === safety ? { x: direction === 1 ? 86 : 8, y: 25 }
+			: { x: Math.max(2, Math.min(92, opponent.x + direction * 3.6)), y: opponent.y };
+		const fraction = Math.min(1, 12 / (Math.hypot(point.x - from.x, point.y - from.y) || 1));
+		targets[id] = { x: from.x + (point.x - from.x) * fraction, y: from.y + (point.y - from.y) * fraction };
+	}
+	let duration = 1.2;
+	for (const [id, point] of Object.entries(targets)) {
+		duration = Math.max(duration, Math.hypot(point.x - origins[id].x, point.y - origins[id].y) * 1.5 / 8);
+		Object.assign(state.positions[id], point);
+	}
+	state.ball.dribble = false;
+	state.ball.flight = false;
+	plan.outletId = outletId;
+	record(duration);
 }
 
 function planShootingFoul(scenes, index, position, hoop, direction, threePointRadius) {
@@ -2606,7 +2699,7 @@ function compileScene(replay, scene, index, state, data) {
 		if (continuation) {
 			continuation.target = getLaneWaitingPoint(continuation.entry, direction, state.positions[continuation.playerId]);
 		}
-		planReboundSetup(state, scene, namedRebound, continuation, direction);
+		planReboundSetup(state, scene, scene.reboundPressure?.defenderId ?? namedRebound, continuation, direction);
 		if (scene.kind !== "heave" && !scene.shotStyle.tip && !scene.shotStyle.putback) {
 			const lineup = state.lineups[offense];
 			const points = lineup.map((id) => {
@@ -2851,7 +2944,10 @@ function compileScene(replay, scene, index, state, data) {
 			!action.descriptor && Boolean(state.positions[action.foulDrawnPersonId]);
 		const onBall = scene.kind === "turnover" || offensive || personalOnBall ||
 			["shooting", "take", "transition take"].includes(action.descriptor);
-		if (scene.rules.requiresPlay) {
+		if (scene.reboundPressure) {
+			prepareAttack(state, scene, offense, direction, matchups, recordMovement, data, replay, index);
+			prepareReboundPressure(state, scene, direction, record);
+		} else if (scene.rules.requiresPlay) {
 			if (liveFoul && (state.restart || state.possession !== offense || state.needsAdvance)) {
 				replay.attacks.push(scene.start);
 			}
@@ -2865,7 +2961,7 @@ function compileScene(replay, scene, index, state, data) {
 				pacePreparation(state, scene, time, scene.action.descriptor === "shooting" ? 2 : 0.8, record, direction);
 			}
 		}
-		if (onBall) {
+		if (onBall && !scene.reboundPressure) {
 			if (scene.kind === "foul" && action.descriptor === "shooting") {
 				if (scene.rules.requiresPlay) {
 					prepareShootingFoul(state, scene, replay, index, hoop, direction, record);
@@ -2907,6 +3003,7 @@ function compileScene(replay, scene, index, state, data) {
 			record(0.25);
 		} else if (scene.kind === "foul" && victim && actor) {
 			contacts.add(action.personId);
+			const from = { x: actor.x, y: actor.y };
 			Object.assign(actor, { x: victim.x + direction * 1.8, y: victim.y - 0.5 });
 			if (action.descriptor === "shooting") {
 				victim.jump = 1.2;
@@ -2918,7 +3015,9 @@ function compileScene(replay, scene, index, state, data) {
 				state.ball.z = 0;
 			}
 			actor.angle = direction * 0.2;
-			record(0.4);
+			record(scene.reboundPressure
+				? Math.max(0.4, Math.hypot(actor.x - from.x, actor.y - from.y) * 1.5 / 8)
+				: 0.4);
 		}
 		if (action.subType === "technical" && actor && !scene.defensiveThreeSeconds) {
 			actor.angle = 0.3;
@@ -3265,6 +3364,7 @@ export function compileReplay(data) {
 	planGameStates(replay.scenes, data);
 	planTeamFouls(replay.scenes, data);
 	linkRebounds(replay.scenes);
+	planReboundPressure(replay.scenes, data);
 	planShotClockPressure(replay.scenes);
 	replay.scenes.forEach((scene, index) => {
 		scene.start = replay.duration;

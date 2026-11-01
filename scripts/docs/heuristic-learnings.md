@@ -77,6 +77,28 @@ Ein Aufstellungsslot belegt nicht die tatsächliche Ballführerrolle; statische 
 beweisen keine sichere Passlinie gegen bewegte Verteidiger. Die visuelle Nutzerabnahme und eine
 umfassende Beurteilung von Passdruck, Laufwegkonflikten und Anschlussentscheidungen stehen aus.
 
+## Früher Druck auf die Rebounderin
+
+Eine gewöhnliche persönliche Foulfolge direkt nach einem benannten Defensivrebound kann als
+früher Druck auf die Rebounderin ergänzt werden. Ein zuerst zurücklaufender Verteidiger mit
+anschließend erzwungenem Kontakt erklärt diesen Druck nicht. Der Zusammenhang beginnt beim
+Rebound: allgemeine Reboundposition vor dem Wurf, Reaktion auf den Ausgang und eine erreichbare
+Annäherung. Der genaue Fangpunkt darf vor dem Fehlwurf nicht vorweggenommen werden.
+
+WABC Level 1, Team 1.1.11, S. 268–270, beschreibt frühe Absicherung und das Bedrängen der
+Rebounderin, um den Outlet-Pass zu verzögern. Team 2.3.1, S. 345, ergänzt Ballabschirmung und
+eine seitliche, bei Druck veränderbare Anspielstation. Die Rebounderin muss dafür nicht sofort
+dribbeln oder einen zusätzlichen Pass spielen. Andere Verteidiger sichern nach hinten ab.
+
+Die enge zeitliche Verknüpfung ist eine eigene Eignungsheuristik. Sie belegt weder eine konkrete
+Kontaktform noch eine Pressverteidigung des ganzen Teams. Unterbrechungen, andere Foulopfer,
+Team-/Dead-Ball-Rebounds und spezifisch bezeichnete Fouls tragen diese Ergänzung nicht.
+Im visuell akzeptierten Vergleich wirkt der Zusammenhang aus Rebound, frühem Druck und Foul
+stimmiger als der Rücklauf mit anschließender abrupter Kontaktannäherung. Diese Abnahme bestätigt
+die gezeigte Folge, nicht pauschal alle Rebound-Foul-Kontexte.
+
+Grundlage: [WABC Level 1](https://assets.fiba.basketball/image/upload/documents-corporate-wabc-coaching-level-manuals-level-1-eng.pdf).
+
 ## Abschluss und Folgebewegung getrennt beurteilen
 
 Eine Abschlussprüfung muss die Landung am Wurfende bewerten. Die Endposition der gesamten Szene

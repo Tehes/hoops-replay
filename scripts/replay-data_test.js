@@ -5,6 +5,82 @@ import { getTeamColors, getTeamLogo, getTeamName } from "../js/replay-teams.js";
 import { loadFeed, loadGame } from "./replay-source.js";
 import { getLaneWaitingPoint, isDefensiveLaneCountActive, isInOffensiveLane } from "../js/replay-rules.js";
 
+Deno.test("rebound pressure connects the catch to the personal foul without a retreat or invented pass", async () => {
+	for (const [id, actionNumber] of [["1042600306", 303], ["1022600311", 229], ["0022600148", 651]]) {
+		const data = await loadGame(id);
+		for (const mirrored of [false, true]) {
+			const input = structuredClone(data);
+			if (mirrored) {
+				for (const action of input.actions) {
+					if (["left", "right"].includes(action.side)) {
+						action.side = action.side === "left" ? "right" : "left";
+					}
+					if (action.isFieldGoal) {
+						action.x = 100 - action.x;
+					}
+				}
+			}
+			const source = JSON.stringify(input);
+			const replay = compileReplay(input);
+			const foul = replay.scenes.find((scene) => scene.action.actionNumber === actionNumber);
+			const plan = foul.reboundPressure;
+			assert(plan?.source === "inferred-rebound-pressure", "missing explicit pressure assumption");
+			const rebound = replay.scenes.find((scene) => scene.action.actionNumber === plan.reboundActionNumber);
+			const shot = replay.scenes[rebound.reboundShotIndex];
+			assert(shot.pressureRun.startAt >= shot.eventAt, "defender anticipated the bounce before the miss");
+			assert(foul.inboundAt === undefined && foul.outletPlan === undefined, "foul inserted a restart or outlet pass");
+			for (const scene of [shot, rebound, foul]) {
+				const start = scene === shot ? shot.eventAt : 0;
+				let previous = getReplayFrame(replay, scene.start + start);
+				for (let time = start + 0.02; time < (scene === foul ? foul.eventAt : scene.end - scene.start); time += 0.02) {
+					const frame = getReplayFrame(replay, scene.start + time);
+					const before = previous.players.find((player) => player.id === plan.defenderId);
+					const defender = frame.players.find((player) => player.id === plan.defenderId);
+					assert(Math.hypot(defender.x - before.x, defender.y - before.y) <= 8 * 0.02 + 0.001,
+						"defender rushed to the recorded contact");
+					if (scene === foul) {
+						assert(frame.ball.owner === plan.rebounderId && !frame.ball.dribble,
+							"pressure lost the protected ball or invented a pass");
+					}
+					previous = frame;
+				}
+			}
+			const at = foul.start + foul.eventAt / 2;
+			const sample = JSON.stringify(getReplayFrame(replay, at));
+			getReplayFrame(replay, replay.duration);
+			assert(JSON.stringify(getReplayFrame(replay, at)) === sample, "seeking changed the pressure sequence");
+			assert(JSON.stringify(input) === source, "pressure rewrote the source events");
+			assert(checkReplay(input, replay).errors.length === 0, "pressure replay failed validation");
+		}
+	}
+});
+
+Deno.test("rebound pressure excludes other victims, interrupted play, late fouls and specific foul types", async () => {
+	const data = await loadGame("1042600306");
+	for (const variant of ["victim", "clock", "descriptor", "offensive", "interruption", "deadball"]) {
+		const input = structuredClone(data);
+		const foul = input.actions.find((action) => action.actionNumber === 303);
+		const rebound = input.actions.find((action) => action.actionNumber === 302);
+		if (variant === "victim") {
+			foul.foulDrawnPersonId = 1628508;
+		} else if (variant === "clock") {
+			foul.clock = "PT07M06.00S";
+		} else if (variant === "descriptor") {
+			foul.descriptor = "loose ball";
+		} else if (variant === "offensive") {
+			foul.subType = "offensive";
+		} else if (variant === "deadball") {
+			rebound.qualifiers.push("deadball");
+		} else {
+			input.actions.push({ ...rebound, actionType: "timeout", subType: "full", personId: undefined,
+				actionNumber: 99999, orderNumber: (rebound.orderNumber + foul.orderNumber) / 2 });
+		}
+		const replay = compileReplay(input);
+		assert(!replay.scenes.find((scene) => scene.action.actionNumber === 303).reboundPressure,
+			`${variant} invented rebound pressure`);
+	}
+});
+
 Deno.test("PHI-CHA team rebound 12 shows an assumed out ball before the inbound", async () => {
 	const data = await loadGame("0022600148");
 	const original = JSON.stringify(data);
