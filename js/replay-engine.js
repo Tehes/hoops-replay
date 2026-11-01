@@ -973,23 +973,25 @@ function reactDefense(state, scene, matchups, contacts, direction, delay) {
 		}
 		const player = state.positions[id];
 		const target = state.positions[attacker];
-		const onBall = attacker === state.ball.owner;
+		const onBall = attacker === state.ball.owner || (scene.shotPassInFlight && attacker === scene.action.personId);
+		const shotHelp = scene.shotHelp && attacker === scene.action.personId &&
+			scene.releaseAt === undefined;
 		const distance = Math.hypot(hoop.x - target.x, hoop.y - target.y) || 1;
-		const reach = onBall ? 3.2 : 3.6;
+		const reach = onBall ? (scene.kind === "turnover" && scene.action.subType === "shot clock" ? 2.4 : 3.2) : 3.6;
 		let x = target.x + (hoop.x - target.x) / distance * reach;
 		let y = target.y + (hoop.y - target.y) / distance * reach;
 		if (!onBall) {
-			const shade = Number(id) === scene.helpDefender && driving ? 0.45 : 0.13;
+			const shade = Number(id) === scene.helpDefender && driving ? 0.45 : shotHelp ? 0.45 : 0.13;
 			const dx = ball.x - x;
 			const dy = ball.y - y;
-			const scale = Math.min(shade, 6 / (Math.hypot(dx, dy) || 1));
+			const scale = Math.min(shade, (shotHelp ? 10 : 6) / (Math.hypot(dx, dy) || 1));
 			x += dx * scale;
 			y += dy * scale;
 		}
 		x = Math.max(1, Math.min(93, x));
 		y = Math.max(2, Math.min(48, y));
 		const travel = Math.hypot(x - player.x, y - player.y);
-		const fraction = Math.min(1 - Math.exp(-delay / 0.16), delay * 16 / (travel || 1));
+		const fraction = Math.min(1 - Math.exp(-delay / 0.16), delay * (shotHelp && onBall ? 10 : 16) / (travel || 1));
 		player.x += (x - player.x) * fraction;
 		player.y += (y - player.y) * fraction;
 	}
@@ -2535,6 +2537,13 @@ function compileScene(replay, scene, index, state, data) {
 	if (["2pt", "3pt", "heave"].includes(scene.kind)) {
 		followAttackers = true;
 		scene.shotStyle = getShotStyle(action);
+		const style = scene.shotStyle;
+		// The result biases a schematic defensive rotation; it does not prove shot quality.
+		const rotationVariant = action.actionNumber % 4;
+		scene.shotHelp = Boolean(!action.blockPersonId && !scene.andOneFoul &&
+			style.family === "jump" && !style.running && !style.driving && !style.cutting && !style.pullup &&
+			!style.stepBack && !style.fadeaway && !style.turnaround &&
+			(action.shotResult === "Made" ? rotationVariant !== 0 : action.shotResult === "Missed" && rotationVariant === 0));
 		if (state.restart || state.possession !== offense) {
 			replay.attacks.push(scene.start);
 		}
@@ -2640,7 +2649,11 @@ function compileScene(replay, scene, index, state, data) {
 				),
 			};
 		}
-		const finishDuration = 2.5 + (scene.driveStart
+		const passer = state.positions[action.assistPersonId];
+		const passDuration = passer && style.family === "jump" && !style.running && !style.driving &&
+			!style.cutting && !style.pullup && !style.stepBack && !style.fadeaway
+			? Math.max(0.35, Math.hypot(passer.x - shot.x, passer.y - shot.y) / 45) : 0;
+		const finishDuration = 2.5 + passDuration + (scene.driveStart
 			? Math.hypot(scene.driveStart.x - shot.x, scene.driveStart.y - shot.y) / 12 : 0);
 		if (scene.kind !== "heave" && !scene.shotStyle.tip && !scene.shotStyle.putback) {
 			pacePreparation(state, scene, time, finishDuration, record, direction);

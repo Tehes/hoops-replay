@@ -107,7 +107,25 @@ einzelnen Pässe und der Raum beim Empfang ergänzen die Bewertung freier Korrid
 freier ballferner Empfänger kann den direkten Seitenwechsel rechtfertigen. Flug und Fang
 brauchen eigene Zeit; reicht die Reserve vor dem Abschluss nicht, entfällt die Zwischenstation.
 Die verwendeten Abstände und Gewichte sind eigene Heuristiken. Statische Verteidigerabstände
-beweisen keinen sicheren Flug gegen bewegte Verteidiger; die visuelle Nutzerabnahme steht aus.
+beweisen keinen sicheren Flug gegen bewegte Verteidiger. In den visuell beurteilten Beispielen
+wurde das Weiterpassen über passende Zwischenstationen als deutlich natürlicher bewertet;
+daraus folgt keine allgemeine Bestätigung aller Passentscheidungen.
+
+## Wurfchancen und bekannter Ausgang
+
+Ballorientierte Hilfe und die Rückkehr nach einem Pass können einen zeitweilig freien Schützen
+ergeben. Der bekannte Ausgang gewichtet solche Varianten, belegt aber weder den Verteidigerabstand
+noch die tatsächliche Passfolge. Auch getroffene bedrängte und vergebene freie Würfe bleiben möglich.
+Belegte Blocks und bewegte Abschlüsse brauchen ihren eigenen Kontext. Die visuelle Beurteilung und
+ein breiter Vergleich der Wurfchancen stehen aus.
+
+Beim belegten Assist muss der letzte Pass vom Assistgeber kommen. Sein Ballflug und der Closeout
+laufen gemeinsam; ein zusätzlicher Pass gehört davor und setzt erreichbare Stationen und genügend
+Zeit voraus. Ein Shot-Clock-Verstoß kann mit engerem Druck am Ball dargestellt werden, belegt
+aber weder einen Steal noch die konkrete Ursache für den ausbleibenden Abschluss.
+
+Grundlage: [Jr. NBA, Kick Pass](https://jr.nba.com/basketball-practice-plans/starter/page/3/)
+und [Jr. NBA, Extra Pass](https://jr.nba.com/basketball-practice-plans/rookie/page/7/).
 
 ## Freilaufen nach einem Pass
 

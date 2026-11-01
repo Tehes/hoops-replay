@@ -170,6 +170,9 @@ und belegten Ereignissen.
   freie Spieler müssen nicht nach jedem Pass weiterlaufen.
 - Defensive Zuordnungen, Ballorientierung, Korbschutz, Hilfe und Rückkehr werden gemeinsam geplant.
   Die Defense kopiert nicht nur den Lauf ihres Gegenspielers mit konstantem Abstand.
+- Der bekannte Ausgang darf plausible Vorteile von Angriff und Verteidigung unterschiedlich gewichten.
+  Ein Treffer beweist keinen freien Wurf und ein Fehlwurf keine erfolgreiche Verteidigung; beide
+  Varianten bleiben bei passenden Belegen und ausreichend Zeit möglich.
 - Wege bleiben einfach, mit plausibler Beschleunigung und Bremsen. Geplante Abstände, ein
   Ausweichweg oder ein späterer Start sind wiederholtem Hin-und-her-Korrigieren vorzuziehen.
 - Bei wenig Zeit oder schwachen Belegen wird der Ablauf einfacher, statt zusätzliche Aktionen

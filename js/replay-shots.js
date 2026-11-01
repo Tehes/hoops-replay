@@ -172,6 +172,19 @@ export function animateShot(state, scene, shot, hoop, direction, record, contact
 			record(0.4);
 			Object.assign(shooter, shot);
 			record(0.35);
+			const passer = state.positions[action.assistPersonId];
+			const distance = Math.hypot(shooter.x - passer.x, shooter.y - passer.y);
+			state.ball = { x: passer.x + 1, y: passer.y + 0.8, z: 0.5, owner: null, dribble: false };
+			scene.shotPassInFlight = true;
+			record(0.01);
+			scene.shotPassAt = scene.frames.at(-1).time;
+			flyBall(state, record, { x: shooter.x + 1, y: shooter.y + 0.8, z: 0.5 }, 0.6,
+				Math.max(0.35, distance / 45));
+			scene.shotPassInFlight = false;
+			state.ball.owner = action.personId;
+			state.ball.flight = false;
+			record(0.01);
+			scene.catchAt = scene.frames.at(-1).time;
 		} else {
 			record(0.35);
 			if (action.assistPersonId) {
