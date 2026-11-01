@@ -3051,7 +3051,7 @@ function compileScene(replay, scene, index, state, data) {
 		state.possession = action.teamId;
 		if (defensive) {
 			state.needsAdvance = true;
-			replay.attacks.push(scene.start + time);
+			replay.attacks.push(scene.start);
 		}
 		const next = replay.scenes[index + 1]?.action;
 		const nextStyle = next && ["2pt", "3pt"].includes(next.actionType) ? getShotStyle(next) : null;
@@ -3281,7 +3281,7 @@ function compileScene(replay, scene, index, state, data) {
 			const stealer = action.stealPersonId || action.personId;
 			state.needsAdvance = true;
 			addMarker(replay, scene, time, "steal", state.positions[stealer]);
-			replay.attacks.push(scene.start + time);
+			replay.attacks.push(scene.start);
 		} else if (scene.looseBallPlan) {
 			// The following whistle resolves the loose ball; no intervening catch or inbound is implied.
 		} else if (scene.kind === "turnover" || offensive) {
@@ -3301,11 +3301,11 @@ function compileScene(replay, scene, index, state, data) {
 			} else if (action.subType === "lost ball") {
 				flyBall(state, record, { x: state.ball.x + direction * 3, y: state.ball.y + 2, z: 0 }, 0.2, 0.3);
 			}
-			replay.attacks.push(scene.start + time);
+			replay.attacks.push(scene.start);
 		} else if (scene.kind === "foul") {
 			releaseBall(state);
 			if (scene.looseBallTurnoverIndex !== undefined && replay.scenes[scene.looseBallTurnoverIndex].looseBallPlan) {
-				replay.attacks.push(scene.start + time);
+				replay.attacks.push(scene.start);
 			}
 		}
 		landPlayers(state);

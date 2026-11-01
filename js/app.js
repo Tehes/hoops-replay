@@ -602,7 +602,7 @@ function render() {
 	timeline.value = currentTime;
 	elapsed.value = `${formatTime(currentTime)} / ${formatTime(replay.duration)}`;
 	previousButton.disabled = currentTime === 0;
-	nextButton.disabled = currentTime >= replay.attacks.at(-1);
+	nextButton.disabled = currentTime >= replay.scenes.at(-1).start;
 }
 
 /* --------------------------------------------------------------------------------------------------
@@ -649,11 +649,11 @@ function seek(time) {
 	render();
 }
 
-function stepAttack(direction) {
+function stepAction(direction) {
 	const target = direction === 1
-		? replay.attacks.find((time) => time > currentTime + 0.15)
-		: replay.attacks.findLast((time) => time < currentTime - 0.6);
-	seek(target ?? (direction === 1 ? replay.duration : 0));
+		? replay.scenes.find((scene) => scene.start > currentTime)
+		: replay.scenes.findLast((scene) => scene.start < currentTime);
+	seek(target?.start ?? (direction === 1 ? replay.duration : 0));
 }
 
 /* --------------------------------------------------------------------------------------------------
@@ -804,8 +804,8 @@ async function init() {
 			setPlaying(!playing);
 		});
 		timeline.addEventListener("input", () => seek(Number(timeline.value)));
-		previousButton.addEventListener("click", () => stepAttack(-1));
-		nextButton.addEventListener("click", () => stepAttack(1));
+		previousButton.addEventListener("click", () => stepAction(-1));
+		nextButton.addEventListener("click", () => stepAction(1));
 		canvas.addEventListener("click", selectPlayer);
 		document.addEventListener("keydown", (event) => {
 			if (
@@ -822,7 +822,7 @@ async function init() {
 				setPlaying(!playing);
 			} else if (event.code === "ArrowLeft" || event.code === "ArrowRight") {
 				event.preventDefault();
-				stepAttack(event.code === "ArrowRight" ? 1 : -1);
+				stepAction(event.code === "ArrowRight" ? 1 : -1);
 			}
 		});
 		document.addEventListener("visibilitychange", () => {

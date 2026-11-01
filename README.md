@@ -52,16 +52,16 @@ pass sequence or play that actually happened.
 - **The recorded game story:** score, clock, player photos and original play-by-play descriptions.
 - **Different finishes**, including distinct movements and ball flights for dunks, layups and jump shots.
 - **Shot results on the court:** green dots for makes and red crosses for misses.
-- **Any part of the replay**, using the timeline, period selector and possession controls.
+- **Any part of the replay**, using the timeline, period selector and action controls.
 
 ## How to Use
 
 1. Press **Play** to start or pause.
 2. Choose a playback speed: **0.5×, 1×, 1.5×, 2× or 4×**.
-3. Drag the timeline to seek, select a period, or use the previous/next buttons to move between possessions.
+3. Drag the timeline to seek, select a period, or use the previous/next buttons to move between actions.
 4. Tap or click a jersey to see the player’s name.
 
-On a keyboard, **Space** toggles playback and the **left/right arrow keys** move between possessions.
+On a keyboard, **Space** toggles playback and the **left/right arrow keys** move between actions.
 Pressing Play at the end restarts the replay.
 
 ### Load Another Game

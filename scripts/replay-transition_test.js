@@ -38,6 +38,18 @@ function scenario({ league = "nba", mirrored = false, recovery = "rebound", seco
 	};
 }
 
+Deno.test("possession navigation starts before rebounds, steals and turnovers unfold", () => {
+	for (const recovery of ["rebound", "steal", "turnover"]) {
+		const replay = compileReplay(scenario({ recovery }));
+		const scene = replay.scenes[1];
+		assert(scene.eventAt > 0, "scenario needs a recovery with visible buildup");
+		assert(replay.attacks.includes(scene.start), `navigation skipped the start of ${recovery}`);
+		assert(!replay.attacks.includes(scene.start + scene.eventAt), `navigation landed at the end of ${recovery}`);
+		assert(replay.attacks.every((time) => replay.scenes.some((scene) => scene.start === time)),
+			"navigation target was not a scene start");
+	}
+});
+
 Deno.test("recorded fastbreaks preserve recovery, assists, shot anchors and seeking in both leagues and directions", () => {
 	for (const league of ["nba", "wnba"]) {
 		for (const mirrored of [false, true]) {
