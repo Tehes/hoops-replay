@@ -55,6 +55,8 @@ const quarterTemplate = document.querySelector("#quarter-template");
 const awayTeamEl = document.querySelector(".team.away");
 const homeTeamEl = document.querySelector(".team.home");
 const actionDisplay = document.querySelector(".action-display");
+const shotClockDisplay = document.querySelector(".shot-clock");
+const shotClockValue = document.querySelector("#shot-clock");
 const actionPhoto = document.querySelector("#action-photo");
 const actionCopy = document.querySelector(".action-display > .action-copy");
 const actionPlayer = document.querySelector("#action-player");
@@ -519,7 +521,18 @@ function renderAction(frame) {
 			break;
 		}
 	}
-	if (displayedAction === active) {
+	const counting = frame.shotClock !== null;
+	const wasCounting = !shotClockDisplay.hidden;
+	shotClockDisplay.hidden = !counting;
+	shotClockValue.textContent = counting ? frame.shotClock : "";
+	if (counting) {
+		idleDisplay.hidden = true;
+		actionCopy.hidden = true;
+		actionPhoto.hidden = true;
+		actionDisplay.style.setProperty("--event-color", "var(--shot-clock-color)");
+		return;
+	}
+	if (displayedAction === active && !wasCounting) {
 		return;
 	}
 	displayedAction = active;

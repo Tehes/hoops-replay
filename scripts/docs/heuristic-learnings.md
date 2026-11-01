@@ -127,6 +127,15 @@ aber weder einen Steal noch die konkrete Ursache für den ausbleibenden Abschlus
 Grundlage: [Jr. NBA, Kick Pass](https://jr.nba.com/basketball-practice-plans/starter/page/3/)
 und [Jr. NBA, Extra Pass](https://jr.nba.com/basketball-practice-plans/rookie/page/7/).
 
+## Shotclock-Schlusscountdown
+
+Ein aufgezeichneter Shotclock-Verstoß belegt den Endpunkt, aber keine vollständige Folge von
+Starts, Stopps und Resets. Der Schlusscountdown bleibt deshalb eine schematische Ergänzung.
+Er folgt der abgebildeten Spielzeit innerhalb der Verstoßszene und endet am Ereignisanker;
+Einwurfvorbereitung zählt nicht mit. Bei weniger als drei Sekunden Spielzeit in dieser Szene
+entfällt die Anzeige, statt den Countdown über möglicherweise unklare Ereignisgrenzen zu verlängern.
+Eine vorausgehende Fehlwurf-/Rebound-Folge wird damit bewusst nicht als durchgehender Timer behandelt.
+
 ## Freilaufen nach einem Pass
 
 Kurze diagonale Vorwärtswege können die bisher überwiegend seitlichen oder rückwärtigen Optionen

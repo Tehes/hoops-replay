@@ -47,6 +47,37 @@ Deno.test("a shot-clock turnover applies ball pressure without inventing a steal
 	}
 });
 
+Deno.test("shot-clock display follows game time, expires at the event and survives seeking", () => {
+	const replay = scenario("", 1, "", 0, {
+		actionType: "turnover", subType: "shot clock", isFieldGoal: 0, assistPersonId: 0,
+		clock: "PT11M36S",
+	});
+	const scene = replay.scenes[0];
+	const liveAt = scene.liveAt ?? 0;
+	const atRemaining = (seconds) => getReplayFrame(
+		replay,
+		scene.start + liveAt + (scene.eventAt - liveAt) * (1 - seconds / scene.liveSeconds),
+	);
+	for (const [remaining, expected] of [[4, null], [2.8, 3], [1.8, 2], [0.8, 1], [0, 0], [2.8, 3]]) {
+		if (atRemaining(remaining).shotClock !== expected) {
+			throw new Error(`unexpected countdown at ${remaining} game seconds remaining`);
+		}
+	}
+	if (getReplayFrame(replay, scene.start + scene.eventAt + 0.61).shotClock !== null) {
+		throw new Error("countdown hid the turnover description after expiration");
+	}
+	for (const overrides of [{ clock: "PT11M58S" }, { subType: "lost ball" }]) {
+		const other = scenario("", 1, "", 0, {
+			actionType: "turnover", subType: "shot clock", isFieldGoal: 0, assistPersonId: 0,
+			...overrides,
+		});
+		const event = other.scenes[0];
+		if (getReplayFrame(other, event.start + event.eventAt - 0.1).shotClock !== null) {
+			throw new Error("countdown invented a lead-in or an unrecorded expiration");
+		}
+	}
+});
+
 Deno.test("ball-oriented help changes the shooter's defender before a catch", () => {
 	const helped = scenario("Made", 1);
 	const covered = scenario("Missed", 1);

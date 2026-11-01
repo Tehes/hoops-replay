@@ -57,6 +57,9 @@ schematische Ergänzungen zu verstehen. Es gibt keinen Live-Spielmodus.
   Ein fehlender Assist beweist keine Isolation, ein Turnover allein keinen Fastbreak.
 - Das Replay verdichtet Zeit. Auch bei 1× ist es keine Echtzeitwiedergabe.
   Aufgezeichnete Spieluhrzeiten bleiben verbindliche Anker.
+- Eine Shotclock-Anzeige beschränkt sich auf einen schematischen Schlusscountdown vor einem
+  aufgezeichneten Shotclock-Verstoß mit ausreichend zusammenhängendem Vorlauf. Der Ablauf ist
+  am belegten Verstoß verankert; eine durchgehend bekannte Shotclock wird nicht behauptet.
 - Keine zusätzlichen Menüs, Statistikseiten, PWA-Funktionen oder Tracking-Events ohne eigenen Auftrag.
   Die bestehende Lizenz nicht beiläufig ändern.
 

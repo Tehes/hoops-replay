@@ -219,6 +219,7 @@ input:focus-visible {
 
 .action-display {
 	--event-color: var(--accent-color);
+	--shot-clock-color: #ff735c;
 	display: flex;
 	align-items: center;
 	gap: 16px;
@@ -262,6 +263,25 @@ input:focus-visible {
 	width: 100%;
 	min-width: 0;
 }
+.shot-clock {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 20px;
+	width: 100%;
+	color: var(--shot-clock-color);
+}
+.shot-clock span {
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: 0.12em;
+}
+.shot-clock strong {
+	font-size: 46px;
+	line-height: 1;
+	font-variant-numeric: tabular-nums;
+}
+.shot-clock[hidden],
 .idle-display[hidden],
 .action-copy[hidden] {
 	display: none;

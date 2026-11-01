@@ -3286,6 +3286,14 @@ export function getReplayFrame(replay, time) {
 			y: players[ownerIndex].y - originalPlayers[ownerIndex].y,
 		}
 		: { x: 0, y: 0 };
+	const clock = scene.clockFrom + (scene.clockTo - scene.clockFrom) *
+		Math.max(0, Math.min(1, (local - (scene.liveAt ?? 0)) / (scene.eventAt - (scene.liveAt ?? 0) || 1)));
+	// Only infer the final count within an uninterrupted lead-in to a recorded expiration.
+	const shotClock = scene.kind === "turnover" && scene.action.subType === "shot clock" &&
+			scene.liveSeconds >= 3 && local >= (scene.liveAt ?? 0) && clock - scene.clockTo <= 3 &&
+			local < scene.eventAt + 0.6
+		? Math.ceil(Math.max(0, clock - scene.clockTo))
+		: null;
 	return {
 		scene,
 		time: bounded,
@@ -3301,8 +3309,8 @@ export function getReplayFrame(replay, time) {
 		possession: fraction === 1 ? to.possession : from.possession,
 		gameState: getSceneGameState(scene, local),
 		period: scene.action.period,
-		clock: scene.clockFrom + (scene.clockTo - scene.clockFrom) *
-				Math.max(0, Math.min(1, (local - (scene.liveAt ?? 0)) / (scene.eventAt - (scene.liveAt ?? 0) || 1))),
+		clock,
+		shotClock,
 		participants: local >= scene.eventAt - 1.5 ? scene.participants : [],
 		markers: replay.markers.filter((marker) => marker.time <= bounded && marker.end > bounded),
 		banner: scene.banner && local > 0.15 ? scene.banner : "",
