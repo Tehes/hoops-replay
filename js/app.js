@@ -650,6 +650,7 @@ function seek(time) {
 }
 
 function stepAction(direction) {
+	setPlaying(false);
 	const target = direction === 1
 		? replay.scenes.find((scene) => scene.start > currentTime)
 		: replay.scenes.findLast((scene) => scene.start < currentTime);
