@@ -60,6 +60,9 @@ schematische Ergänzungen zu verstehen. Es gibt keinen Live-Spielmodus.
 - Eine Shotclock-Anzeige beschränkt sich auf einen schematischen Schlusscountdown vor einem
   aufgezeichneten Shotclock-Verstoß mit ausreichend zusammenhängendem Vorlauf. Der Ablauf ist
   am belegten Verstoß verankert; eine durchgehend bekannte Shotclock wird nicht behauptet.
+- Die Bonus-Anzeige zeigt das begünstigte Team anhand der bis zum Replay-Moment aufgezeichneten
+  Teamfouls. Periodenwechsel, Overtime und die Zwei-Minuten-Regel der jeweiligen Liga gelten dabei;
+  technische Fouls, gewöhnliche Offensivfouls und Doppelfouls zählen nicht zur Teamfoul-Grenze.
 - Keine zusätzlichen Menüs, Statistikseiten, PWA-Funktionen oder Tracking-Events ohne eigenen Auftrag.
   Die bestehende Lizenz nicht beiläufig ändern.
 

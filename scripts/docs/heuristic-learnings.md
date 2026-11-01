@@ -127,6 +127,20 @@ aber weder einen Steal noch die konkrete Ursache für den ausbleibenden Abschlus
 Grundlage: [Jr. NBA, Kick Pass](https://jr.nba.com/basketball-practice-plans/starter/page/3/)
 und [Jr. NBA, Extra Pass](https://jr.nba.com/basketball-practice-plans/rookie/page/7/).
 
+## Bonus und Teamfouls
+
+Der abschließende Boxscore-Bonuszustand eignet sich nicht für frühere Replay-Momente. Die Anzeige
+muss aus den bisherigen Foulereignissen entstehen und am Ereignisanker wechseln, damit Seeking
+denselben Zustand ergibt. Ein `inpenalty`-Qualifier an einem späteren Foul belegt nicht den genauen
+früheren Eintrittszeitpunkt. Nach ausgeschöpfter Freifoulquote gilt der Bonus für das gegnerische
+Team bereits vor dem nächsten Foul. In den letzten zwei Minuten genügt dafür das erste dort
+gezählte Teamfoul; technische, gewöhnliche offensive und doppelte Fouls verbrauchen keine Quote.
+
+Grundlage: [NBA Rule 12B, Sections V–VIII](https://official.nba.com/rule-no-12-fouls-and-penalties/)
+und [WNBA 2026 Rule 12B, Sections V–VIII](https://cdn.wnba.com/sites/4/2026/05/2026-WNBA-Official-Rule-Book.pdf).
+Die Ableitung setzt vollständige und korrekt klassifizierte Foulereignisse voraus; sie entscheidet
+keine Freiwurfstrafe neu.
+
 ## Shotclock-Schlusscountdown
 
 Ein aufgezeichneter Shotclock-Verstoß belegt den Endpunkt, aber keine vollständige Folge von

@@ -15,6 +15,40 @@ export function getLaneWaitingPoint(point, direction, origin = point) {
 	].sort((a, b) => Math.hypot(a.x - origin.x, a.y - origin.y) - Math.hypot(b.x - origin.x, b.y - origin.y))[0];
 }
 
+// NBA/WNBA Rule 12B, Sections V–VIII: the next common foul incurs the penalty once the quota is used.
+export function planTeamFouls(scenes, data) {
+	let period = null;
+	let totals;
+	for (const scene of scenes) {
+		const action = scene.action;
+		if (action.period !== period) {
+			period = action.period;
+			totals = data.teams.map(() => ({ total: 0, lastTwo: 0 }));
+		}
+		const before = totals;
+		const personal = scene.kind === "foul" &&
+			!["technical", "double technical", "double personal", "offensive"].includes(action.subType);
+		const offensiveFlagrant = scene.kind === "foul" && action.subType === "offensive" &&
+			["flagrant", "flagrant 1", "flagrant 2", "punching"].includes(action.descriptor);
+		if (personal || offensiveFlagrant) {
+			totals = totals.map((count, index) => data.teams[index].id === action.teamId
+				? { total: count.total + 1, lastTwo: count.lastTwo + (scene.clockTo <= 120 ? 1 : 0) }
+				: count);
+		}
+		if (scene.kind === "game" || (scene.kind === "period" && action.subType === "end")) {
+			totals = data.teams.map(() => ({ total: 0, lastTwo: 0 }));
+		}
+		scene.teamFouls = { before, after: totals };
+	}
+}
+
+export function getSceneBonus(scene, time, clock) {
+	const occurred = time + 1e-9 >= scene.eventAt;
+	const counts = occurred ? scene.teamFouls.after : scene.teamFouls.before;
+	const quota = scene.action.period > 4 ? 3 : 4;
+	return [counts[1], counts[0]].map((count) => count.total >= quota || (clock <= 120 && count.lastTwo >= 1));
+}
+
 // NBA/WNBA Rules 6 and 9, and Rule 12A, Section V: resolve continuations before animation.
 function continuation(phase, teamId = null, restart = null) {
 	return {

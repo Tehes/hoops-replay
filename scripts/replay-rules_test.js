@@ -1,5 +1,5 @@
 import { compileReplay, getReplayFrame } from "../js/replay-engine.js";
-import { planGameStates } from "../js/replay-rules.js";
+import { getSceneBonus, planGameStates, planTeamFouls } from "../js/replay-rules.js";
 
 function assert(value, message) {
 	if (!value) {
@@ -234,4 +234,69 @@ Deno.test("a standalone steal transfers control at the recorded catch without aw
 	const steal = scenes[1].rules;
 	assert(steal.offense === 1 && steal.play.controlTeam === 1, "stealer controlled the preceding attack");
 	assert(steal.after.controlTeam === 2 && steal.after.restart === null, "steal did not preserve live play");
+});
+
+Deno.test("bonus uses the opponent's exhausted quota, resets each period and survives reverse seeking", () => {
+	for (const league of ["nba", "wnba"]) {
+		const data = scenario([
+			...[1, 2, 3, 4].map(() => ({ actionType: "foul", subType: "personal", teamId: 2 })),
+			...[1, 2, 3, 4].map(() => ({ actionType: "foul", subType: "personal", teamId: 1 })),
+			{ actionType: "period", subType: "end" },
+			{ actionType: "period", subType: "start", period: 2 },
+			...[1, 2, 3].map(() => ({ actionType: "foul", subType: "personal", teamId: 1, period: 5 })),
+			{ actionType: "period", subType: "start", period: 6 },
+		], league);
+		const scenes = data.actions.map((action) => ({ action, kind: action.actionType, clockTo: 480, eventAt: 2 }));
+		planTeamFouls(scenes, data);
+		const bonus = (index, time = 2) => getSceneBonus(scenes[index], time, 480).join(",");
+		assert(bonus(2) === "false,false", "bonus before quota was exhausted");
+		assert(bonus(3, 1.99) === "false,false", "bonus anticipated the fourth foul");
+		assert(bonus(3) === "true,false", "four home fouls must give away bonus");
+		assert(bonus(7) === "true,true", "both teams should have bonus");
+		assert(bonus(8) === "false,false", "bonus remains after period end");
+		assert(bonus(9) === "false,false", "new period retained fouls");
+		assert(bonus(11) === "false,false", "overtime bonus before third foul");
+		assert(bonus(12) === "false,true", "overtime requires only three fouls");
+		assert(bonus(13) === "false,false", "next overtime retained fouls");
+		assert(bonus(3, 1) === "false,false", "reverse seeking retained later fouls");
+	}
+});
+
+Deno.test("bonus counts the first team foul at 2:00 but excludes technical, offensive and double fouls", () => {
+	const data = scenario([
+		...["technical", "offensive", "double personal", "double technical"].map((subType) => ({
+			actionType: "foul", subType, teamId: 2,
+		})),
+		{ actionType: "foul", subType: "personal", teamId: 2 },
+		{ actionType: "foul", subType: "personal", descriptor: "loose ball", teamId: 2 },
+		{ actionType: "foul", subType: "flagrant1", teamId: 1 },
+		{ actionType: "game" },
+	]);
+	const scenes = data.actions.map((action, index) => ({
+		action, kind: action.actionType, clockTo: index < 5 ? 121 : 120, eventAt: 2,
+	}));
+	planTeamFouls(scenes, data);
+	assert(getSceneBonus(scenes[4], 2, 121).join(",") === "false,false", "excluded fouls used quota");
+	assert(getSceneBonus(scenes[5], 1.99, 120).join(",") === "false,false", "late foul anticipated");
+	assert(getSceneBonus(scenes[5], 2, 120).join(",") === "true,false", "2:00 foul did not exhaust late quota");
+	assert(getSceneBonus(scenes[6], 2, 120).join(",") === "true,true", "flagrant did not count as team foul");
+	assert(getSceneBonus(scenes[7], 2, 120).join(",") === "false,false", "bonus remains at game end");
+});
+
+Deno.test("compiled replay changes bonus at the foul anchor and keeps it off through the final scene", () => {
+	const data = scenario([
+		...[1, 2, 3, 4].map(() => ({ ...personal, descriptor: "", clock: "PT03M00S" })),
+		{ actionType: "period", subType: "end", clock: "PT00M00S" },
+		{ actionType: "game", subType: "end", clock: "PT00M00S" },
+	]);
+	const replay = compileReplay(data);
+	const foul = replay.scenes[3];
+	const before = foul.start + foul.eventAt - 0.001;
+	const after = foul.start + foul.eventAt + 0.001;
+	assert(getReplayFrame(replay, before).bonus.join(",") === "false,false", "compiled bonus anticipated foul");
+	assert(getReplayFrame(replay, after).bonus.join(",") === "true,false", "compiled bonus missed foul");
+	const end = replay.scenes.at(-1);
+	assert(getReplayFrame(replay, end.start).bonus.join(",") === "false,false", "final scene restored bonus");
+	assert(getReplayFrame(replay, replay.duration).bonus.join(",") === "false,false", "final retained bonus");
+	assert(getReplayFrame(replay, before).bonus.join(",") === "false,false", "seeking backwards retained bonus");
 });

@@ -5,7 +5,7 @@ import { movePlayers } from "./replay-motion.js";
 import { getPassCost, planPassConnection } from "./replay-passing.js";
 import { getLeague } from "./replay-leagues.js";
 import { getInteriorScore, getMatchupCost, getPlayerRole } from "./replay-profiles.js";
-import { getLaneWaitingPoint, getSceneGameState, isDefensiveLaneCountActive, isInOffensiveLane, planGameStates, scheduleGameStates } from "./replay-rules.js";
+import { getLaneWaitingPoint, getSceneBonus, getSceneGameState, isDefensiveLaneCountActive, isInOffensiveLane, planGameStates, planTeamFouls, scheduleGameStates } from "./replay-rules.js";
 
 const POSITION_ORDER = {
 	PG: 0,
@@ -3224,6 +3224,7 @@ export function compileReplay(data) {
 		scene.liveSeconds = Math.max(0, scene.clockFrom - scene.clockTo);
 	});
 	planGameStates(replay.scenes, data);
+	planTeamFouls(replay.scenes, data);
 	linkRebounds(replay.scenes);
 	planShotClockPressure(replay.scenes);
 	replay.scenes.forEach((scene, index) => {
@@ -3311,6 +3312,7 @@ export function getReplayFrame(replay, time) {
 		period: scene.action.period,
 		clock,
 		shotClock,
+		bonus: getSceneBonus(scene, local, clock),
 		participants: local >= scene.eventAt - 1.5 ? scene.participants : [],
 		markers: replay.markers.filter((marker) => marker.time <= bounded && marker.end > bounded),
 		banner: scene.banner && local > 0.15 ? scene.banner : "",

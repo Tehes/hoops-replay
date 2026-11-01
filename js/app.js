@@ -43,6 +43,9 @@ const awayScore = document.querySelector("#away-score");
 const homeScore = document.querySelector("#home-score");
 const periodEl = document.querySelector("#period");
 const clockEl = document.querySelector("#clock");
+const bonusEl = document.querySelector("#bonus");
+const awayBonus = document.querySelector("#away-bonus");
+const homeBonus = document.querySelector("#home-bonus");
 const timeline = document.querySelector("#timeline");
 const playButton = document.querySelector("#play");
 const playIcon = document.querySelector("#play-icon");
@@ -593,6 +596,9 @@ function render() {
 		? `OT${frame.period - 4}`
 		: `Q${frame.period}`;
 	clockEl.textContent = formatTime(frame.clock);
+	bonusEl.hidden = currentTime === replay.duration || !frame.bonus.some(Boolean);
+	awayBonus.hidden = !frame.bonus[0];
+	homeBonus.hidden = !frame.bonus[1];
 	timeline.value = currentTime;
 	elapsed.value = `${formatTime(currentTime)} / ${formatTime(replay.duration)}`;
 	previousButton.disabled = currentTime === 0;
