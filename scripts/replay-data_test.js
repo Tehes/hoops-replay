@@ -1954,6 +1954,63 @@ Deno.test("schematic circulation has free pass flights, visible catches and the 
 	assert(sequences > 0 && assists > 0 && shotClocks > 0, "missing circulation scenarios");
 });
 
+Deno.test("long finish connections use visible shorter passes while preserving assists, time and seeking", async () => {
+	let connections = 0;
+	let assisted = 0;
+	const leagues = new Set();
+	const directions = new Set();
+	for (const id of ["0022600007", "0022600008", "0022600094", "0022600105", "1042600304", "1022600024"]) {
+		const data = await loadGame(id);
+		const original = JSON.stringify(data);
+		const replay = compileReplay(data);
+		for (const scene of replay.scenes.filter((scene) => scene.connectionPasses)) {
+			const passes = scene.connectionPasses;
+			assert(passes.length === 2 && passes[0].to === passes[1].from, "missing continuous relay");
+			assert(passes.at(-1).to === (scene.action.assistPersonId || scene.action.personId),
+				"connection bypassed the recorded finish participant");
+			assert(passes[1].releaseAt - passes[0].catchAt >= 0.15 - 0.00001, "relay has no visible catch");
+			assert(passes.at(-1).catchAt <= scene.approachAt, "connection overlaps the shot approach");
+			const finishDuration = 2.5 + (scene.driveStart
+				? Math.hypot(scene.driveStart.x - scene.shotPoint.x, scene.driveStart.y - scene.shotPoint.y) / 12 : 0);
+			assert(passes.at(-1).catchAt - (scene.liveAt ?? 0) + finishDuration <= scene.liveSeconds + 0.00001,
+				"relay consumed the time reserved for the finish");
+			const start = getReplayFrame(replay, scene.start + passes[0].releaseAt);
+			const from = start.players.find((player) => player.id === passes[0].from);
+			const to = start.players.find((player) => player.id === passes[1].to);
+			const direct = Math.hypot(to.x - from.x, to.y - from.y);
+			for (const pass of passes) {
+				assert(scene.lineups[scene.attackTeam].includes(pass.from) &&
+					scene.lineups[scene.attackTeam].includes(pass.to), "pass used an inactive player");
+				const release = getReplayFrame(replay, scene.start + pass.releaseAt);
+				const catchFrame = getReplayFrame(replay, scene.start + pass.catchAt);
+				const passer = release.players.find((player) => player.id === pass.from);
+				const receiver = catchFrame.players.find((player) => player.id === pass.to);
+				assert(Math.hypot(receiver.x - passer.x, receiver.y - passer.y) <= direct * 0.8 + 0.00001,
+					"relay did not shorten the individual passes");
+				assert(catchFrame.ball.owner === pass.to &&
+					Math.hypot(catchFrame.ball.x - receiver.x - 1, catchFrame.ball.y - receiver.y - 0.8) < 0.00001,
+					"connection missed its receiver");
+				const time = scene.start + (pass.releaseAt + pass.catchAt) / 2;
+				const flight = getReplayFrame(replay, time);
+				assert(flight.ball.owner === null && flight.ball.z > 0.5, "connection has no free ball flight");
+				getReplayFrame(replay, replay.duration);
+				assert(JSON.stringify(getReplayFrame(replay, time)) === JSON.stringify(flight), "seeking changed the connection");
+			}
+			if (scene.action.assistPersonId) {
+				assert(!passes.some((pass) => pass.to === scene.action.personId), "extra pass changed the recorded assist");
+				assisted++;
+			}
+			directions.add(attackDirection(data, scene.attackTeam, scene.action.period));
+			leagues.add(replay.league.id);
+			connections++;
+		}
+		assert(JSON.stringify(data) === original, "pass connection changed source data");
+		assert(checkReplay(data, replay).errors.length === 0, "pass connection failed replay validation");
+	}
+	assert(connections > 10 && assisted > 0 && directions.size === 2 && leagues.size === 2,
+		"missing long connections, recorded assists or league/direction coverage");
+});
+
 Deno.test("backcourt finishes keep inbound, outlet, circulation and shot approach behind half court", async () => {
 	const source = await loadGame("0022600007");
 	for (const period of [1, 3]) {

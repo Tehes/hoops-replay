@@ -2,6 +2,7 @@
 
 import { animateShot, flyBall, getDriveStart, getShotEntry, getShotStyle, landPlayers } from "./replay-shots.js";
 import { movePlayers } from "./replay-motion.js";
+import { getPassCost, planPassConnection } from "./replay-passing.js";
 import { getLeague } from "./replay-leagues.js";
 import { getInteriorScore, getMatchupCost, getPlayerRole } from "./replay-profiles.js";
 import { getLaneWaitingPoint, getSceneGameState, isDefensiveLaneCountActive, isInOffensiveLane, planGameStates, scheduleGameStates } from "./replay-rules.js";
@@ -1594,14 +1595,20 @@ function circulateBall(state, scene, duration, record) {
 		? owner
 		: null;
 	const defenders = Object.keys(scene.matchups).map((id) => state.positions[id]);
+	const flight = 0.85;
+	const passTimes = (count, step) => {
+		const hold = (duration - count * (flight + 0.02)) / (count + 1);
+		const releaseAt = start + hold + step * (hold + flight + 0.02) + 0.01;
+		return { releaseAt, catchAt: releaseAt + flight };
+	};
 	const candidates = [];
 	for (const passCount of duration >= 10 ? [2, 3] : [2]) {
 		let paths = [[owner]];
 		for (let step = 0; step < passCount; step++) {
 			const nextPaths = [];
 			for (const path of paths) {
-				const at = start + duration * (step + 1) / (passCount + 1);
-				const from = preparationPosition(state, scene, path.at(-1), at);
+				const { releaseAt, catchAt } = passTimes(passCount, step);
+				const from = preparationPosition(state, scene, path.at(-1), releaseAt);
 				const targets = step === passCount - 1 && finish ? [finish] : receivers.slice().sort((a, b) => {
 					const first = state.positions[a];
 					const second = state.positions[b];
@@ -1612,17 +1619,8 @@ function circulateBall(state, scene, duration, record) {
 					if (id === path.at(-1) || (path.includes(id) && !(step === passCount - 1 && id === finish))) {
 						continue;
 					}
-					const to = preparationPosition(state, scene, id, at + 0.7);
-					const dx = to.x - from.x;
-					const dy = to.y - from.y;
-					const length = Math.hypot(dx, dy);
-					if (
-						length < 6 || length > 32 || defenders.some((defender) => {
-							const fraction = ((defender.x - from.x) * dx + (defender.y - from.y) * dy) / length ** 2;
-							return fraction > 0.1 && fraction < 0.9 &&
-								Math.hypot(defender.x - from.x - dx * fraction, defender.y - from.y - dy * fraction) < 2.5;
-						})
-					) {
+					const to = preparationPosition(state, scene, id, catchAt);
+					if (Math.hypot(to.x - from.x, to.y - from.y) > 32 || !Number.isFinite(getPassCost(from, to, defenders))) {
 						continue;
 					}
 					nextPaths.push([...path, id]);
@@ -1633,18 +1631,10 @@ function circulateBall(state, scene, duration, record) {
 		candidates.push(...paths);
 	}
 	const score = (path) => path.slice(1).reduce((cost, id, i) => {
-		const at = start + duration * (i + 1) / path.length;
-		const from = preparationPosition(state, scene, path[i], at);
-		const to = preparationPosition(state, scene, id, at + 0.7);
-		const distance = Math.hypot(to.x - from.x, to.y - from.y);
-		const clearance = Math.min(...defenders.map((defender) => {
-			const u = Math.max(0.1, Math.min(0.9,
-				((defender.x - from.x) * (to.x - from.x) + (defender.y - from.y) * (to.y - from.y)) / distance ** 2));
-			return Math.hypot(defender.x - from.x - (to.x - from.x) * u,
-				defender.y - from.y - (to.y - from.y) * u);
-		}));
-		return cost + distance * 0.04 + Math.max(0, 5 - clearance) ** 2;
-	}, (path.length - 1) * 0.5);
+		const { releaseAt, catchAt } = passTimes(path.length - 1, i);
+		return cost + getPassCost(preparationPosition(state, scene, path[i], releaseAt),
+			preparationPosition(state, scene, id, catchAt), defenders);
+	}, 0);
 	const ranked = candidates.filter((candidate) => new Set(candidate).size >= 3)
 		.map((path) => ({ path, cost: score(path) })).sort((a, b) => a.cost - b.cost);
 	const path = ranked[0]?.path;
@@ -1654,7 +1644,6 @@ function circulateBall(state, scene, duration, record) {
 	scene.preparationChoices = { candidates: ranked.length, cost: ranked[0].cost };
 	const passCount = path.length - 1;
 	// Fixed flight windows make moving catch points predictable before recording frames.
-	const flight = 0.85;
 	const hold = (duration - passCount * (flight + 0.02)) / (passCount + 1);
 	scene.preparationPasses = [];
 	record(hold);
@@ -1675,6 +1664,42 @@ function circulateBall(state, scene, duration, record) {
 		record(hold);
 	}
 	return true;
+}
+
+function connectShot(state, scene, finishDuration, record) {
+	const style = scene.shotStyle;
+	const receiver = scene.action.assistPersonId || scene.action.personId;
+	if (!state.ball.owner || state.ball.owner === receiver || scene.liveSeconds < 6 ||
+		style.tip || style.putback || style.alleyOop || scene.formation.backcourt) {
+		return;
+	}
+	const start = scene.frames.at(-1).time;
+	const available = Math.min(2.4, scene.liveSeconds - (start - (scene.liveAt ?? 0)) - finishDuration);
+	const moving = new Set([scene.arrivalMove?.id, scene.reboundMove?.id, scene.continuationMove?.playerId,
+		...(scene.laneExits ?? []).map((move) => move.id), ...scene.spacingMoves.map((move) => move.id)]);
+	const defenders = Object.keys(scene.matchups).map((id) => state.positions[id]);
+	const receivers = state.lineups[scene.attackTeam].filter((id) => !moving.has(id) &&
+		(receiver === scene.action.personId || id !== scene.action.personId));
+	const plan = planPassConnection(state.ball.owner, receiver,
+		receivers, state.positions, defenders, available);
+	if (!plan || moving.has(receiver)) {
+		return;
+	}
+	scene.connectionPasses = [];
+	for (let i = 0; i < plan.durations.length; i++) {
+		state.ball.dribble = false;
+		record(0.15);
+		const from = state.ball.owner;
+		const to = plan.path[i + 1];
+		const point = state.positions[to];
+		releaseBall(state);
+		record(0.01);
+		const releaseAt = scene.frames.at(-1).time;
+		flyBall(state, record, { x: point.x + 1, y: point.y + 0.8, z: 0.5 }, 0.6, plan.durations[i]);
+		state.ball.owner = to;
+		record(0.01);
+		scene.connectionPasses.push({ from, to, releaseAt, catchAt: scene.frames.at(-1).time });
+	}
 }
 
 function animateLooseBallTurnover(state, scene, foul, direction, record) {
@@ -2615,10 +2640,13 @@ function compileScene(replay, scene, index, state, data) {
 				),
 			};
 		}
+		const finishDuration = 2.5 + (scene.driveStart
+			? Math.hypot(scene.driveStart.x - shot.x, scene.driveStart.y - shot.y) / 12 : 0);
 		if (scene.kind !== "heave" && !scene.shotStyle.tip && !scene.shotStyle.putback) {
-			const driveTime = scene.driveStart
-				? Math.hypot(scene.driveStart.x - shot.x, scene.driveStart.y - shot.y) / 12 : 0;
-			pacePreparation(state, scene, time, 2.5 + driveTime, record, direction);
+			pacePreparation(state, scene, time, finishDuration, record, direction);
+		}
+		if (["2pt", "3pt"].includes(scene.kind)) {
+			connectShot(state, scene, finishDuration, record);
 		}
 		animateShot(state, scene, shot, hoop, direction, record, contacts, matchups);
 		if (action.blockPersonId) {

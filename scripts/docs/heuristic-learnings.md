@@ -81,6 +81,34 @@ nicht alle Fußpositionen, Ausnahmen und szenenübergreifenden Verläufe. Meldun
 Prüfkandidaten, keine bewiesenen Verstöße; ein unmittelbarer kontinuierlicher Auslauf kann eine
 andere Beurteilung erfordern.
 
+## Ballbewegung und lange Pässe
+
+Ball-Reversal kann über mehrere Stationen oder als direkter Skip-Pass erfolgen. Ein langer Pass
+ist besonders nachvollziehbar, wenn er eine offene ballferne Anspielstation schnell erreicht;
+ein dazwischen stehender Mitspieler allein macht ihn nicht falsch. Bei ausgeglichenen Optionen
+kann das Weiterpassen über geeignete freie Stationen plausibler wirken. Passlinien, Abstände,
+Empfangssituation und verfügbares Zeitbudget müssen gemeinsam betrachtet werden; statische
+Positionen belegen weder eine sichere Passlinie noch einen tatsächlichen Vorteil. Ein pauschales
+Verbot langer Pässe oder eine Pflicht zur nächsten Station wäre deshalb nicht begründet.
+
+Grundlagen: [WABC Coaches Manual, Ball Reversal](https://assets.fiba.basketball/image/upload/documents-corporate-wabc-coaches-manual-eng.pdf),
+Glossar 3.2, [WABC Level 1, Team 2.1.4](https://assets.fiba.basketball/image/upload/documents-corporate-wabc-coaching-level-manuals-level-1-eng.pdf)
+und [USA Basketball, Passing](https://www.usab.com/news/2014/01/6-tips-to-polish-your-teams-passing).
+
+Die vorbereitende Ballzirkulation allein deckt lange Zuspiele nicht ab: Auch der Anschluss an
+den Abschluss muss betrachtet werden. Ein unbelegtes direktes Zuspiel kann bei ausreichender
+Zeit über eine geeignete Zwischenstation laufen; bei belegtem Assist muss diese Verbindung
+zuerst den Assistgeber erreichen. Eine zusätzliche Station zwischen ihm und dem Schützen
+würde die belegte Beteiligung verfälschen. Laufende Abschluss-, Rebound- und Freilaufaufträge
+dürfen nicht zugunsten einer zusätzlichen Anspielstation unterbrochen werden.
+
+Nur die Gesamtlänge aller Pässe zu minimieren bevorzugt die direkte Abkürzung. Die Länge der
+einzelnen Pässe und der Raum beim Empfang ergänzen die Bewertung freier Korridore. Ein klar
+freier ballferner Empfänger kann den direkten Seitenwechsel rechtfertigen. Flug und Fang
+brauchen eigene Zeit; reicht die Reserve vor dem Abschluss nicht, entfällt die Zwischenstation.
+Die verwendeten Abstände und Gewichte sind eigene Heuristiken. Statische Verteidigerabstände
+beweisen keinen sicheren Flug gegen bewegte Verteidiger; die visuelle Nutzerabnahme steht aus.
+
 ## Freilaufen nach einem Pass
 
 Kurze diagonale Vorwärtswege können die bisher überwiegend seitlichen oder rückwärtigen Optionen
