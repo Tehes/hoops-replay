@@ -177,6 +177,12 @@ und belegten Ereignissen.
   Rollen helfen bei der Verteilung; aufgezeichnete Beteiligung und Außenwürfe haben Vorrang.
 - Pässe treffen erreichbare Empfänger. Mitspieler schaffen Raum für Drives und Passlinien;
   freie Spieler müssen nicht nach jedem Pass weiterlaufen.
+- Ein ergänzter Einwurf am angegriffenen Korb bietet bei anschließendem Aufbau eine äußere
+  Anspielstation an, statt ohne Anlass eine freie Korbchance mit anschließendem Rückpass zu erzeugen.
+  Ein tiefer Fang muss zum direkten Abschluss oder zu erkennbarem Verteidigungsdruck und einer
+  plausiblen Anschlussentscheidung passen. Hilfe im Post kann Pässe zurück an den Perimeter
+  erklären; diese sind nicht auf die Corner beschränkt. Einwurfort und Fangpunkt bleiben ohne
+  Ortsbelege Annahmen, kein Nachweis einer tatsächlich gespielten Einwurfvariante.
 - Defensive Zuordnungen, Ballorientierung, Korbschutz, Hilfe und Rückkehr werden gemeinsam geplant.
   Die Defense kopiert nicht nur den Lauf ihres Gegenspielers mit konstantem Abstand.
 - Der bekannte Ausgang darf plausible Vorteile von Angriff und Verteidigung unterschiedlich gewichten.

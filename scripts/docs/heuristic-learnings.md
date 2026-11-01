@@ -124,6 +124,29 @@ andere Beurteilung erfordern.
 
 ## Ballbewegung und lange Pässe
 
+### Einwurffang und anschließender Aufbau
+
+Den Empfänger pauschal knapp innerhalb der nächsten Feldgrenze zu platzieren, erzeugt bei
+angenommenen Ausbällen an der offensiven Baseline tiefe Fänge mit anschließendem Rückweg nach
+außen. Die Ursache liegt dann bereits im Einwurf, nicht in der späteren Passauswahl. Zusätzliche
+Korbschützer nur zur nachträglichen Rechtfertigung dieses Rückwegs wären keine belegte Lösung.
+
+Eine äußere Sicherheitsstation kann anhand von Passlinie, Empfangsraum, Mitspielerabstand und
+Anschlussweg gewählt werden. Kurze direkte Abschlüsse des Empfängers bleiben möglich; ein
+aufgezeichneter späterer Innenabschluss beweist dagegen keinen tiefen Einwurffang. Gibt es unter
+den geprüften Stationen keinen geeigneten Kandidaten, wird keine sichere Option behauptet;
+die bisherige Einwurfplanung bleibt dann bestehen. Eine vollständige gemeinsame Planung von
+Freilaufen, Passverteidigung und Druck beim Innenfang bleibt offen.
+
+Grundlagen: WABC Level 3, Team 2.5.1, S. 223 und 226 (Baseline Out of Bounds, Safety Catch),
+und Level 2, Team 1.1.2, S. 228 (Hilfe im Low Post und Rückpass an den Perimeter).
+Ein Corner-Zwang ist daraus nicht abzuleiten. Fangabstände und Auswahlgewichte sind eigene
+Heuristiken; statische Korridore beweisen keine sichere Anspielbarkeit gegen bewegte Verteidiger.
+Der Vergleich verwendet identische Eingaben für Ausgangsstand und Kandidat; die visuelle
+Nutzerabnahme steht aus. Details stehen im [Iterationsbericht](inbound-reception-iteration.md).
+
+### Ball-Reversal und Anschluss an den Abschluss
+
 Ball-Reversal kann über mehrere Stationen oder als direkter Skip-Pass erfolgen. Ein langer Pass
 ist besonders nachvollziehbar, wenn er eine offene ballferne Anspielstation schnell erreicht;
 ein dazwischen stehender Mitspieler allein macht ihn nicht falsch. Bei ausgeglichenen Optionen

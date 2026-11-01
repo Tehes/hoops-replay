@@ -23,6 +23,26 @@ export function getPassCost(from, to, defenders) {
 		Math.max(0, 5 - clearance) ** 2 + Math.max(0, 5 - receivingSpace) ** 2 * 0.2;
 }
 
+export function planInboundReception(from, buildupTarget, defenders, teammates, direction) {
+	const hoopX = direction === 1 ? 88.75 : 5.25;
+	const candidates = [buildupTarget, ...[[76, 10], [76, 40], [65, 18], [65, 32], [85, 5], [85, 45]]
+		.map(([x, y]) => ({ x: direction === 1 ? x : 94 - x, y }))];
+	let best = null;
+	for (const point of candidates) {
+		// A schematic safety catch must not manufacture a rim chance that the next action discards.
+		if (Math.hypot(point.x - hoopX, point.y - 25) < 12 ||
+			teammates.some((other) => Math.hypot(other.x - point.x, other.y - point.y) < 4)) {
+			continue;
+		}
+		const cost = getPassCost(from, point, defenders) +
+			Math.hypot(point.x - buildupTarget.x, point.y - buildupTarget.y) * 0.06;
+		if (Number.isFinite(cost) && (!best || cost < best.cost)) {
+			best = { point, cost };
+		}
+	}
+	return best;
+}
+
 export function planPassConnection(fromId, toId, receivers, positions, defenders, available) {
 	const from = positions[fromId];
 	const to = positions[toId];

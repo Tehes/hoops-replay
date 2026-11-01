@@ -1,4 +1,4 @@
-import { planPassConnection } from "../js/replay-passing.js";
+import { getPassCost, planInboundReception, planPassConnection } from "../js/replay-passing.js";
 
 function assert(value, message) {
 	if (!value) {
@@ -63,4 +63,36 @@ Deno.test("pass selection is deterministic and preserves its positional inputs",
 		"identical pass decisions changed",
 	);
 	assert(JSON.stringify({ positions, defenders }) === input, "pass selection moved players");
+});
+
+Deno.test("frontcourt safety catches avoid the rim, covered lanes and occupied receiving spots", () => {
+	for (const direction of [1, -1]) {
+		const point = (x, y) => ({ x: direction === 1 ? x : 94 - x, y });
+		const from = point(95.5, 25);
+		const target = point(62, 25);
+		const defenders = [point(87, 25), point(80, 10)];
+		const teammates = [point(85, 45)];
+		const input = JSON.stringify({ from, target, defenders, teammates });
+		const plan = planInboundReception(from, target, defenders, teammates, direction);
+		assert(plan, "no safety catch offered despite free outside options");
+		assert(Math.hypot(plan.point.x - point(88.75, 25).x, plan.point.y - 25) >= 12,
+			"a safety catch created an unnecessary rim entry");
+		assert(Number.isFinite(getPassCost(from, plan.point, defenders)), "inbound crossed a covered pass lane");
+		assert(teammates.every((other) => Math.hypot(other.x - plan.point.x, other.y - plan.point.y) >= 4),
+			"receiver crowded a teammate");
+		assert(JSON.stringify(planInboundReception(from, target, defenders, teammates, direction)) === JSON.stringify(plan),
+			"safety catch selection was not deterministic");
+		assert(JSON.stringify({ from, target, defenders, teammates }) === input, "selection changed its inputs");
+	}
+});
+
+Deno.test("safety catches can retain a useful formation target and decline fully denied options", () => {
+	const from = { x: 95.5, y: 25 };
+	const target = { x: 76, y: 10 };
+	const plan = planInboundReception(from, target, [], [], 1);
+	assert(plan?.point === target, "a useful formation target was unnecessarily replaced");
+	const occupied = [target, ...[[76, 40], [65, 18], [65, 32], [85, 5], [85, 45]]
+		.map(([x, y]) => ({ x, y }))];
+	assert(planInboundReception(from, target, [], occupied, 1) === null,
+		"selection claimed a free safety catch when every option was occupied");
 });

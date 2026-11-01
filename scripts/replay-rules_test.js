@@ -97,6 +97,39 @@ Deno.test("team rebounds connect a schematic out ball to the same inbound spot",
 	}
 });
 
+Deno.test("frontcourt inbounds offer an outside safety catch without changing recorded shots or immediate finishes", () => {
+	for (const league of ["nba", "wnba"]) {
+		for (const side of ["left", "right"]) {
+			for (const immediate of [false, true]) {
+				const x = side === "right" ? 94 : 6;
+				const data = scenario([
+					{ ...basket, side, x, shotResult: "Missed" },
+					{ actionType: "rebound", subType: "offensive", teamId: 1,
+						qualifiers: ["team"], shotActionNumber: 1 },
+					{ ...basket, side, x: immediate ? x : 60, personId: immediate ? 1 : 2,
+						actionType: immediate ? "2pt" : "3pt", clock: immediate ? "PT07M58S" : "PT07M48S" },
+				], league);
+				const original = JSON.stringify(data);
+				const replay = compileReplay(data);
+				const scene = replay.scenes[2];
+				const frame = getReplayFrame(replay, scene.start + scene.liveAt);
+				const receiver = frame.players.find((player) => player.id === frame.ball.owner);
+				const distance = Math.hypot(receiver.x - scene.hoop.x, receiver.y - 25);
+				assert(immediate ? distance < 8 && !scene.inboundReception : distance >= 12 && scene.inboundReception,
+					"inbound ignored the distinction between a safety catch and an immediate recorded finish");
+				assert(Number.isFinite(scene.releaseAt) && scene.action.personId === (immediate ? 1 : 2) &&
+					scene.shotPoint.x === data.actions[2].x * 0.94 && scene.shotPoint.y === data.actions[2].y * 0.5,
+					"inbound changed the recorded shooter or removed the shot");
+				const sample = JSON.stringify(frame);
+				getReplayFrame(replay, replay.duration);
+				assert(JSON.stringify(getReplayFrame(replay, scene.start + scene.liveAt)) === sample,
+					"seeking changed the inbound catch");
+				assert(JSON.stringify(data) === original, "inbound planning changed source events");
+			}
+		}
+	}
+});
+
 Deno.test("team rebound assumptions exclude catches, dead balls and recorded interruptions", () => {
 	for (const variant of ["player", "deadball", "foul", "period", "freethrow"]) {
 		const rebound = { actionType: "rebound", subType: "offensive", teamId: 1,

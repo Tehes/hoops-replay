@@ -2,7 +2,7 @@
 
 import { animateShot, flyBall, getDriveStart, getShotEntry, getShotStyle, landPlayers } from "./replay-shots.js";
 import { movePlayers } from "./replay-motion.js";
-import { getPassCost, planPassConnection } from "./replay-passing.js";
+import { getPassCost, planInboundReception, planPassConnection } from "./replay-passing.js";
 import { getLeague } from "./replay-leagues.js";
 import { getInteriorScore, getMatchupCost, getPlayerRole } from "./replay-profiles.js";
 import { getLaneWaitingPoint, getSceneBonus, getSceneGameState, isDefensiveLaneCountActive, isInOffensiveLane, planGameStates, planTeamFouls, scheduleGameStates } from "./replay-rules.js";
@@ -1441,6 +1441,19 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 				? { x: Math.max(8, Math.min(86, inboundPoint.x)), y: Math.max(8, Math.min(42, inboundPoint.y)) }
 				: restart === "baseline" ? { x: direction === 1 ? 15 : 79, y: 28 } : { x: inboundPoint.x, y: 40 },
 		);
+		const directFinish = scene.kind === "2pt" && scene.action.personId === pg &&
+			!scene.action.assistPersonId && scene.liveSeconds <= 3 &&
+			Math.hypot(scene.shotPoint.x - scene.hoop.x, scene.shotPoint.y - 25) <= 8;
+		if (scene.assumedInbound && !scene.formation.backcourt && !directFinish &&
+			(direction === 1 ? inboundPoint.x : 94 - inboundPoint.x) > 75) {
+			const defenders = Object.keys(matchups).map((id) => state.positions[id]);
+			const teammates = lineup.filter((id) => id !== pg && id !== inbounder).map((id) => state.positions[id]);
+			const reception = planInboundReception(inboundPoint, targets[pg], defenders, teammates, direction);
+			if (reception) {
+				Object.assign(state.positions[pg], reception.point);
+				scene.inboundReception = { receiverId: pg, ...reception, reason: "perimeter-safety" };
+			}
+		}
 		state.ball.owner = inbounder;
 		record(0.85);
 		scene.inboundAt = scene.frames.at(-1).time;
