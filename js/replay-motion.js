@@ -50,7 +50,9 @@ function planRoutes(scene, index) {
 	const from = frames[index];
 	const to = frames[index + 1];
 	const duration = to.time - from.time;
-	const transition = scene.transitionRuns?.some((run) => from.time >= run.start - 1e-8 && to.time <= run.end + 1e-8);
+	const transition = scene.transitionRuns?.some((run) => from.time >= run.start - 1e-8 && to.time <= run.end + 1e-8) ||
+		(scene.transitionPlan && from.time >= scene.transitionPlan.startAt - 1e-8 &&
+			to.time <= scene.transitionPlan.endAt + 1e-8);
 	const priority = new Set([scene.action.personId, scene.action.assistPersonId, from.ball.owner, to.ball.owner]);
 	const routes = from.players.map((player, i) => {
 		const end = to.players[i];

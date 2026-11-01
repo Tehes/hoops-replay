@@ -62,7 +62,7 @@ export function getDriveStart(scene, shot, hoop, direction) {
 	const style = scene.shotStyle;
 	const guard = (scene.shooterRole ?? getPlayerRole({ position: scene.shooterPosition ?? "" })).perimeter >= 0.6;
 	const rimFinish = style.family === "layup" || style.family === "dunk";
-	if (!guard || scene.immediateReboundFinish || style.tip || style.putback || style.cutting || style.alleyOop ||
+	if (scene.transitionPlan || !guard || scene.immediateReboundFinish || style.tip || style.putback || style.cutting || style.alleyOop ||
 		style.stepBack || style.fadeaway || style.family === "heave" ||
 		(!style.driving && !(rimFinish && !scene.action.assistPersonId)) ||
 		Math.hypot(shot.x - hoop.x, shot.y - hoop.y) > 18) {
@@ -135,6 +135,36 @@ export function animateShot(state, scene, shot, hoop, direction, record, contact
 		state.ball.owner = action.personId;
 		state.ball.dribble = false;
 		record(style.tip ? 0.18 : 0.3);
+	} else if (scene.transitionPlan && !style.alleyOop && !style.reverse && !style.stepBack &&
+		!style.fadeaway && !style.turnaround) {
+		const start = { ...shooter };
+		if (state.ball.owner !== action.personId) {
+			const passer = state.positions[state.ball.owner];
+			const catchPoint = { x: start.x + (shot.x - start.x) * 0.35,
+				y: start.y + (shot.y - start.y) * 0.35 };
+			state.ball.dribble = false;
+			scene.shotPassAt = scene.frames.at(-1).time;
+			scene.shotPassInFlight = true;
+			flyBall(state, record, { x: catchPoint.x + 1, y: catchPoint.y + 0.8, z: 0.5 }, 0.6,
+				Math.max(0.3, Math.hypot(catchPoint.x - passer.x, catchPoint.y - passer.y) / 45), 0, (fraction) => {
+					shooter.x = start.x + (catchPoint.x - start.x) * fraction;
+					shooter.y = start.y + (catchPoint.y - start.y) * fraction;
+				});
+			scene.shotPassInFlight = false;
+			state.ball.owner = action.personId;
+			state.ball.flight = false;
+			record(0.01);
+			scene.catchAt = scene.frames.at(-1).time;
+		}
+		const from = { ...shooter };
+		const duration = Math.max(0.15, Math.hypot(shot.x - from.x, shot.y - from.y) / 14);
+		const steps = Math.ceil(duration / 0.1);
+		state.ball.dribble = !style.cutting;
+		for (let step = 1; step <= steps; step++) {
+			shooter.x = from.x + (shot.x - from.x) * step / steps;
+			shooter.y = from.y + (shot.y - from.y) * step / steps;
+			record(duration / steps);
+		}
 	} else if (style.alleyOop) {
 		const passer = action.assistPersonId || state.lineups[action.teamId].find((id) => id !== action.personId);
 		state.ball.owner = passer;

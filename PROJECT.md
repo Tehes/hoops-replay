@@ -173,6 +173,18 @@ und belegten Ereignissen.
 
 - Herkunft des Ballbesitzes und Unterbrechungen bestimmen, ob Transition, zweite Chance oder
   geordneter Aufbau plausibel ist.
+- Ein ausdrücklicher Fastbreak-Qualifier belegt den Kontext des markierten Ereignisses, nicht
+  bestimmte Laufwege oder eine Überzahl. Die zusammenhängende Folge seit dem Ballgewinn
+  beziehungsweise Einwurf bestimmt den Anlauf; Unterbrechungen dürfen nicht übergangen werden.
+  Ohne ausdrückliche Markierung können ein kontrollierter Live-Ballgewinn, ein kurzer zeitlicher
+  Abstand und ein räumlicher Vorteil gemeinsam eine schematische Transition begründen.
+  Ein fehlender Qualifier beweist nicht, dass kein Fastbreak stattfand.
+- In der Transition laufen Mitspieler früh in breite Bahnen und bieten sich vor dem Ball an.
+  Der Ballgewinner kann selbst vortragen; ein offener, erreichbarer Vorauspass ist eine Alternative,
+  keine Pflichtübergabe an eine feste Aufstellungsrolle. Aufgezeichnete Assists bleiben verbindlich.
+  Die Defense schützt zuerst Korb und Ballweg und übernimmt erreichbare Gegenspieler, statt vor dem
+  Abschluss zwangsweise vollständig zugeordnet zu sein. Der Angriff muss keine Halbfeldformation
+  erreichen, bevor er abschließt; auch Dreier und Fehlwürfe können einen Fastbreak beenden.
 - Abschlussorte werden rechtzeitig erreicht, ohne den nächsten Schützen dauerhaft dort abzustellen.
   Rollen helfen bei der Verteilung; aufgezeichnete Beteiligung und Außenwürfe haben Vorrang.
 - Pässe treffen erreichbare Empfänger. Mitspieler schaffen Raum für Drives und Passlinien;
@@ -245,8 +257,11 @@ Als Vorbild dient der Verbesserungsprozess der
 [Poker-Bots](https://github.com/Tehes/poker/blob/master/scripts/docs/bot-tuning-playbook.md):
 Literatur beziehungsweise Regelgrundlage, konkrete Hypothese, fokussierte Änderung,
 Vergleich gegen einen akzeptierten Stand und nachvollziehbares Learning.
-Ein allgemeines Modell für eine gemeinsame Ursache hat Vorrang vor Ausnahmen für einzelne
-Spieler, Spiele oder Szenen.
+Einzelne Spiele dürfen keinen eigenen Code und keine speziell auf sie zugeschnittenen Ausnahmen
+erhalten, auch nicht indirekt über bestimmte Spieler oder Ereignisse. Jede Regel muss eine
+allgemeine Basketballsituation oder einen anhand der Daten belegbaren Feedfehler behandeln und
+unabhängig vom konkreten Spiel anwendbar sein. Einzelne Spiele und Szenen dienen als Prüf- und
+Regressionstestfälle, nicht als Bedingungen für ein abweichendes Modellverhalten.
 
 ### Spielauswahl und Vergleichsdaten
 

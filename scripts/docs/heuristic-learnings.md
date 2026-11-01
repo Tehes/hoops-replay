@@ -64,6 +64,44 @@ Grundlage: [NBA Video Rulebook, Rebound](https://videorulebook.nba.com/rule/rebo
 insbesondere „Team Rebound, no individual rebound as ball goes out of bounds“.
 Die Statistikzuordnung macht diesen Ablauf plausibel, beweist ihn aber nicht für eine einzelne Szene.
 
+## Fastbreak und geordneter Aufbau
+
+Ein schnellerer Vorlauf in dieselbe Halbfeldformation genügt nicht als Fastbreak: Wenn die
+Verteidiger vor dem Abschluss stets ihre Zuordnungen erreichen und der Ballgewinner zunächst an
+einen festen Guard-Slot abgeben muss, verschwindet der mögliche Vorteil des Ballgewinns.
+Dieser Ablauf ist als allgemeine Transition-Lösung ungeeignet. Startpositionen und kontrollierter
+Ballbesitz müssen erhalten bleiben; Läufer bieten sich früh in breiten Bahnen an, während die
+Defense Korb und Ballweg absichert. Ein offener Vorauspass und eigenes Vortragen sind Alternativen.
+Nachlaufende Spieler brauchen getrennte Räume, sonst entstehen bereits vor einem folgenden
+Offensivrebound überlagerte Ausgangspositionen. Bei einem frühen Außenwurf kann ein geeigneter
+Mitspieler korbnah unterstützen, während der belegte Passgeber anspielbar bleibt.
+Nach einem Gegenangriff können die beibehaltenen Positionen einen bisher freien direkten
+Rebound-Vorbereitungsweg versperren. Ein einzelner auf freie Korridore geprüfter Außenweg kann
+diesen Anschluss erhalten, ohne einen Mitspieler zu versetzen oder die Laufgeschwindigkeit zu erhöhen.
+
+Der Feed liefert mit `fastbreak` einen ausdrücklichen Kontext auch für Dreier und Fehlwürfe.
+`fromturnover`, ein Running-Abschluss oder eine kurze Zeitspanne allein reichen nicht aus.
+Ohne Markierung ist die Kombination aus kontrolliertem Live-Ballgewinn, kurzem Zeitfenster,
+passendem Abschluss und räumlichem Vorteil eine vorsichtige eigene Heuristik. Maßgeblich ist der
+Abstand zum Besitzbeginn, nicht nur zum unmittelbar vorangehenden Annotationseintrag.
+Dead-Ball-Turnover, Teamrebound-Einwürfe, Unterbrechungen und zweite Chancen dürfen dadurch keinen
+Live-Gegenangriff erhalten. Ein ausdrücklich markierter Fastbreak nach einem Treffer benötigt
+weiterhin den regulären Einwurf. Freiwerfeinträge mit Fastbreak-Markierung allein begründen keinen
+neuen Gegenangriff nach dem Pfiff. Fastbreaks mit einem Foul oder Ballverlust als Endereignis sind
+damit noch nicht vollständig choreografiert.
+
+Pässe benötigen sichtbare freie Ballphasen und erreichbare Fänge; ein Assist darf auch beim
+Running-Abschluss keinen unmittelbaren Wechsel des Ballhalters erzeugen. Zusätzliche Zirkulation,
+Halbfeld-Wartephasen und ein vorsorglicher langer Reboundaufbau dürfen den frühen Abschluss nicht
+wieder verzögern. Tests für Halbfeldaufbau und feste Matchups benötigen deshalb eine ausdrückliche
+Abgrenzung zur Transition; Ballkontinuität, Ereignisanker und Bewegungsgrenzen gelten weiterhin.
+Automatische Prüfungen belegen keine visuelle Nutzerabnahme oder tatsächlichen Laufwege.
+
+Grundlage: [WABC Level 1](https://assets.fiba.basketball/image/upload/documents-corporate-wabc-coaching-level-manuals-level-1-eng.pdf),
+Team 2.3.1–2.3.3 (Starting the Break, Running Wide Lanes, Pass the Ball Ahead) und Team 1.1.11
+(Transition Defence); [NBA Game Distribution API](https://developer.geniussports.com/nbangss/rest/index_central.html),
+Play by Play Action Types, Qualifiers für `2pt`, `3pt` und `freethrow`.
+
 ## Outlet nach kontrolliertem Defensivrebound
 
 Eine immer zentral platzierte erste Anspielstation verdeckt den Outlet-Pass und die Bewegung beim
