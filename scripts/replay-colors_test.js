@@ -17,6 +17,25 @@ function contrast(first, second) {
 	return (values[0] + 0.05) / (values[1] + 0.05);
 }
 
+Deno.test("LockerVision preserves jersey bases and derives readable details independently of website text", () => {
+	for (
+		const [code, league, shirt, ink, expectedInk] of [
+			["BOS", "nba", "#ffffff", "#000000", TEAM_COLORS.BOS.shirt],
+			["NYK", "nba", "#ffffff", "#000000", TEAM_COLORS.NYK.alternate],
+			["DEN", "nba", "#0a2240", "#ffffff", "#ffffff"],
+			["GSV", "wnba", "#b896d4", "#ffffff", "#000000"],
+			["NYL", "wnba", "#000000", "#ffffff", WNBA_TEAM_COLORS.NYL.shirt],
+		]
+	) {
+		const home = { code, league, home: true };
+		const away = { code: "ATL", league, home: false };
+		const jersey = getJerseyColors(home, away, { shirt, ink });
+		assert(jersey.shirt === shirt, "readability adjustments must never change the supplied jersey base");
+		assert(jersey.ink === expectedInk && jersey.trim === expectedInk, "number and outline must share readable ink");
+		assert(contrast(jersey.shirt, jersey.ink) >= 4, "numbers must retain the existing 4:1 readability minimum");
+	}
+});
+
 Deno.test("distinct primaries keep home white and away primary even with low graphic contrast", () => {
 	for (const [homeCode, awayCode] of [["OKC", "DEN"], ["BOS", "PHI"], ["LAL", "DAL"]]) {
 		const home = { code: homeCode, home: true };

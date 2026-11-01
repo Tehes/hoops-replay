@@ -54,7 +54,7 @@ function getNeutralColor(background) {
 	return getColorContrast("#ffffff", background) >= getColorContrast("#000000", background) ? "#ffffff" : "#000000";
 }
 
-function createJerseyColors(shirt, colors) {
+export function createJerseyColors(shirt, colors) {
 	let detail = getNeutralColor(shirt);
 	const teamColors = [colors.shirt, colors.alternate].filter(Boolean);
 	if (shirt === "#ffffff" || shirt === "#000000") {

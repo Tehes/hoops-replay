@@ -1,4 +1,4 @@
-import { selectMatchupJerseys } from "./replay-colors.js";
+import { createJerseyColors, selectMatchupJerseys } from "./replay-colors.js";
 
 // Replay alternates follow the schedule palette; adjust visually per matchup (see PROJECT.md).
 // Primary colors and logos: Tehes/nba-spielplan, commit 610e3d6.
@@ -116,7 +116,11 @@ export function getTeamLogo(team) {
 	return `./img/${team.league === "wnba" ? "WNBA" : "NBA"}/${team.code}.svg`;
 }
 
-export function getJerseyColors(team, opponent) {
+export function getJerseyColors(team, opponent, uniform = null) {
+	if (uniform) {
+		// LockerVision's text color styles website labels, not the jersey's numbers or trim.
+		return createJerseyColors(uniform.shirt, getTeamColors(team));
+	}
 	const colors = getTeamColors(team);
 	const other = getTeamColors(opponent);
 	const jerseys = team.home ? selectMatchupJerseys(colors, other) : selectMatchupJerseys(other, colors);

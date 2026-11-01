@@ -221,6 +221,33 @@ export async function loadRecentGameIds() {
 	return ids;
 }
 
+export async function loadGameUniforms(game, fetchResponse = fetch) {
+	try {
+		const query = game.league === "wnba" ? "?league=wnba" : "";
+		const response = await fetchResponse(`${API_BASE}/uniforms/${game.gameId}${query}`);
+		if (response.status === 204) {
+			return null;
+		}
+		if (!response.ok) {
+			throw new Error(`HTTP ${response.status}`);
+		}
+		const uniforms = await response.json();
+		if (uniforms?.gameId !== game.gameId || uniforms.league !== game.league || uniforms.source !== "lockervision") {
+			throw new Error("Uniforms do not match the requested game or league.");
+		}
+		for (const team of game.teams) {
+			const uniform = uniforms[team.home ? "home" : "away"];
+			if (uniform?.teamId !== team.id || !/^#[\da-f]{6}$/i.test(uniform.shirt)) {
+				throw new Error("Uniforms contain mismatched teams or invalid colors.");
+			}
+		}
+		return uniforms;
+	} catch (error) {
+		console.warn(`LockerVision ${game.gameId} unavailable; using replay team colors:`, error);
+		return null;
+	}
+}
+
 export async function loadReplayData(gameId) {
 	const league = getLeague(gameId).id;
 	const query = league === "wnba" ? "?league=wnba" : "";

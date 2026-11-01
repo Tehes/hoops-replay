@@ -46,6 +46,9 @@ pass sequence or play that actually happened.
 
 - **NBA and WNBA games** with league-specific teams, court markings and period lengths.
 - **Both teams on a full court**, represented by numbered jerseys in team colors.
+- **The game's jersey colors**, using [NBA LockerVision](https://lockervision.nba.com/) and
+  [WNBA LockerVision](https://lockervision.wnba.com/) when available, with team colors as a fallback.
+  Numbers and outlines remain schematic.
 - **The recorded game story:** score, clock, player photos and original play-by-play descriptions.
 - **Different finishes**, including distinct movements and ball flights for dunks, layups and jump shots.
 - **Shot results on the court:** green dots for makes and red crosses for misses.
@@ -104,6 +107,7 @@ all endpoints also accept `?league=wnba`. Profile seasons use `YYYY-YY` for NBA 
 | `/schedule` | League schedule | Optional `region=de` (default) or `region=us` for broadcast labels. |
 | `/boxscore/:gameId` | Teams, players, starting lineups and game statistics | Ten-digit Game ID. |
 | `/playbyplay/:gameId` | Recorded events, scores, game clocks and available shot coordinates | Ten-digit Game ID. |
+| `/uniforms/:gameId` | LockerVision editions and colors for both teams | Ten-digit Game ID matching the selected league. |
 | `/roster/:teamId` | League roster with player IDs, positions, heights and available weights | Required `season`. |
 | `/players/:teamId` | Per-game player statistics, including shooting, assists and rebounds | Required `season`; optional `seasonType=Regular Season` (default), `Playoffs` or `Pre Season`. |
 

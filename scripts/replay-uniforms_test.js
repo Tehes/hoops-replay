@@ -1,4 +1,6 @@
 import { loadLockerVisionUniforms } from "../api/main.js";
+import { loadGameUniforms } from "../js/replay-data.js";
+import { getJerseyColors } from "../js/replay-teams.js";
 
 // Color fields from the NBA and WNBA LockerVision detail responses; unrelated content omitted.
 const NBA_GAME = {
@@ -31,6 +33,90 @@ const WNBA_GAME = {
 		text_Color: "#000000",
 	},
 };
+
+Deno.test("frontend matches LockerVision by game, league and both team identities before selecting colors", async () => {
+	for (const [league, data, codes] of [["nba", NBA_GAME, ["DEN", "NOP"]], ["wnba", WNBA_GAME, ["NYL", "CON"]]]) {
+		const game = {
+			gameId: data.gameId,
+			league,
+			teams: [
+				{ id: data.awayTeamUniform.teamId, code: codes[1], home: false, league },
+				{ id: data.homeTeamUniform.teamId, code: codes[0], home: true, league },
+			],
+		};
+		const payload = await loadLockerVisionUniforms(data.gameId, league, () => Promise.resolve(Response.json(data)));
+		const uniforms = await loadGameUniforms(game, (url) => {
+			const expected = `https://hoops-replay.tehes.deno.net/uniforms/${data.gameId}${
+				league === "wnba" ? "?league=wnba" : ""
+			}`;
+			if (url !== expected) {
+				throw new Error(`Wrong frontend uniform URL: ${url}`);
+			}
+			return Promise.resolve(Response.json(payload));
+		});
+		if (!uniforms) {
+			throw new Error("Available, matching uniforms were rejected");
+		}
+		for (const [index, team] of game.teams.entries()) {
+			const uniform = uniforms[team.home ? "home" : "away"];
+			const jersey = getJerseyColors(team, game.teams[1 - index], uniform);
+			if (jersey.shirt !== uniform.shirt || jersey.trim !== jersey.ink) {
+				throw new Error("LockerVision colors were replaced by schematic matchup colors");
+			}
+		}
+	}
+});
+
+Deno.test("frontend preserves both existing jerseys on absent, failed, partial or mismatched LockerVision data", async () => {
+	const game = {
+		gameId: NBA_GAME.gameId,
+		league: "nba",
+		teams: [
+			{ id: 1610612740, code: "NOP", home: false },
+			{ id: 1610612743, code: "DEN", home: true },
+		],
+	};
+	const valid = await loadLockerVisionUniforms(game.gameId, "nba", () => Promise.resolve(Response.json(NBA_GAME)));
+	const invalid = [
+		{ ...valid, gameId: "0022500110" },
+		{ ...valid, league: "wnba" },
+		{ ...valid, source: "other" },
+		{ ...valid, home: valid.away, away: valid.home },
+		{ ...valid, away: null },
+		{ ...valid, away: { ...valid.away, shirt: "#fff" } },
+		null,
+	];
+	const fetchers = [
+		() => Promise.resolve(new Response(null, { status: 204 })),
+		() => Promise.resolve(new Response("Unavailable", { status: 502 })),
+		() => Promise.resolve(new Response("not JSON")),
+		() => Promise.reject(new Error("Connection failed")),
+		...invalid.map((body) => () => Promise.resolve(Response.json(body))),
+	];
+	const warn = console.warn;
+	let warnings = 0;
+	console.warn = () => warnings++;
+	try {
+		for (const fetchResponse of fetchers) {
+			const uniforms = await loadGameUniforms(game, fetchResponse);
+			if (uniforms !== null) {
+				throw new Error("Unavailable or mismatched uniforms must reject the whole pair");
+			}
+			for (const [index, team] of game.teams.entries()) {
+				const opponent = game.teams[1 - index];
+				const actual = getJerseyColors(team, opponent, uniforms?.[team.home ? "home" : "away"]);
+				if (JSON.stringify(actual) !== JSON.stringify(getJerseyColors(team, opponent))) {
+					throw new Error("Optional uniform failure changed the existing fallback palette");
+				}
+			}
+		}
+		if (warnings !== fetchers.length - 1) {
+			throw new Error("Failures must be logged; a normal no-data response needs no warning");
+		}
+	} finally {
+		console.warn = warn;
+	}
+});
 
 Deno.test("LockerVision uses league-specific hosts and a freshly generated UTC website header", async () => {
 	for (const [league, data] of [["nba", NBA_GAME], ["wnba", WNBA_GAME]]) {

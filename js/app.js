@@ -2,7 +2,7 @@
 Imports
 ---------------------------------------------------------------------------------------------------*/
 
-import { loadRecentGameIds, loadReplayData } from "./replay-data.js";
+import { loadGameUniforms, loadRecentGameIds, loadReplayData } from "./replay-data.js";
 import { checkReplay } from "./replay-validation.js";
 import { attackDirection, compileReplay, getReplayFrame } from "./replay-engine.js";
 import { getJerseyColors, getTeamColors, getTeamLogo, getTeamName } from "./replay-teams.js";
@@ -693,6 +693,7 @@ async function init() {
 			throw new Error("Game ID must contain ten digits.");
 		}
 		const candidates = requestedGame === null ? await loadRecentGameIds() : [requestedGame];
+		let uniforms = null;
 		for (const [index, gameId] of candidates.entries()) {
 			try {
 				const loadedGame = await loadReplayData(gameId);
@@ -702,6 +703,7 @@ async function init() {
 					console.error("Replay validation failed:", report.errors);
 					throw new Error(`Replay data is inconsistent (${report.errors.length} validation errors).`);
 				}
+				uniforms = await loadGameUniforms(loadedGame);
 				game = loadedGame;
 				replay = compiledReplay;
 				break;
@@ -739,7 +741,10 @@ async function init() {
 		playerById = new Map(replay.players.map((player) => [player.id, player]));
 		teamById = new Map(game.teams.map((team) => [team.id, team]));
 		jerseyByTeamId = new Map(
-			game.teams.map((team, index) => [team.id, getJerseyColors(team, game.teams[1 - index])]),
+			game.teams.map((team, index) => [
+				team.id,
+				getJerseyColors(team, game.teams[1 - index], uniforms?.[team.home ? "home" : "away"]),
+			]),
 		);
 		for (const [index, element] of [awayTeamEl, homeTeamEl].entries()) {
 			const team = game.teams[index];
