@@ -5,6 +5,23 @@ import { getTeamColors, getTeamLogo, getTeamName } from "../js/replay-teams.js";
 import { loadFeed, loadGame } from "./replay-source.js";
 import { getLaneWaitingPoint, isDefensiveLaneCountActive, isInOffensiveLane } from "../js/replay-rules.js";
 
+Deno.test("PHI-CHA team rebound 12 shows an assumed out ball before the inbound", async () => {
+	const data = await loadGame("0022600148");
+	const original = JSON.stringify(data);
+	const replay = compileReplay(data);
+	const shot = replay.scenes.find((scene) => scene.action.actionNumber === 11);
+	const rebound = replay.scenes.find((scene) => scene.action.actionNumber === 12);
+	const next = replay.scenes.find((scene) => scene.action.actionNumber === 14);
+	assert(rebound.assumedOutOfBounds && next.assumedInbound, "team rebound has no explanatory out ball");
+	assert(shot.outAt > shot.eventAt && shot.frames.at(-1).ball.x < 0, "shot deflection did not go straight out");
+	assert(rebound.frames.every((frame) => frame.ball.x === rebound.frames[0].ball.x &&
+		frame.ball.y === rebound.frames[0].ball.y), "team rebound moved the ball again");
+	assert(rebound.frames.at(-1).ball.x < 0, "ball did not cross the nearby baseline");
+	assert(next.assumedInbound.point.x === rebound.frames.at(-1).ball.x, "inbound changed sides");
+	assert(checkReplay(data, replay).errors.length === 0, "team rebound replay failed validation");
+	assert(JSON.stringify(data) === original, "recorded events changed");
+});
+
 Deno.test("linked turnovers show a free ball before the recorded foul in either court direction", async () => {
 	const data = await loadGame("0022600002");
 	for (const mirrored of [false, true]) {

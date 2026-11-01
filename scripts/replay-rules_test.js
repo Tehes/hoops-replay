@@ -51,6 +51,70 @@ const basket = {
 	side: "right",
 	shotResult: "Made",
 };
+
+Deno.test("team rebounds connect a schematic out ball to the same inbound spot", () => {
+	for (const side of ["left", "right"]) {
+		for (const teamId of [1, 2]) {
+			const data = scenario([
+				{ ...basket, side, shotResult: "Missed" },
+				{ actionType: "rebound", subType: teamId === 1 ? "offensive" : "defensive",
+					teamId, qualifiers: ["team"], shotActionNumber: 1 },
+				{ ...basket, side: teamId === 1 ? side : side === "left" ? "right" : "left",
+					teamId, personId: teamId === 1 ? 1 : 6, clock: "PT07M48S" },
+			]);
+			const original = JSON.stringify(data);
+			const replay = compileReplay(data);
+			const shot = replay.scenes[0];
+			const rebound = replay.scenes[1];
+			const next = replay.scenes[2];
+			const plan = rebound.assumedOutOfBounds;
+			assert(plan?.source === "inferred-team-rebound", "missing explicit assumption");
+			const end = rebound.frames.at(-1).ball;
+			const impact = shot.frames.find((frame) => frame.time === shot.eventAt);
+			const flight = shot.frames.filter((frame) => frame.time > shot.eventAt && frame.time <= shot.outAt);
+			assert(flight.length >= 4 && flight.slice(0, -1).every((frame) => frame.ball.z > 0),
+				"deflection landed inside before going out");
+			assert(Math.hypot(flight[0].ball.x - impact.ball.x, flight[0].ball.y - impact.ball.y) < 3,
+				"deflection jumped away from the rim");
+			assert(rebound.frames.every((frame) => frame.ball.x === end.x && frame.ball.y === end.y),
+				"rebound annotation started a second ball movement");
+			assert(getReplayFrame(replay, shot.start + shot.outAt + 0.01).gameState.ballStatus === "dead",
+				"out ball remained live");
+			assert(end.x < 0 || end.x > 94 || end.y < 0 || end.y > 50, "ball stayed in court");
+			assert(rebound.frames.every((frame) => frame.ball.owner === null), "invented a rebound catch");
+			assert(next.frames[0].ball.x === end.x && next.frames[0].ball.y === end.y, "scene boundary moved ball");
+			const release = next.frames.find((frame) => frame.time === next.inboundAt);
+			const thrower = release.players.find((player) => player.id === release.ball.owner);
+			assert(thrower.x === plan.point.x && thrower.y === plan.point.y, "inbound moved to another boundary");
+			assert(next.frames.some((frame) => frame.time > next.inboundAt && frame.time < next.liveAt &&
+				frame.ball.flight && frame.ball.owner === null), "missing inbound pass");
+			const sample = shot.start + (shot.eventAt + shot.outAt) / 2;
+			const frame = JSON.stringify(getReplayFrame(replay, sample));
+			getReplayFrame(replay, replay.duration);
+			assert(JSON.stringify(getReplayFrame(replay, sample)) === frame, "seeking changed assumed ball path");
+			assert(JSON.stringify(data) === original, "assumption rewrote recorded data");
+		}
+	}
+});
+
+Deno.test("team rebound assumptions exclude catches, dead balls and recorded interruptions", () => {
+	for (const variant of ["player", "deadball", "foul", "period", "freethrow"]) {
+		const rebound = { actionType: "rebound", subType: "offensive", teamId: 1,
+			qualifiers: variant === "deadball" ? ["team", "deadball"] : ["team"], shotActionNumber: 1 };
+		if (variant === "player") {
+			rebound.personId = 2;
+		}
+		const next = variant === "foul"
+			? { actionType: "foul", subType: "personal", teamId: 2, personId: 10, foulDrawnPersonId: 1 }
+			: variant === "period" ? { actionType: "period", subType: "end", clock: "PT00M00S" }
+			: variant === "freethrow"
+			? { actionType: "freethrow", subType: "2 of 2", teamId: 1, personId: 1, shotResult: "Made" }
+			: { ...basket, clock: "PT07M48S" };
+		const replay = compileReplay(scenario([{ ...basket, shotResult: "Missed" }, rebound, next]));
+		assert(!replay.scenes[1].assumedOutOfBounds && !replay.scenes[2].assumedInbound,
+			`${variant} incorrectly inferred an out ball`);
+	}
+});
 const personal = {
 	actionType: "foul",
 	subType: "personal",

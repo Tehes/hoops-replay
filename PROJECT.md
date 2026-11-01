@@ -183,6 +183,10 @@ und belegten Ereignissen.
   Ausweichweg oder ein späterer Start sind wiederholtem Hin-und-her-Korrigieren vorzuziehen.
 - Bei wenig Zeit oder schwachen Belegen wird der Ablauf einfacher, statt zusätzliche Aktionen
   in das Fenster zu zwingen.
+- Ein Teamrebound ohne benannten Fänger kann vor einer gewöhnlichen Spielfortsetzung als
+  schematischer Ausball mit anschließendem Einwurf ergänzt werden, sofern keine andere
+  Unterbrechung belegt ist. Ausball und Einwurfort bleiben Annahmen; ein zusätzlicher individueller
+  Rebound oder eine konkrete letzte Berührung werden daraus nicht abgeleitet.
 - Zusammenhängende Ballverluste und Loose-Ball-Fouls benötigen einen durchgängigen Ballweg:
   sichtbare Ballabgabe beziehungsweise Kontrollverlust, freie Ballphase und belegter Kontakt.
   Der Foulort darf nicht durch nachträgliches Versetzen des Balls hergestellt werden.

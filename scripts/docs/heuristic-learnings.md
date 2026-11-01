@@ -45,6 +45,25 @@ nicht ohne Beleg ableiten. Ein allgemeines Teamkontrollmodell und die visuelle N
 Kandidaten stehen aus; nicht direkt verknüpfbare Folgen sowie Rebound-/Wurf-Fälle bleiben offen.
 Details und Quellen zur Untersuchung stehen im [Iterationsbericht](loose-ball-iteration.md).
 
+## Teamrebound und angenommener Ausball
+
+Ein Teamrebound ohne benannten Fänger ist kein belegter individueller Fang. Folgt auf einen
+zusammenhängenden Live-Fehlwurf eine gewöhnliche Spielfortsetzung mit Einwurfrecht, kann ein
+schematischer Ausball die fehlende Unterbrechung erklären. Den Ball im Feld liegen zu lassen und
+danach an einer beliebigen Seitenlinienposition einzuwerfen, verdeckt diesen Zusammenhang.
+Auch ein nachträglicher Flug aus einer bereits ruhenden Feldposition wurde visuell verworfen:
+Der Abpraller muss unmittelbar am Korb beziehungsweise Block beginnen und ohne Zwischenlandung
+im Feld ins Aus führen. Der folgende Teamrebound-Eintrag bewegt den Ball nicht erneut;
+die tote Ballphase beginnt bereits mit dem Ausball.
+Die nächstgelegene Feldgrenze ist eine räumliche Heuristik; Ausball, Ort und Ballweg sind als
+Annahme im Plan gekennzeichnet und verändern keine Quelldaten. Eine letzte Berührung wird nicht
+erfunden. Benannte Rebounder, Dead-Ball-Einträge, nicht zusammenhängende Wurf-/Rebound-Folgen und
+belegte andere Fortsetzungen erhalten diese Ergänzung nicht. Die visuelle Nutzerabnahme steht aus.
+
+Grundlage: [NBA Video Rulebook, Rebound](https://videorulebook.nba.com/rule/rebound/),
+insbesondere „Team Rebound, no individual rebound as ball goes out of bounds“.
+Die Statistikzuordnung macht diesen Ablauf plausibel, beweist ihn aber nicht für eine einzelne Szene.
+
 ## Outlet nach kontrolliertem Defensivrebound
 
 Eine immer zentral platzierte erste Anspielstation verdeckt den Outlet-Pass und die Bewegung beim

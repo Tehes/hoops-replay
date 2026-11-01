@@ -1383,12 +1383,12 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 	placeFormation(state, offense, direction, matchups, data, buildup);
 	const targets = Object.fromEntries(Object.entries(state.positions).map(([id, position]) => [id, { ...position }]));
 	if (restart) {
-		const inboundPoint = restart === "baseline"
+		const inboundPoint = scene.assumedInbound?.point ?? (restart === "baseline"
 			? { x: direction === 1 ? -1.5 : 95.5, y: 30 }
 			: restart === "flagrant" || restart === "free-throw-line"
 			? { x: direction === 1 ? 75 : 19,
 				y: restart === "free-throw-line" && state.restartOrigin.y < 25 ? -1.5 : 51.5 }
-			: { x: state.formation.backcourt ? direction === 1 ? 34 : 60 : 47, y: 51.5 };
+			: { x: state.formation.backcourt ? direction === 1 ? 34 : 60 : 47, y: 51.5 });
 		const inbounder = lineup.filter((id) => id !== pg).reduce((closest, id) =>
 			Math.hypot(origins[id].x - inboundPoint.x, origins[id].y - inboundPoint.y) <
 					Math.hypot(origins[closest].x - inboundPoint.x, origins[closest].y - inboundPoint.y)
@@ -1408,13 +1408,19 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 		Object.assign(state.positions[inbounder], inboundPoint);
 		Object.assign(
 			state.positions[pg],
-			restart === "baseline" ? { x: direction === 1 ? 15 : 79, y: 28 } : { x: inboundPoint.x, y: 40 },
+			scene.assumedInbound
+				? { x: Math.max(8, Math.min(86, inboundPoint.x)), y: Math.max(8, Math.min(42, inboundPoint.y)) }
+				: restart === "baseline" ? { x: direction === 1 ? 15 : 79, y: 28 } : { x: inboundPoint.x, y: 40 },
 		);
 		state.ball.owner = inbounder;
 		record(0.85);
 		scene.inboundAt = scene.frames.at(-1).time;
+		if (scene.assumedInbound) {
+			const receiver = state.positions[pg];
+			flyBall(state, record, { x: receiver.x + 1, y: receiver.y + 0.8, z: 0.5 }, 0.5, 0.45);
+		}
 		state.ball.owner = pg;
-		record(0.45);
+		record(scene.assumedInbound ? 0.01 : 0.45);
 		// Inbound setup takes replay time without consuming the game clock.
 		scene.liveAt = scene.frames.at(-1).time;
 		advanceFormation(state, scene, offense, direction, targets, record, 1.2 * advanceScale, inbounder);
@@ -2198,6 +2204,35 @@ function prepareFreeThrow(state, scene, direction, deadAfterSeries) {
 	}
 }
 
+function animateTeamReboundOut(state, scene, replay, record) {
+	const rebound = scene.reboundContinuous ? replay.scenes[scene.reboundSceneIndex] : null;
+	if (!rebound || rebound.action.personId || rebound.action.qualifiers?.includes("deadball") ||
+		rebound.rules.after.phase !== "throw-in") {
+		return false;
+	}
+	const next = replay.scenes.slice(scene.reboundSceneIndex + 1).find((item) => item.kind !== "substitution");
+	if (next?.action.period !== rebound.action.period || !next.rules.requiresPlay ||
+		next.rules.offense !== rebound.action.teamId || next.rules.buildupRestart !== "sideline" ||
+		!["2pt", "3pt", "heave", "turnover"].includes(next.kind)) {
+		return false;
+	}
+	// Continue the rim/block deflection itself, before any floor landing or rebound annotation.
+	const point = [
+		{ x: -1.5, y: state.ball.y }, { x: 95.5, y: state.ball.y },
+		{ x: state.ball.x, y: -1.5 }, { x: state.ball.x, y: 51.5 },
+	].sort((a, b) => Math.hypot(a.x - state.ball.x, a.y - state.ball.y) -
+		Math.hypot(b.x - state.ball.x, b.y - state.ball.y))[0];
+	const plan = { point, source: "inferred-team-rebound", actionNumber: rebound.action.actionNumber,
+		teamId: rebound.action.teamId };
+	scene.assumedOutOfBounds = plan;
+	rebound.assumedOutOfBounds = plan;
+	next.assumedInbound = plan;
+	flyBall(state, record, { ...point, z: 0 }, 1.2,
+		Math.max(0.6, Math.hypot(point.x - state.ball.x, point.y - state.ball.y) / 18));
+	state.ball.flight = false;
+	return true;
+}
+
 function prepareRebound(replay, scene, index, state) {
 	const previous = replay.scenes[scene.reboundShotIndex];
 	const id = scene.action.personId;
@@ -2671,6 +2706,8 @@ function compileScene(replay, scene, index, state, data) {
 		if (made) {
 			setScore(state, action);
 			state.ball = { ...hoop, z: 0, owner: null };
+		} else if (animateTeamReboundOut(state, scene, replay, record)) {
+			scene.outAt = time;
 		} else {
 			const reboundPoint = {
 				x: action.blockPersonId
@@ -2770,6 +2807,8 @@ function compileScene(replay, scene, index, state, data) {
 		addMarker(replay, scene, time, made ? "made" : "miss", shooter, made ? "+1" : "");
 		if (!final && !technical) {
 			state.ball.owner = action.personId;
+		} else if (!made && animateTeamReboundOut(state, scene, replay, record)) {
+			scene.outAt = time;
 		} else if (!made && !technical && !scene.flagrantFreeThrow) {
 			const reboundPoint = { x: state.ball.x - direction * 3, y: 28, z: 3.1 };
 			if (namedRebound) {

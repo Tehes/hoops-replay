@@ -329,6 +329,10 @@ export function scheduleGameStates(scene) {
 		});
 	}
 	scene.ruleTimeline.push({ time: scene.eventAt, state: scene.rules.after });
+	if (scene.outAt !== undefined) {
+		scene.ruleTimeline.push({ time: scene.outAt,
+			state: { ...scene.rules.after, ...continuation("throw-in", scene.assumedOutOfBounds.teamId, "sideline") } });
+	}
 }
 
 export function getSceneGameState(scene, time) {
