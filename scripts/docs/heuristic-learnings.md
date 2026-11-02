@@ -281,6 +281,15 @@ Verbesserung der Angriffschoreografie.
 
 ## Spielerprofile, Matchups und Grundformationen
 
+Eine stabile Zuordnung innerhalb eines Angriffs darf spätere belegte Kontakte nicht blockieren.
+Nach einem Offensivrebound kann derselbe Verteidiger einen anderen Angreifer beim Wurf foulen,
+obwohl eine frühere Blockbeteiligung seine ursprüngliche Zuordnung festgelegt hat. Das aktuelle
+Kontaktpaar muss bereits vor Pass und Drive berücksichtigt werden; ein Tausch der beiden
+betroffenen Zuordnungen erhält die eindeutige Verteilung. Nur die letzte Kontaktanimation zu
+verlängern verdeckt den falschen Vorlauf. Die verbleibende Kontaktannäherung benötigt zusätzlich
+ein zur Strecke passendes Zeitfenster. Der ergänzte Zuordnungswechsel bleibt schematisch und
+belegt keinen tatsächlich gespielten Switch.
+
 Mischpositionen müssen unabhängig von der Reihenfolge ihrer Bestandteile berücksichtigt werden.
 Die Profile der aktiven Fünf unterstützen Rollen und gemeinsame Matchups; belegte Beteiligung
 behält Vorrang. Maße helfen bei der Wahl einer benötigten Innenrolle, beweisen aber weder

@@ -307,6 +307,15 @@ export function checkReplay(data, replay = compileReplay(data)) {
 				`${id} active matchups ${scene.action.actionNumber}`,
 			);
 			if (scene.matchupPlanId === matchupPlanId) {
+				if (scene.kind === "foul" && scene.action.descriptor === "shooting") {
+					const defender = scene.action.personId;
+					const attacker = scene.action.foulDrawnPersonId;
+					const previousDefender = Object.keys(expectedMatchups).find((id) => expectedMatchups[id] === attacker);
+					if (previousDefender) {
+						expectedMatchups[previousDefender] = expectedMatchups[defender];
+						expectedMatchups[defender] = attacker;
+					}
+				}
 				check(
 					Object.keys(expectedMatchups).every((defender) =>
 						scene.matchups[defender] === expectedMatchups[defender]

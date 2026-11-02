@@ -301,6 +301,51 @@ function assert(value, message) {
 	}
 }
 
+Deno.test("a shooting foul after an offensive rebound supersedes an earlier contact matchup", async () => {
+	const data = await loadGame("0022600157");
+	for (const mirrored of [false, true]) {
+		const input = structuredClone(data);
+		if (mirrored) {
+			for (const action of input.actions) {
+				if (["left", "right"].includes(action.side)) {
+					action.side = action.side === "left" ? "right" : "left";
+				}
+				if (action.isFieldGoal) {
+					action.x = 100 - action.x;
+				}
+			}
+		}
+		const source = JSON.stringify(input);
+		const replay = compileReplay(input);
+		const foul = replay.scenes.find((scene) => scene.action.actionNumber === 23);
+		const defender = foul.action.personId;
+		const attacker = foul.action.foulDrawnPersonId;
+		assert(foul.matchups[defender] === attacker, "earlier block kept the fouler on another attacker");
+		assert(new Set(Object.values(foul.matchups)).size === 5, "contact swap duplicated a matchup");
+		const approach = getReplayFrame(replay, foul.start + foul.foulApproachAt);
+		const actor = approach.players.find((player) => player.id === defender);
+		const victim = approach.players.find((player) => player.id === attacker);
+		assert(Math.hypot(actor.x - victim.x, actor.y - victim.y) < 6, "defender did not approach before the drive");
+		let previous = getReplayFrame(replay, foul.start + foul.foulGatherAt);
+		for (let time = foul.foulGatherAt + 0.01; time <= foul.eventAt; time += 0.01) {
+			const frame = getReplayFrame(replay, foul.start + time);
+			const from = previous.players.find((player) => player.id === defender);
+			const to = frame.players.find((player) => player.id === defender);
+			assert(Math.hypot(to.x - from.x, to.y - from.y) <= 0.081, "contact approach exceeded eight feet per second");
+			previous = frame;
+		}
+		getReplayFrame(replay, replay.duration);
+		assert(JSON.stringify(approach) === JSON.stringify(getReplayFrame(replay, foul.start + foul.foulApproachAt)),
+			"seeking changed the contact approach");
+		assert(JSON.stringify(input) === source, "contact swap changed recorded events");
+		assert(checkReplay(input, replay).errors.length === 0, "contact swap failed replay validation");
+		const displaced = Object.keys(foul.matchups).find((id) => Number(id) !== defender);
+		[foul.matchups[defender], foul.matchups[displaced]] = [foul.matchups[displaced], foul.matchups[defender]];
+		assert(checkReplay(input, replay).errors.some((error) => error.includes("stable matchups within possession 23")),
+			"validator accepted a matchup change unrelated to the recorded contact");
+	}
+});
+
 Deno.test("a sideline restart releases the previous foul matchup before a new shooting foul", async () => {
 	for (const period of [1, 3]) {
 		for (const offenseIndex of [0, 1]) {

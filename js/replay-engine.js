@@ -1514,6 +1514,16 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 		state.formation.contactMatchups = plan.contacts;
 		state.formation.reboundMatchup = plan.reboundMatchup;
 	}
+	if (scene.kind === "foul" && scene.action.descriptor === "shooting") {
+		const defender = scene.action.personId;
+		const attacker = scene.action.foulDrawnPersonId;
+		const previousDefender = Object.keys(state.matchups).find((id) => state.matchups[id] === attacker);
+		// A retained possession can contain a later contact that supersedes an earlier block or foul.
+		if (previousDefender && state.matchups[defender] !== attacker) {
+			state.matchups[previousDefender] = state.matchups[defender];
+			state.matchups[defender] = attacker;
+		}
+	}
 	Object.assign(matchups, state.matchups);
 	scene.matchups = { ...matchups };
 	scene.matchupPlanId = state.formation.id;
@@ -3217,9 +3227,7 @@ function compileScene(replay, scene, index, state, data) {
 				state.ball.z = 0;
 			}
 			actor.angle = direction * 0.2;
-			record(scene.reboundPressure
-				? Math.max(0.4, Math.hypot(actor.x - from.x, actor.y - from.y) * 1.5 / 8)
-				: 0.4);
+			record(Math.max(0.4, Math.hypot(actor.x - from.x, actor.y - from.y) * 1.5 / 8));
 		}
 		if (action.subType === "technical" && actor && !scene.defensiveThreeSeconds) {
 			actor.angle = 0.3;
