@@ -58,11 +58,24 @@ export function getScoreMarkerGeometry(marker, time, pixelScale) {
 export function planBallOffsets(replay) {
 	const openingTip = replay.scenes.find((scene) => scene.jumpBallPlan?.opening);
 	const openingTossAt = openingTip ? openingTip.start + openingTip.jumpBallPlan.tossAt : -1;
-	let anchor = { time: 0, x: 0, y: 0, z: 0 };
+	const frames = replay.scenes.flatMap((scene) => scene.frames);
+	const directions = new Map();
+	let direction = 0;
+	for (let index = frames.length - 1; index >= 0; index--) {
+		const frame = frames[index];
+		const next = frames[index + 1];
+		direction = frame.ball.dribble && frame.ball.owner && frame.ball.owner === next?.ball.owner
+			? Math.sign(next.ball.x - frame.ball.x) || direction
+			: 0;
+		directions.set(frame, direction);
+	}
+	let handSide = 1;
+	let lastOwner = null;
+	let anchor = { time: 0, x: 0, y: 0, z: 0, handX: 0 };
 	const pending = [];
 	for (const scene of replay.scenes) {
 		scene.ballOffsets = [];
-		const initialOffset = { x: anchor.x, y: anchor.y, z: anchor.z };
+		const initialOffset = { x: anchor.x, y: anchor.y, z: anchor.z, handX: anchor.handX };
 		for (const frame of scene.frames) {
 			const ball = frame.ball;
 			const key = { time: frame.time };
@@ -76,8 +89,9 @@ export function planBallOffsets(replay) {
 			const atTip = jumpBall && Math.abs(frame.time - jumpBall.tipAt) < 1e-8;
 			let offset = null;
 			if (owner) {
+				handSide = directions.get(frame) || (lastOwner === ball.owner ? handSide : 1);
 				const body = getPlayerGeometry(owner, Infinity);
-				offset = { x: body.x - owner.x, y: body.y - owner.y, z: owner.jump * 1.4 };
+				offset = { x: body.x - owner.x, y: body.y - owner.y, z: owner.jump * 1.4, handX: handSide - 1 };
 			} else if (atTip) {
 				const top = Math.min(
 					...frame.players.filter((player) =>
@@ -91,6 +105,7 @@ export function planBallOffsets(replay) {
 				const fraction = frame.time / jumpBall.tossAt;
 				offset = {
 					x: initialOffset.x * (1 - fraction),
+					handX: initialOffset.handX * (1 - fraction),
 					y: initialOffset.y + (-PLAYER_HALF_HEIGHT - initialOffset.y) * fraction,
 					z: initialOffset.z * (1 - fraction),
 				};
@@ -100,13 +115,15 @@ export function planBallOffsets(replay) {
 			} else if (ball.z === 0 || atBoard) {
 				offset = { x: 0, y: 0, z: 0 };
 			}
+			lastOwner = ball.owner;
 			if (offset === null) {
 				pending.push({ time, key });
 				continue;
 			}
+			offset.handX = offset.handX ?? 0;
 			for (const point of pending) {
 				const fraction = (point.time - anchor.time) / (time - anchor.time || 1);
-				for (const axis of ["x", "y", "z"]) {
+				for (const axis of ["x", "y", "z", "handX"]) {
 					point.key[axis] = anchor[axis] + (offset[axis] - anchor[axis]) * fraction;
 				}
 			}
@@ -116,7 +133,36 @@ export function planBallOffsets(replay) {
 		}
 	}
 	for (const point of pending) {
-		Object.assign(point.key, { x: anchor.x, y: anchor.y, z: anchor.z });
+		Object.assign(point.key, { x: anchor.x, y: anchor.y, z: anchor.z, handX: anchor.handX });
+	}
+	planBallDribbles(replay);
+}
+
+function planBallDribbles(replay) {
+	let run = null;
+	for (const scene of replay.scenes) {
+		scene.ballDribbles = [];
+		for (let index = 0; index < scene.frames.length - 1; index++) {
+			const from = scene.frames[index];
+			const to = scene.frames[index + 1];
+			const start = scene.start + from.time;
+			const end = scene.start + to.time;
+			if (
+				!from.ball.owner || !from.ball.dribble || from.ball.owner !== to.ball.owner ||
+				from.players.find((player) => player.id === from.ball.owner).jump > 0 ||
+				to.players.find((player) => player.id === to.ball.owner).jump > 0 || end <= start
+			) {
+				run = null;
+				scene.ballDribbles.push(null);
+				continue;
+			}
+			if (!run || run.owner !== from.ball.owner || Math.abs(run.end - start) > 1e-8) {
+				run = { owner: from.ball.owner, start, end: start, distance: 0 };
+			}
+			run.end = end;
+			run.distance += Math.hypot(to.ball.x - from.ball.x, to.ball.y - from.ball.y);
+			scene.ballDribbles.push(run);
+		}
 	}
 }
 
@@ -135,7 +181,7 @@ export function getBallGeometry(frame, pixelScale) {
 	const start = scene.ballOffsets[index];
 	const end = scene.ballOffsets[index + 1] || start;
 	const offset = {};
-	for (const axis of ["x", "y", "z"]) {
+	for (const axis of ["x", "y", "z", "handX"]) {
 		offset[axis] = start[axis] + (end[axis] - start[axis]) * progress;
 	}
 	const size = getPlayerSize(pixelScale);
@@ -146,13 +192,31 @@ export function getBallGeometry(frame, pixelScale) {
 		offset.y = (body.y - owner.y) / size;
 		offset.z = owner.jump * 1.4;
 	}
-	const dribble = !flight && ball.owner && ball.dribble ? Math.abs(Math.sin(frame.time * 12)) * 0.4 : 0;
+	const radius = Math.max(0.65, 3.2 / pixelScale);
+	let x = ball.x + offset.x * size + offset.handX;
+	let y = ball.y - ball.z * BALL_HEIGHT_SCALE + offset.y * size + offset.z * BALL_HEIGHT_SCALE;
+	let groundY = ball.y;
+	let shadowHeight = 0;
+	const run = scene.ballDribbles[index];
+	if (!flight && ball.owner && run && run.end - run.start >= 0.22) {
+		const duration = run.end - run.start;
+		const speed = run.distance / duration;
+		const cycles = Math.max(1, Math.round(duration / (0.68 - Math.min(1, speed / 16) * 0.24)));
+		// Whole cycles keep catches and releases at hand height, including after seeking.
+		const phase = Math.max(0, Math.min(1, (frame.time - run.start) / duration)) * cycles % 1;
+		const depth = (1 - Math.abs(phase * 2 - 1)) ** 2;
+		groundY = Math.max(groundY, y + radius + size * 1.1);
+		x += Math.sign(to.ball.x - from.ball.x) * size * 0.2 * depth;
+		y += (groundY - radius - y) * depth;
+		shadowHeight = 1 - depth;
+	}
 	return {
-		x: ball.x + offset.x * size,
-		y: ball.y - ball.z * BALL_HEIGHT_SCALE + offset.y * size + offset.z * BALL_HEIGHT_SCALE - dribble,
-		radius: Math.max(0.65, 3.2 / pixelScale),
-		groundX: ball.x + offset.x * size,
-		groundY: ball.y,
+		x,
+		y,
+		radius,
+		groundX: x,
+		groundY,
+		shadowHeight,
 		index,
 		fraction,
 	};

@@ -100,6 +100,104 @@ Deno.test("held ball follows torso rotation and jump while its shadow stays on t
 	}
 });
 
+Deno.test("dribbles touch the floor and return to the hand across scene boundaries and display sizes", () => {
+	const p = player(1, 40, 25);
+	const key = (time, dribble = true) => ({ time, players: [p], ball: { ...heldBall(p), dribble } });
+	const first = { start: 10, frames: [key(0), key(0.3)] };
+	const second = { start: 10.3, frames: [key(0), key(0.38, false), key(0.8, false)] };
+	const source = JSON.stringify([first.frames, second.frames]);
+	planBallOffsets({ scenes: [first, second] });
+	for (const pixels of [2, 4, 12]) {
+		const hand = atKey(first, 0, pixels);
+		const contact = getBallGeometry({ ...key(0), scene: second, time: 10.34 }, pixels);
+		near(contact.y + contact.radius, contact.groundY, "ball does not meet its floor shadow");
+		assert(contact.y > hand.y + 1, "dribble has no visible descent");
+		assert(Math.abs(contact.x - hand.x) < (contact.y - hand.y) * 0.25, "dribble angles too far sideways");
+		assert(contact.shadowHeight < hand.shadowHeight, "shadow does not tighten on contact");
+		near(atKey(first, 1, pixels).y, atKey(second, 0, pixels).y, "dribble resets at scene boundary");
+		near(atKey(second, 1, pixels).y, hand.y, "ball is not gathered at hand height");
+		atKey(second, 2, pixels);
+		near(getBallGeometry({ ...key(0), scene: second, time: 10.34 }, pixels).y, contact.y, "seeking changes bounce");
+	}
+	assert(JSON.stringify([first.frames, second.frames]) === source, "dribble changes compiled ball paths");
+});
+
+Deno.test("the slight dribble lean follows horizontal travel and stays vertical at rest", () => {
+	for (const direction of [-1, 0, 1]) {
+		const key = (time, x) => {
+			const p = player(1, x, 25);
+			return { time, players: [p], ball: { ...heldBall(p), dribble: true } };
+		};
+		const scene = { start: 0, frames: [key(0, 40), key(0.68, 40 + direction * 2)] };
+		planBallOffsets({ scenes: [scene] });
+		for (const pixels of [2, 4, 12]) {
+			const frame = { ...key(0.34, 40 + direction), scene };
+			const ball = getBallGeometry(frame, pixels);
+			const bodyX = getPlayerGeometry(frame.players[0], pixels).x;
+			const handX = bodyX + (direction || 1);
+			assert(Math.sign(ball.x - bodyX) === (direction || 1), "ball is led on the wrong body side");
+			assert(Math.sign(ball.x - handX) === direction, "dribble leans against the movement direction");
+			near(ball.groundX, ball.x, "shadow does not follow the mirrored dribble");
+			near(ball.y + ball.radius, ball.groundY, "mirrored dribble misses the floor");
+		}
+	}
+});
+
+Deno.test("left-hand projection survives a scene boundary, a stop and the following pass", () => {
+	const key = (time, x, dribble) => {
+		const p = player(1, x, 25);
+		return { time, players: [p], ball: { ...heldBall(p), dribble } };
+	};
+	const first = { start: 0, frames: [key(0, 40, true), key(0.68, 38, false)] };
+	const second = {
+		start: 0.68,
+		frames: [
+			key(0, 38, false), key(0.3, 38, false),
+			{ time: 0.6, players: [player(1, 38, 25)], ball: { x: 30, y: 25, z: 2, flight: true, owner: null } },
+			key(0.9, 20, false),
+		],
+	};
+	planBallOffsets({ scenes: [first, second] });
+	for (const pixels of [2, 4, 12]) {
+		near(atKey(first, 1, pixels).x, 37, "gather switches back to the right hand");
+		near(atKey(second, 0, pixels).x, 37, "scene boundary resets the hand");
+		near(atKey(second, 1, pixels).x, 37, "stopping resets the hand");
+		const release = getBallGeometry({ ...second.frames[1], scene: second, time: second.start + 0.3 + 1e-8 }, pixels);
+		assert(Math.abs(release.x - 37) < 1e-6, "pass jumps from the left hand to the right");
+		atKey(second, 3, pixels);
+		near(atKey(first, 0, pixels).x, 39, "reverse seeking changes the selected hand");
+	}
+});
+
+Deno.test("dribble gathers before a flight and does not bounce during a jump or a brief hold", () => {
+	const p = player(1, 40, 25);
+	for (
+		const ending of [
+			{ players: [p], ball: { x: 50, y: 25, z: 4, flight: true, owner: null } },
+			{ players: [{ ...p, jump: 1 }], ball: { ...heldBall({ ...p, jump: 1 }), dribble: true } },
+		]
+	) {
+		const scene = {
+			start: 0,
+			frames: [0, 0.68].map((time) => ({ time, players: [p], ball: { ...heldBall(p), dribble: true } })),
+		};
+		scene.frames.push({ time: 1, ...ending });
+		planBallOffsets({ scenes: [scene] });
+		near(atKey(scene, 1, 8).y, atKey(scene, 0, 8).y, "release starts below the hand");
+		assert(scene.ballDribbles[1] === null, "flight or jump keeps a dribble cycle");
+	}
+	const brief = {
+		start: 0,
+		frames: [0, 0.1].map((time) => ({ time, players: [p], ball: { ...heldBall(p), dribble: true } })),
+	};
+	planBallOffsets({ scenes: [brief] });
+	near(
+		getBallGeometry({ ...brief.frames[0], scene: brief, time: 0.05 }, 8).y,
+		atKey(brief, 0, 8).y,
+		"brief hold creates a frantic bounce",
+	);
+});
+
 Deno.test("pass, rim, board and floor anchors use one projection without moving the source path", () => {
 	const a = player(1, 40, 15, -0.3);
 	const b = player(2, 60, 35, 0.6, 1);

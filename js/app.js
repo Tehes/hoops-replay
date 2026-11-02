@@ -504,9 +504,10 @@ function planBallPresentation() {
 }
 
 function drawBallShadow(ball) {
-	ctx.fillStyle = "#10182044";
+	ctx.fillStyle = `rgba(16, 24, 32, ${0.27 - ball.shadowHeight * 0.12})`;
 	ctx.beginPath();
-	ctx.ellipse(ball.groundX, ball.groundY, ball.radius * 1.1, ball.radius * 0.45, 0, 0, Math.PI * 2);
+	const spread = 1 + ball.shadowHeight * 0.35;
+	ctx.ellipse(ball.groundX, ball.groundY, ball.radius * 1.1 * spread, ball.radius * 0.45 * spread, 0, 0, Math.PI * 2);
 	ctx.fill();
 }
 

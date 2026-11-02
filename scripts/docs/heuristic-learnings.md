@@ -15,6 +15,21 @@ fachliche Zielbild steht in [PROJECT.md](../../PROJECT.md); Code und Tests zeige
 - Keine Versuchsprotokolle, vollständigen Testergebnisse, Messwerttabellen oder Implementierungsstände
   sammeln. Git bewahrt die Änderungsgeschichte; Spiel-IDs allein sind kein unveränderliches Datenarchiv.
 
+## Sichtbarer Dribbelkontakt
+
+Ein kleines globales Sinus-Wackeln vermittelt keinen Bodenkontakt. Eine größere Auslenkung allein
+kann beim Pass oder Wurf einen Sprung zur Hand erzeugen. Vollständige Zyklen pro zusammenhängender
+Dribbelphase verbinden Handhöhe, sichtbaren Bodenkontakt und anschließendes Aufnehmen; eine
+Szenengrenze allein darf den Zyklus nicht zurücksetzen. Ballradius und Darstellungsgröße müssen
+beim Kontakt mit dem Bodenschatten berücksichtigt werden. Eine starke seitliche Auslenkung zum
+Freihalten des Trikots wurde visuell verworfen: Der Ball soll nahezu senkrecht unter der Hand
+aufkommen. Der verbleibende leichte Winkel folgt der horizontalen Laufrichtung; im Stand wird
+senkrecht gedribbelt. Auch der Haltepunkt muss zur Laufrichtung gespiegelt werden; allein den
+Winkel umzukehren lässt den Ball auf der falschen Körperseite. Beim Anhalten bleibt die zuletzt
+verwendete Seite erhalten; Fang und Abgabe müssen dieselbe Projektion verwenden.
+Diese Projektion verändert keine
+kompilierten Ballwege und belegt weder echte Dribbelzeitpunkte noch die verwendete Hand.
+
 ## Defensive Drei-Sekunden-Verstöße
 
 Ein Verteidiger sollte nicht allein deshalb in die Zone laufen, damit ein geometrischer Timer beim
