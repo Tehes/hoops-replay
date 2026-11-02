@@ -7,12 +7,24 @@ import { checkReplay } from "./replay-validation.js";
 import { attackDirection, compileReplay, getReplayFrame } from "./replay-engine.js";
 import { getJerseyColors, getTeamColors, getTeamLogo, getTeamName } from "./replay-teams.js";
 import { getLeague } from "./replay-leagues.js";
+import {
+	getBallGeometry,
+	getPlayerGeometry,
+	getPlayerHitDistance,
+	getPlayerSize,
+	getScoreMarkerGeometry,
+	getShotMarkerGeometry,
+	planBallOffsets,
+	PLAYER_HALF_HEIGHT,
+	RIM_Y,
+	SHOT_MARKER_FLATTENING,
+	WORLD,
+} from "./replay-presentation.js";
 
 /* --------------------------------------------------------------------------------------------------
 Constants and state
 ---------------------------------------------------------------------------------------------------*/
 
-const WORLD = { width: 110, height: 65, left: 8, top: 9 };
 const ACTION_DURATION = 5;
 const NEUTRAL_COURT = { shirt: "#34434f", trim: "#9aabb8" };
 let actionEvents = [];
@@ -180,6 +192,7 @@ function drawCourt() {
 function drawBaskets() {
 	const home = game?.teams.find((team) => team.home);
 	const colors = home ? getTeamColors(home) : NEUTRAL_COURT;
+	const rimY = RIM_Y;
 	for (const mirror of [false, true]) {
 		ctx.save();
 		if (mirror) {
@@ -190,15 +203,15 @@ function drawBaskets() {
 		ctx.lineWidth = 0.35;
 		ctx.beginPath();
 		ctx.moveTo(-2.4, 25);
-		ctx.lineTo(4, 23.7);
+		ctx.lineTo(4, rimY - 1.3);
 		ctx.moveTo(-2.4, 25);
-		ctx.lineTo(4, 26.3);
+		ctx.lineTo(4, rimY + 1.3);
 		ctx.stroke();
 		ctx.strokeStyle = "#b8c4ce";
 		ctx.lineWidth = 0.65;
 		ctx.beginPath();
 		ctx.moveTo(-2.4, 25);
-		ctx.lineTo(4, 25);
+		ctx.lineTo(4, rimY);
 		ctx.stroke();
 		ctx.fillStyle = colors.shirt;
 		roundedRect(ctx, -4.6, 22.9, 2.2, 4.2, 0.35);
@@ -209,13 +222,13 @@ function drawBaskets() {
 		ctx.lineWidth = 0.3;
 		ctx.strokeStyle = "#f6f7f8";
 		ctx.beginPath();
-		ctx.moveTo(4, 22);
-		ctx.lineTo(4, 28);
+		ctx.moveTo(4, rimY - 3);
+		ctx.lineTo(4, rimY + 3);
 		ctx.stroke();
 		ctx.strokeStyle = "#18212b";
 		ctx.lineWidth = 0.42;
 		ctx.beginPath();
-		ctx.arc(5.25, 25, 0.75, 0, Math.PI * 2);
+		ctx.arc(5.25, rimY, 0.75, 0, Math.PI * 2);
 		ctx.stroke();
 		ctx.strokeStyle = "#ff982e";
 		ctx.lineWidth = 0.22;
@@ -236,15 +249,15 @@ function resizeCourt() {
 
 function drawJersey(context, colors) {
 	context.beginPath();
-	context.moveTo(-0.6, -2.2);
+	context.moveTo(-0.6, -PLAYER_HALF_HEIGHT);
 	context.lineTo(-1.25, -2.05);
 	context.quadraticCurveTo(-0.95, -0.8, -1.45, -0.3);
-	context.lineTo(-1.4, 2.2);
-	context.lineTo(1.4, 2.2);
+	context.lineTo(-1.4, PLAYER_HALF_HEIGHT);
+	context.lineTo(1.4, PLAYER_HALF_HEIGHT);
 	context.lineTo(1.45, -0.3);
 	context.quadraticCurveTo(0.95, -0.8, 1.25, -2.05);
-	context.lineTo(0.6, -2.2);
-	context.bezierCurveTo(0.6, -1.25, -0.6, -1.25, -0.6, -2.2);
+	context.lineTo(0.6, -PLAYER_HALF_HEIGHT);
+	context.bezierCurveTo(0.6, -1.25, -0.6, -1.25, -0.6, -PLAYER_HALF_HEIGHT);
 	context.closePath();
 	context.fillStyle = colors.shirt;
 	context.fill();
@@ -253,19 +266,27 @@ function drawJersey(context, colors) {
 	context.stroke();
 }
 
-function drawPlayer(position) {
-	const player = playerById.get(position.id);
-	const colors = jerseyByTeamId.get(player.teamId);
-	const size = Math.max(1, 7 / (scale / (globalThis.devicePixelRatio || 1) * 1.6));
+function drawPlayerShadow(position) {
+	const size = getPlayerSize(scale / (globalThis.devicePixelRatio || 1));
 	ctx.save();
 	ctx.globalAlpha = position.opacity;
 	ctx.translate(position.x, position.y);
 	ctx.scale(size, size);
 	ctx.fillStyle = "#19212c30";
 	ctx.beginPath();
-	ctx.ellipse(0.2, 1.9, 2 / (1 + position.jump * 0.08), 0.7, 0, 0, Math.PI * 2);
+	ctx.ellipse(0, 0, 2 / (1 + position.jump * 0.08), 0.7, 0, 0, Math.PI * 2);
 	ctx.fill();
-	ctx.translate(0, -position.jump * 0.65);
+	ctx.restore();
+}
+
+function drawPlayer(position) {
+	const player = playerById.get(position.id);
+	const colors = jerseyByTeamId.get(player.teamId);
+	const body = getPlayerGeometry(position, scale / (globalThis.devicePixelRatio || 1));
+	ctx.save();
+	ctx.globalAlpha = position.opacity;
+	ctx.translate(body.x, body.y);
+	ctx.scale(body.size, body.size);
 	ctx.rotate(position.angle);
 	drawJersey(ctx, colors);
 	ctx.fillStyle = colors.ink;
@@ -281,15 +302,27 @@ function drawNames(frame) {
 	const small = canvas.getBoundingClientRect().width < 600;
 	const ids = small ? frame.participants.slice(0, 2) : frame.participants;
 	const visible = new Set([...ids, selectedPlayer].filter(Boolean));
-	const occupied = frame.markers.filter((marker) => marker.kind === "made" || marker.kind === "miss").map((
-		marker,
-	) => ({
-		x: marker.x - 4,
-		y: marker.y - 10,
-		width: 8,
-		height: 8,
-	}));
-	const fontSize = Math.max(1.05, 9 / (scale / (globalThis.devicePixelRatio || 1)));
+	const pixelScale = scale / (globalThis.devicePixelRatio || 1);
+	const occupied = frame.players.filter((player) => player.opacity > 0.5)
+		.map((player) => getPlayerGeometry(player, pixelScale).bounds);
+	const ball = getBallGeometry(frame, pixelScale);
+	occupied.push({ x: ball.x - ball.radius, y: ball.y - ball.radius, width: ball.radius * 2, height: ball.radius * 2 });
+	for (const marker of frame.markers) {
+		if (marker.kind !== "made" && marker.kind !== "miss") {
+			continue;
+		}
+		const ground = getShotMarkerGeometry(marker, pixelScale);
+		occupied.push({ x: ground.x - ground.radius, y: ground.y - ground.height,
+			width: ground.radius * 2, height: ground.height * 2 });
+		if (marker.kind === "made" && marker.value) {
+			const score = getScoreMarkerGeometry(marker, frame.time, pixelScale);
+			ctx.font = `850 ${score.fontSize}px system-ui`;
+			const width = ctx.measureText(marker.value).width + score.lineWidth * 2;
+			occupied.push({ x: score.x - width / 2, y: score.y - score.fontSize / 2 - score.lineWidth,
+				width, height: score.fontSize + score.lineWidth * 2 });
+		}
+	}
+	const fontSize = Math.max(1.05, 9 / pixelScale);
 	ctx.font = `650 ${fontSize}px system-ui`;
 	ctx.textAlign = "center";
 	ctx.textBaseline = "middle";
@@ -301,11 +334,14 @@ function drawNames(frame) {
 		const name = player.name.replace(/^\S+ /, "");
 		const width = ctx.measureText(name).width + 1.6;
 		const height = fontSize + 1.1;
+		const body = getPlayerGeometry(position, pixelScale);
+		const above = body.bounds.y - height - 0.7;
+		const below = body.bounds.y + body.bounds.height + 0.7;
 		let box;
-		for (const offset of [-5.2, 4.6, -8.5, 8, -12]) {
+		for (const y of [above, below, above - height - 1, below + height + 1, above - (height + 1) * 2]) {
 			box = {
-				x: Math.max(-5, Math.min(99 - width, position.x - width / 2)),
-				y: Math.max(-5, Math.min(54, position.y + offset)),
+				x: Math.max(-5, Math.min(99 - width, body.x - width / 2)),
+				y: Math.max(-WORLD.top + 0.5, Math.min(WORLD.height - WORLD.top - height - 0.5, y)),
 				width,
 				height,
 			};
@@ -328,29 +364,30 @@ function drawNames(frame) {
 
 function drawShotMarkers(frame) {
 	const pixelScale = scale / (globalThis.devicePixelRatio || 1);
-	const markerSize = Math.max(1, 5 / pixelScale);
 	for (const marker of frame.markers) {
 		if (marker.kind !== "made" && marker.kind !== "miss") {
 			continue;
 		}
 		const age = frame.time - marker.time;
 		const remaining = marker.end - frame.time;
-		const y = marker.y + 1.7;
+		const markerSize = getShotMarkerGeometry(marker, pixelScale).radius;
 		ctx.save();
+		ctx.translate(marker.x, marker.y);
+		ctx.scale(1, SHOT_MARKER_FLATTENING);
 		ctx.globalAlpha = Math.min(1, remaining, age / 0.12 + 0.2);
 		ctx.beginPath();
 		if (marker.kind === "made") {
 			ctx.fillStyle = "#228b50";
-			ctx.arc(marker.x, y, 1.6 * markerSize, 0, Math.PI * 2);
+			ctx.arc(0, 0, markerSize, 0, Math.PI * 2);
 			ctx.fill();
 		} else {
 			ctx.strokeStyle = "#d03b45";
-			ctx.lineWidth = 0.45 * markerSize;
+			ctx.lineWidth = 0.4 * markerSize;
 			ctx.lineCap = "round";
-			ctx.moveTo(marker.x - 1.1 * markerSize, y - 1.1 * markerSize);
-			ctx.lineTo(marker.x + 1.1 * markerSize, y + 1.1 * markerSize);
-			ctx.moveTo(marker.x + 1.1 * markerSize, y - 1.1 * markerSize);
-			ctx.lineTo(marker.x - 1.1 * markerSize, y + 1.1 * markerSize);
+			ctx.moveTo(-0.8 * markerSize, -0.8 * markerSize);
+			ctx.lineTo(0.8 * markerSize, 0.8 * markerSize);
+			ctx.moveTo(0.8 * markerSize, -0.8 * markerSize);
+			ctx.lineTo(-0.8 * markerSize, 0.8 * markerSize);
 			ctx.stroke();
 		}
 		ctx.restore();
@@ -359,24 +396,23 @@ function drawShotMarkers(frame) {
 
 function drawScoreMarkers(frame) {
 	const pixelScale = scale / (globalThis.devicePixelRatio || 1);
-	const markerSize = Math.max(1, 5 / pixelScale);
 	for (const marker of frame.markers) {
 		if (marker.kind !== "made" || !marker.value) {
 			continue;
 		}
 		const age = frame.time - marker.time;
 		const remaining = marker.end - frame.time;
+		const score = getScoreMarkerGeometry(marker, frame.time, pixelScale);
 		ctx.save();
 		ctx.globalAlpha = Math.min(1, remaining, age / 0.08 + 0.2);
-		ctx.font = `850 ${2.4 * markerSize}px system-ui`;
+		ctx.font = `850 ${score.fontSize}px system-ui`;
 		ctx.textAlign = "center";
 		ctx.textBaseline = "middle";
-		ctx.lineWidth = 0.65 * markerSize;
+		ctx.lineWidth = score.lineWidth;
 		ctx.strokeStyle = "#f2dbb4";
-		const y = marker.y - (4 + Math.min(age, 1) * 1.3) * markerSize;
-		ctx.strokeText(marker.value, marker.x, y);
+		ctx.strokeText(marker.value, score.x, score.y);
 		ctx.fillStyle = "#13694e";
-		ctx.fillText(marker.value, marker.x, y);
+		ctx.fillText(marker.value, score.x, score.y);
 		ctx.restore();
 	}
 }
@@ -399,8 +435,10 @@ function drawShotEffects(frame) {
 		}
 		ctx.beginPath();
 		points.forEach((point, index) => {
-			const x = point.ball.x;
-			const y = point.ball.y - point.ball.z * 0.6;
+			const { x, y } = getBallGeometry(
+				{ ...point, scene, time: scene.start + point.time },
+				scale / (globalThis.devicePixelRatio || 1),
+			);
 			if (index === 0) {
 				ctx.moveTo(x, y);
 			} else {
@@ -416,7 +454,7 @@ function drawShotEffects(frame) {
 			ctx.strokeStyle = `rgba(255, 247, 221, ${1 - age / 0.55})`;
 			ctx.lineWidth = 0.35;
 			ctx.beginPath();
-			ctx.arc(scene.hoop.x, scene.hoop.y, 1 + age * 4, 0, Math.PI * 2);
+			ctx.arc(scene.hoop.x, RIM_Y, 1 + age * 4, 0, Math.PI * 2);
 			ctx.stroke();
 		}
 	}
@@ -425,13 +463,13 @@ function drawShotEffects(frame) {
 		ctx.lineWidth = 0.45;
 		const boardX = scene.hoop.x < 47 ? 4 : 90;
 		ctx.beginPath();
-		ctx.moveTo(boardX, 22);
-		ctx.lineTo(boardX, 28);
+		ctx.moveTo(boardX, RIM_Y - 3);
+		ctx.lineTo(boardX, RIM_Y + 3);
 		ctx.stroke();
 	}
 }
 
-function planBallRotations() {
+function planBallPresentation() {
 	let angle = -Math.PI / 6;
 	for (const scene of replay.scenes) {
 		const spinningShot = (scene.shotStyle && scene.shotStyle.family !== "dunk") || scene.kind === "freethrow";
@@ -462,31 +500,26 @@ function planBallRotations() {
 			scene.ballRotations.push({ time: to.time, angle });
 		}
 	}
+	planBallOffsets(replay);
 }
 
-function drawBall(frame) {
-	const ball = frame.ball;
+function drawBallShadow(ball) {
+	ctx.fillStyle = "#10182044";
+	ctx.beginPath();
+	ctx.ellipse(ball.groundX, ball.groundY, ball.radius * 1.1, ball.radius * 0.45, 0, 0, Math.PI * 2);
+	ctx.fill();
+}
+
+function drawBall(frame, ball) {
 	const scene = frame.scene;
-	const dribble = ball.owner && ball.dribble ? Math.abs(Math.sin(frame.time * 12)) * 0.4 : 0;
-	const local = frame.time - scene.start;
-	let index = 0;
-	while (index < scene.ballRotations.length - 2 && scene.ballRotations[index + 1].time <= local) {
-		index++;
-	}
+	const { index, fraction, radius } = ball;
 	const from = scene.ballRotations[index];
 	const to = scene.ballRotations[index + 1] || from;
-	const fraction = Math.max(0, Math.min(1, (local - from.time) / (to.time - from.time || 1)));
 	const angle = from.angle + (from.wobble
 		? (Math.sin(frame.time * 6) - Math.sin((scene.start + from.time) * 6)) * 0.05
 		: (to.angle - from.angle) * fraction);
-	const radius = Math.max(0.65, 3.2 / (scale / (globalThis.devicePixelRatio || 1)));
-	ctx.fillStyle = "#10182044";
-	ctx.beginPath();
-	ctx.ellipse(ball.x, ball.y + 0.7, radius * 1.1, radius * 0.45, 0, 0, Math.PI * 2);
-	ctx.fill();
-	const y = ball.y - ball.z * 0.6 - dribble;
 	ctx.save();
-	ctx.translate(ball.x, y);
+	ctx.translate(ball.x, ball.y);
 	ctx.rotate(angle);
 	ctx.fillStyle = "#ff9b30";
 	ctx.strokeStyle = "#572f14";
@@ -576,14 +609,20 @@ function render() {
 	}
 	const frame = getReplayFrame(replay, currentTime);
 	currentFrame = frame;
+	const players = frame.players.filter((player) => player.opacity > 0.01).sort((a, b) => a.y - b.y);
+	const ball = getBallGeometry(frame, scale / (globalThis.devicePixelRatio || 1));
 	drawShotMarkers(frame);
-	for (const position of frame.players.filter((player) => player.opacity > 0.01).sort((a, b) => a.y - b.y)) {
+	for (const position of players) {
+		drawPlayerShadow(position);
+	}
+	drawBallShadow(ball);
+	for (const position of players) {
 		drawPlayer(position);
 	}
 	drawBaskets();
 	drawShotEffects(frame);
 	drawScoreMarkers(frame);
-	drawBall(frame);
+	drawBall(frame, ball);
 	drawNames(frame);
 
 	ctx.restore();
@@ -650,6 +689,7 @@ function seek(time) {
 }
 
 function stepAction(direction) {
+	setPlaying(false);
 	const target = direction === 1
 		? replay.scenes.find((scene) => scene.start > currentTime)
 		: replay.scenes.findLast((scene) => scene.start < currentTime);
@@ -668,9 +708,11 @@ function selectPlayer(event) {
 	const x = (event.clientX - bounds.left) / bounds.width * WORLD.width - WORLD.left;
 	const y = (event.clientY - bounds.top) / bounds.height * WORLD.height - WORLD.top;
 	const player = currentFrame.players.filter((p) => p.opacity > 0.5)
-		.map((p) => ({ id: p.id, distance: Math.hypot(p.x - x, p.y - y) }))
+		.sort((a, b) => b.y - a.y)
+		.map((p) => ({ id: p.id,
+			distance: getPlayerHitDistance(p, x, y, scale / (globalThis.devicePixelRatio || 1)) }))
 		.sort((a, b) => a.distance - b.distance)[0];
-	if (player && player.distance < 4) {
+	if (player && player.distance < 1) {
 		selectedPlayer = selectedPlayer === player.id ? null : player.id;
 	} else {
 		selectedPlayer = null;
@@ -719,7 +761,7 @@ async function init() {
 			url.searchParams.set("game", game.gameId);
 			globalThis.history.replaceState(null, "", url);
 		}
-		planBallRotations();
+		planBallPresentation();
 		actionEvents = replay.scenes.filter((scene) => scene.action.description).map((scene) => ({
 			time: scene.start + scene.eventAt,
 			label: scene.banner || "",
