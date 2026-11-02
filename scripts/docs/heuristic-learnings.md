@@ -27,6 +27,9 @@ aufkommen. Der verbleibende leichte Winkel folgt der horizontalen Laufrichtung; 
 senkrecht gedribbelt. Auch der Haltepunkt muss zur Laufrichtung gespiegelt werden; allein den
 Winkel umzukehren lässt den Ball auf der falschen Körperseite. Beim Anhalten bleibt die zuletzt
 verwendete Seite erhalten; Fang und Abgabe müssen dieselbe Projektion verwenden.
+Ein besitzloser Freigabezustand mit `z=0` direkt zwischen gehaltenem Ball und Flug ist kein
+Bodenkontakt: Seine Projektion muss Höhe und Körperseite der letzten Handposition erhalten.
+Ein Test ohne diesen expliziten Zwischenzustand erkennt den kurzen Sprung zur Feldposition nicht.
 Diese Projektion verändert keine
 kompilierten Ballwege und belegt weder echte Dribbelzeitpunkte noch die verwendete Hand.
 

@@ -60,10 +60,19 @@ export function planBallOffsets(replay) {
 	const openingTossAt = openingTip ? openingTip.start + openingTip.jumpBallPlan.tossAt : -1;
 	const frames = replay.scenes.flatMap((scene) => scene.frames);
 	const directions = new Map();
+	const releases = new Map();
 	let direction = 0;
 	for (let index = frames.length - 1; index >= 0; index--) {
 		const frame = frames[index];
 		const next = frames[index + 1];
+		const previous = frames[index - 1];
+		if (
+			!frame.ball.owner && frame.ball.z === 0 && previous?.ball.owner &&
+			next?.ball.flight && !next.ball.owner &&
+			frame.ball.x === previous.ball.x && frame.ball.y === previous.ball.y
+		) {
+			releases.set(frame, previous.ball.z);
+		}
 		direction = frame.ball.dribble && frame.ball.owner && frame.ball.owner === next?.ball.owner
 			? Math.sign(next.ball.x - frame.ball.x) || direction
 			: 0;
@@ -92,6 +101,9 @@ export function planBallOffsets(replay) {
 				handSide = directions.get(frame) || (lastOwner === ball.owner ? handSide : 1);
 				const body = getPlayerGeometry(owner, Infinity);
 				offset = { x: body.x - owner.x, y: body.y - owner.y, z: owner.jump * 1.4, handX: handSide - 1 };
+			} else if (releases.has(frame)) {
+				// A release snapshot at z=0 still starts at the preceding hand, not on the floor.
+				offset = { x: anchor.x, y: anchor.y, z: anchor.z - releases.get(frame), handX: anchor.handX };
 			} else if (atTip) {
 				const top = Math.min(
 					...frame.players.filter((player) =>

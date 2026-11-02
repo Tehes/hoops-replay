@@ -169,6 +169,35 @@ Deno.test("left-hand projection survives a scene boundary, a stop and the follow
 	}
 });
 
+Deno.test("explicit zero-height pass releases preserve the gathered hand instead of resetting to the floor", () => {
+	for (const direction of [-1, 1]) {
+		const start = player(1, 40, 25, 0.4);
+		const passer = { ...start, x: 40 + direction * 2 };
+		const receiver = player(2, 60, 35, -0.3);
+		const scene = {
+			start: 0,
+			frames: [
+				{ time: 0, players: [start, receiver], ball: { ...heldBall(start), dribble: true } },
+				{ time: 0.68, players: [passer, receiver], ball: heldBall(passer) },
+				{ time: 0.69, players: [passer, receiver], ball: { x: passer.x + 1, y: 25.8, z: 0, owner: null } },
+				{ time: 0.89, players: [passer, receiver], ball: { x: 50, y: 30, z: 1, owner: null, flight: true } },
+				{ time: 1.09, players: [passer, receiver], ball: heldBall(receiver) },
+			],
+		};
+		const source = JSON.stringify(scene.frames);
+		planBallOffsets({ scenes: [scene] });
+		for (const pixels of [2, 4, 12]) {
+			const hand = atKey(scene, 1, pixels);
+			const release = atKey(scene, 2, pixels);
+			near(release.x, hand.x, "pass resets to the wrong side of the body");
+			near(release.y, hand.y, "pass drops from the hand to the floor before departing");
+			atKey(scene, 4, pixels);
+			near(atKey(scene, 2, pixels).x, release.x, "seeking changes the release point");
+		}
+		assert(JSON.stringify(scene.frames) === source, "release projection changes source data");
+	}
+});
+
 Deno.test("dribble gathers before a flight and does not bounce during a jump or a brief hold", () => {
 	const p = player(1, 40, 25);
 	for (
