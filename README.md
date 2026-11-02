@@ -62,8 +62,6 @@ pass sequence or play that actually happened.
 4. Tap or click a jersey to see the player’s name.
 
 On a keyboard, **Space** toggles playback and the **left/right arrow keys** move between actions.
-Moving between actions pauses playback at the start of the selected action.
-Pressing Play at the end restarts the replay.
 
 ### Load Another Game
 
