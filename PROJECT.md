@@ -176,6 +176,12 @@ und belegten Ereignissen.
 
 - Herkunft des Ballbesitzes und Unterbrechungen bestimmen, ob Transition, zweite Chance oder
   geordneter Aufbau plausibel ist.
+- Nach einem Offensivrebound werden Korbschutz und Anschlussentscheidung zusammen betrachtet.
+  Ein erreichbarer Verteidiger kann den direkten Putback erschweren; Hilfe vom Perimeter kann eine
+  äußere Anspielstation freigeben. Der Rebounder sichert den Ball und kann aus seiner Fangposition
+  herauspassen, bevor er Platz schafft. Eine freie Korbchance wird nicht allein für einen späteren
+  Pass aufgegeben. Direkte Abschlüsse bleiben möglich; ein Offensivrebound allein belegt weder
+  ein Doppelteam noch einen tatsächlich gespielten Kick-out.
 - Ein ausdrücklicher Fastbreak-Qualifier belegt den Kontext des markierten Ereignisses, nicht
   bestimmte Laufwege oder eine Überzahl. Die zusammenhängende Folge seit dem Ballgewinn
   beziehungsweise Einwurf bestimmt den Anlauf; Unterbrechungen dürfen nicht übergangen werden.

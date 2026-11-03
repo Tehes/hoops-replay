@@ -1173,6 +1173,10 @@ function reactDefense(state, scene, matchups, contacts, direction, delay) {
 			x += dx * scale;
 			y += dy * scale;
 		}
+		if (scene.postHelp?.defenderId === Number(id) && state.ball.owner === scene.postHelp.owner) {
+			x = ball.x + direction * 1.5;
+			y = ball.y + scene.postHelp.side * 3.4;
+		}
 		x = Math.max(1, Math.min(93, x));
 		y = Math.max(2, Math.min(48, y));
 		const travel = Math.hypot(x - player.x, y - player.y);
@@ -1496,7 +1500,7 @@ function planOutlet(state, scene, origin, carrier, receiver, direction, data) {
 	}) ?? null;
 }
 
-function prepareAttack(state, scene, offense, direction, matchups, record, data, replay, index) {
+function prepareAttack(state, scene, offense, direction, matchups, record, data, replay, index, recordPlay) {
 	const lineup = state.lineups[offense];
 	const pg = lineup[0];
 	const advanceScale = scene.liveSeconds > 0 ? Math.max(0.65, Math.min(1.8, scene.liveSeconds / 8)) : 1;
@@ -1542,6 +1546,7 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 	planReceivingEntry(state, scene, direction);
 	const entry = scene.stagedEntry ?? scene.waitingEntry ?? scene.shotEntry;
 	if (!restart && !changed && !state.needsAdvance && carrier) {
+		prepareReboundKickOut(state, scene, replay.scenes[index - 1], direction, recordPlay);
 		if (scene.shotEntry) {
 			Object.assign(state.positions[scene.action.personId], entry);
 		}
@@ -1554,6 +1559,10 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 			});
 		}
 		for (const [defender, attacker] of Object.entries(matchups)) {
+			// Post help recovers through the live defense response, not a formation reset.
+			if (replay.scenes[index - 1]?.postReboundHelp) {
+				continue;
+			}
 			const target = state.positions[attacker];
 			Object.assign(state.positions[defender], {
 				x: Math.max(1, Math.min(93, target.x + direction * 3.6)),
@@ -1565,6 +1574,13 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 		for (const move of scene.laneExits ?? []) {
 			move.startAt = startAt;
 			move.duration = scene.frames.at(-1).time - startAt;
+			if (replay.scenes[index - 1]?.postReboundHelp) {
+				const duration = Math.max(0.2, Math.hypot(move.x - move.from.x, move.y - move.from.y) * 1.5 / 12);
+				if (duration < move.duration) {
+					move.holdUntil = startAt + move.duration;
+					move.duration = duration;
+				}
+			}
 		}
 		return;
 	}
@@ -2554,11 +2570,20 @@ function prepareRebound(replay, scene, index, state) {
 	const target = { x: state.ball.x, y: state.ball.y };
 	// The rim/block outcome starts the catch route; the buildup only established general position.
 	previous.reboundRun = { id, from: { ...origin }, x: target.x, y: target.y, startAt: start, duration: end - start };
-	const pressure = scene.reboundPressure;
+	const offensive = scene.action.subType === "offensive" && ["2pt", "3pt"].includes(previous.kind) &&
+		!scene.action.qualifiers?.includes("deadball");
+	const defenderId = offensive
+		? Number(Object.keys(previous.matchups).find((defender) => previous.matchups[defender] === id))
+		: null;
+	const pressure = scene.reboundPressure ?? (defenderId ? { defenderId } : null);
 	if (pressure) {
 		const defender = startFrame.players.find((player) => player.id === pressure.defenderId);
 		const direction = previous.hoop.x > 47 ? -1 : 1;
-		const point = { x: target.x + direction * 3.4, y: target.y + (defender.y < target.y ? -1.6 : 1.6) };
+		const radius = Math.hypot(previous.hoop.x - target.x, previous.hoop.y - target.y);
+		const point = offensive
+			? { x: target.x + (radius > 0 ? (previous.hoop.x - target.x) / radius : direction) * 2.8,
+				y: target.y + (previous.hoop.y - target.y) / (radius || 1) * 2.8 }
+			: { x: target.x + direction * 3.4, y: target.y + (defender.y < target.y ? -1.6 : 1.6) };
 		const distance = Math.hypot(point.x - defender.x, point.y - defender.y);
 		const fraction = Math.min(1, (end - start) * 8 / 1.5 / (distance || 1));
 		// React to the rim outcome; never reserve the future catch point before the miss.
@@ -2566,13 +2591,35 @@ function prepareRebound(replay, scene, index, state) {
 			x: defender.x + (point.x - defender.x) * fraction,
 			y: defender.y + (point.y - defender.y) * fraction, startAt: start, duration: end - start };
 	}
+	const next = replay.scenes[index + 1];
+	if (offensive && Math.hypot(previous.hoop.x - target.x, previous.hoop.y - target.y) <= 12 &&
+		next?.rules.requiresPlay && !next.rules.buildupRestart && next.liveSeconds >= 4 &&
+		next.action.period === scene.action.period && next.rules.offense === scene.action.teamId &&
+		next.action.personId !== id && !getShotStyle(next.action).putback && !getShotStyle(next.action).alleyOop &&
+		!getShotStyle(next.action).tip) {
+		const helper = Object.keys(previous.matchups).map(Number).filter((other) => other !== defenderId)
+			.map((other) => ({ player: startFrame.players.find((player) => player.id === other) }))
+			.map(({ player }) => ({ player, distance: Math.hypot(player.x - target.x, player.y - target.y) }))
+			.filter((candidate) => candidate.distance >= 5 && candidate.distance <= 14)
+			.sort((a, b) => a.distance - b.distance)[0];
+		if (helper) {
+			const side = helper.player.y < target.y ? -1 : 1;
+			const point = { x: target.x + (previous.hoop.x > 47 ? 1 : -1) * 1.5, y: target.y + side * 3.4 };
+			const distance = Math.hypot(point.x - helper.player.x, point.y - helper.player.y);
+			const fraction = Math.min(1, (end - start) * 8 / 1.5 / distance);
+			previous.reboundHelpRun = { id: helper.player.id, from: { ...helper.player },
+				x: helper.player.x + (point.x - helper.player.x) * fraction,
+				y: helper.player.y + (point.y - helper.player.y) * fraction, startAt: start, duration: end - start };
+			scene.postReboundHelp = { defenderId: helper.player.id, owner: id, side, target: point };
+		}
+	}
 	for (const frame of previous.frames) {
 		if (frame.time <= start) {
 			continue;
 		}
 		const fraction = Math.min(1, (frame.time - start) / (end - start));
 		const smooth = fraction * fraction * (3 - 2 * fraction);
-		for (const move of [previous.reboundRun, previous.pressureRun].filter(Boolean)) {
+		for (const move of [previous.reboundRun, previous.pressureRun, previous.reboundHelpRun].filter(Boolean)) {
 			const player = frame.players.find((player) => player.id === move.id);
 			player.x = move.from.x + (move.x - move.from.x) * smooth;
 			player.y = move.from.y + (move.y - move.from.y) * smooth;
@@ -2581,18 +2628,106 @@ function prepareRebound(replay, scene, index, state) {
 	for (const between of replay.scenes.slice(scene.reboundShotIndex + 1, index)) {
 		for (const frame of between.frames) {
 			Object.assign(frame.players.find((player) => player.id === id), target);
-			if (previous.pressureRun) {
-				const move = previous.pressureRun;
+			for (const move of [previous.pressureRun, previous.reboundHelpRun].filter(Boolean)) {
 				Object.assign(frame.players.find((player) => player.id === move.id), { x: move.x, y: move.y });
 			}
 		}
 	}
 	Object.assign(state.positions[id], target);
-	if (previous.pressureRun) {
-		const move = previous.pressureRun;
+	for (const move of [previous.pressureRun, previous.reboundHelpRun].filter(Boolean)) {
 		Object.assign(state.positions[move.id], { x: move.x, y: move.y });
 	}
 	scene.reboundApproach = { sceneIndex: scene.reboundShotIndex, start, end, playerId: id, target };
+}
+
+// WABC Level 2, Team 1.1.2 and 2.1.5: protect the rim, then pass out of post pressure.
+function prepareReboundKickOut(state, scene, rebound, direction, record) {
+	const owner = state.ball.owner;
+	if (rebound?.kind !== "rebound" || rebound.action.subType !== "offensive" ||
+		!rebound.reboundContinuous || rebound.action.qualifiers?.includes("deadball") ||
+		rebound.action.personId !== owner || rebound.action.teamId !== scene.attackTeam ||
+		rebound.action.period !== scene.action.period || scene.liveSeconds < 4 ||
+		scene.action.personId === owner || scene.shotStyle?.tip || scene.shotStyle?.putback || scene.shotStyle?.alleyOop) {
+		return;
+	}
+	const origin = state.positions[owner];
+	const hoop = { x: direction === 1 ? 88.75 : 5.25, y: 25 };
+	const radius = Math.hypot(origin.x - hoop.x, origin.y - hoop.y);
+	const defenders = Object.keys(scene.matchups).map(Number);
+	const protector = defenders.find((id) => {
+		const player = state.positions[id];
+		return Math.hypot(player.x - origin.x, player.y - origin.y) <= 4.5 &&
+			Math.hypot(player.x - hoop.x, player.y - hoop.y) < radius;
+	});
+	if (radius > 12 || !protector) {
+		return;
+	}
+	// A nearby perimeter defender can dig down; the pass releases that defender to recover.
+	const helper = rebound.postReboundHelp
+		? { id: rebound.postReboundHelp.defenderId,
+			distance: Math.hypot(state.positions[rebound.postReboundHelp.defenderId].x - origin.x,
+				state.positions[rebound.postReboundHelp.defenderId].y - origin.y) }
+		: defenders.filter((id) => id !== protector && scene.matchups[id] !== owner)
+		.map((id) => ({ id, distance: Math.hypot(state.positions[id].x - origin.x, state.positions[id].y - origin.y) }))
+		.filter((candidate) => candidate.distance >= 5 && candidate.distance <= 14)
+		.sort((a, b) => a.distance - b.distance)[0];
+	state.ball.dribble = false;
+	state.ball.flight = false;
+	if (helper) {
+		scene.postHelp = { defenderId: helper.id, owner, side: state.positions[helper.id].y < origin.y ? -1 : 1 };
+		const duration = Math.max(0.18, Math.min(0.9, (helper.distance - 3.4) / 12 + 0.16));
+		for (let step = 0; step < 4; step++) {
+			record(duration / 4);
+		}
+	}
+	const intended = scene.action.assistPersonId || scene.action.personId;
+	const candidates = [];
+	for (const id of state.lineups[scene.attackTeam].filter((id) => id !== owner)) {
+		const from = state.positions[id];
+		for (const [dx, dy] of [[0, 0], [0, -5], [0, 5], [-direction * 5, 0]]) {
+			const point = { x: from.x + dx, y: from.y + dy };
+			if (point.x < 2 || point.x > 92 || point.y < 3 || point.y > 47 ||
+				isInOffensiveLane(point, direction) || Math.hypot(point.x - hoop.x, point.y - hoop.y) < 12 ||
+				Object.values(state.lineups).flat().filter((other) => other !== id).some((other) =>
+					[0.25, 0.5, 0.75, 1].some((fraction) => Math.hypot(
+						from.x + dx * fraction - state.positions[other].x,
+						from.y + dy * fraction - state.positions[other].y) < 2.8))) {
+				continue;
+			}
+			const cost = getPassCost(origin, point, defenders.map((id) => state.positions[id])) +
+				Math.hypot(dx, dy) * 0.5 - (id === intended ? 0.5 : 0);
+			if (Number.isFinite(cost)) {
+				candidates.push({ id, point, cost });
+			}
+		}
+	}
+	candidates.sort((a, b) => a.cost - b.cost);
+	if (!candidates.length) {
+		return;
+	}
+	const receiverId = candidates[0].id;
+	const receiver = state.positions[receiverId];
+	const from = { ...receiver };
+	const point = candidates[0].point;
+	const duration = Math.max(0.18, Math.hypot(point.x - from.x, point.y - from.y) * 1.5 / 12);
+	for (let step = 1; step <= 4; step++) {
+		receiver.x = from.x + (point.x - from.x) * step / 4;
+		receiver.y = from.y + (point.y - from.y) * step / 4;
+		record(duration / 4);
+	}
+	if (!Number.isFinite(getPassCost(origin, receiver, defenders.map((id) => state.positions[id])))) {
+		return;
+	}
+	releaseBall(state);
+	record(0.01);
+	const releaseAt = scene.frames.at(-1).time;
+	flyBall(state, record, { x: receiver.x + 1, y: receiver.y + 0.8, z: 0.5 }, 0.6,
+		Math.max(0.35, Math.hypot(receiver.x - origin.x, receiver.y - origin.y) / 45));
+	state.ball.owner = receiverId;
+	state.ball.dribble = false;
+	record(0.01);
+	scene.reboundKickOut = { from: owner, to: receiverId, protector, helper: helper?.id ?? null, releaseAt,
+		catchAt: scene.frames.at(-1).time, source: "schematic-post-pressure" };
 }
 
 // WABC Level 1, Team 1.1.11 and 2.3.1: delay the outlet while the rebounder protects the ball.
@@ -2866,6 +3001,14 @@ function compileScene(replay, scene, index, state, data) {
 	scene.spacingMoves = spacingMoves;
 	const contacts = new Set();
 	const record = (delay, movement = false) => {
+		if (scene.postReboundHelp) {
+			const plan = scene.postReboundHelp;
+			const player = state.positions[plan.defenderId];
+			const distance = Math.hypot(plan.target.x - player.x, plan.target.y - player.y);
+			const fraction = Math.min(1, delay * 8 / (distance || 1));
+			player.x += (plan.target.x - player.x) * fraction;
+			player.y += (plan.target.y - player.y) * fraction;
+		}
 		const arrival = scene.arrivalMove;
 		if (arrival && scene.approachAt === undefined) {
 			Object.assign(state.positions[arrival.id], preparationPosition(state, scene, arrival.id, time + delay));
@@ -2973,7 +3116,7 @@ function compileScene(replay, scene, index, state, data) {
 			}
 		}
 		let continuation = planContinuation(replay, scene, state.lineups[offense], direction);
-		prepareAttack(state, scene, offense, direction, matchups, recordMovement, data, replay, index);
+		prepareAttack(state, scene, offense, direction, matchups, recordMovement, data, replay, index, record);
 		if (scene.transitionPlan) {
 			continuation = null;
 		}
@@ -3216,7 +3359,7 @@ function compileScene(replay, scene, index, state, data) {
 		// Unlisted people can receive technical fouls; keep the action without inventing a court player.
 		if (scene.rules.requiresPlay) {
 			followAttackers = true;
-			prepareAttack(state, scene, offense, direction, matchups, recordMovement, data, replay, index);
+			prepareAttack(state, scene, offense, direction, matchups, recordMovement, data, replay, index, record);
 			pacePreparation(state, scene, time, 0.8, record, direction);
 		}
 		scene.eventAt = time;
@@ -3229,14 +3372,14 @@ function compileScene(replay, scene, index, state, data) {
 		const onBall = scene.kind === "turnover" || offensive || personalOnBall ||
 			["shooting", "take", "transition take"].includes(action.descriptor);
 		if (scene.reboundPressure) {
-			prepareAttack(state, scene, offense, direction, matchups, recordMovement, data, replay, index);
+			prepareAttack(state, scene, offense, direction, matchups, recordMovement, data, replay, index, record);
 			prepareReboundPressure(state, scene, direction, record);
 		} else if (scene.rules.requiresPlay) {
 			if (liveFoul && (state.restart || state.possession !== offense || state.needsAdvance)) {
 				replay.attacks.push(scene.start);
 			}
 			followAttackers = true;
-			prepareAttack(state, scene, offense, direction, matchups, recordMovement, data, replay, index);
+			prepareAttack(state, scene, offense, direction, matchups, recordMovement, data, replay, index, record);
 			const help = planDefensiveHelp(state, scene, direction);
 			if (help) {
 				contacts.add(help.playerId);
@@ -3504,7 +3647,7 @@ function compileScene(replay, scene, index, state, data) {
 	} else {
 		if (scene.rules.requiresPlay) {
 			followAttackers = true;
-			prepareAttack(state, scene, offense, direction, matchups, recordMovement, data, replay, index);
+			prepareAttack(state, scene, offense, direction, matchups, recordMovement, data, replay, index, record);
 			pacePreparation(state, scene, time, 0.8, record, direction);
 		}
 		scene.eventAt = time + 0.3;

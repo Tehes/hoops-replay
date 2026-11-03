@@ -133,6 +133,36 @@ Ein Aufstellungsslot belegt nicht die tatsächliche Ballführerrolle; statische 
 beweisen keine sichere Passlinie gegen bewegte Verteidiger. Die visuelle Nutzerabnahme und eine
 umfassende Beurteilung von Passdruck, Laufwegkonflikten und Anschlussentscheidungen stehen aus.
 
+## Offensivrebound: Korbschutz und Kick-out
+
+Ein allgemeiner Zonen-Auslauf direkt nach dem Fang kann eine freie Korbchance grundlos aufgeben.
+Korbschutz, Hilfe und Pass müssen davor zusammenpassen: Der zugeordnete Verteidiger reagiert erst
+auf den Fehlwurf mit einem erreichbaren Weg zur Korbseite des Rebounders. Ein naher Außenverteidiger
+kann herunterhelfen und nach der Ballabgabe zurückkehren. Der Rebounder hält bis zum Pass seine
+Fangposition; eine Außenstation darf sich kurz für eine freie Passlinie lösen. Erst nach dem Fang
+des Kick-outs beginnt der allgemeine Zonen-Auslauf. Hilfe allein garantiert keinen freien Pass:
+Ein beim Start offener Korridor kann sich während des Freilaufens schließen und muss vor der
+Abgabe erneut beurteilt werden. Ein direkter Weg der Hilfe auf den Ball kann außerdem genau die
+gewünschte Außenpasslinie blockieren; seitlicher Druck auf der Korbseite lässt diese Option offen.
+Die Hilfe kann bereits nach dem Fehlwurf anlaufen und während des Reboundfangs weiter reagieren;
+erst danach zu starten verlängert den Aufenthalt des Rebounders unnötig. Ein kurzer Zonen-Auslauf
+braucht außerdem seine eigene Bewegungsdauer, auch wenn ein Mitspieler gleichzeitig einen längeren
+Anlauf absolviert. Nach dem früheren Erreichen bleibt das Außenziel bis zum Ende dieser gemeinsamen
+Bewegungsphase erhalten, statt in deren langsamere Interpolation zurückzuspringen.
+
+Die Ergänzung setzt einen benannten, zusammenhängenden Live-Offensivrebound, nahen Korbschutz,
+eine Fortsetzung mit anderem Beteiligten und ausreichend Zeit voraus. Putbacks, Alley-oops,
+unmittelbare Eigenabschlüsse, Team-/Dead-Ball-Rebounds und Unterbrechungen erzwingen keinen Kick-out.
+Fehlt eine geeignete Passlinie, wird kein sicherer Pass behauptet. Die Abstände und Auswahlgewichte
+sind eigene Heuristiken; statische Korridore ersetzen keine vollständige Prüfung bewegter Defense.
+Die visuelle Nutzerabnahme des Ablaufs steht aus.
+
+Grundlagen: [WABC Level 2](https://assets.fiba.basketball/image/upload/documents-corporate-wabc-coaching-manual-level-2-eng.pdf),
+Team 1.1.2, S. 228 (Low-Post-Hilfe und Rückpass), und Team 2.1.5, S. 294 (Entscheidung bei Hilfe),
+sowie [USA Basketball, Advanced Rebounding](https://www.usab.com/news/2014/01/advanced-rebounding-secrets-from-the-pros)
+(freie ballferne Schützen nach Offensivrebound). Diese Prinzipien begründen eine schematische
+Ergänzung, keine Rekonstruktion der tatsächlichen Verteidigung.
+
 ## Früher Druck auf die Rebounderin
 
 Eine gewöhnliche persönliche Foulfolge direkt nach einem benannten Defensivrebound kann als
