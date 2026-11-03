@@ -48,6 +48,49 @@ function scenario(mirrored = false) {
 	return data;
 }
 
+Deno.test("a recorded charge connects the catch to a planted defender and visible impact in either direction", () => {
+	for (const mirrored of [false, true]) {
+		const data = scenario(mirrored);
+		const original = JSON.stringify(data);
+		const replay = compileReplay(data);
+		const scene = replay.scenes.at(-1);
+		const plan = scene.chargePlan;
+		assert(plan?.attackerId === 203507 && plan.defenderId === 1630559, "lost recorded charge participants");
+		assert(plan.contactAt - scene.reboundKickOut.catchAt < 2.5, "charge retained the idle delay after the catch");
+		assert(scene.eventAt === plan.contactAt && plan.settledAt <= plan.contactAt - 0.17,
+			"whistle missed the contact or defender arrived too late");
+		const at = (time) => getReplayFrame(replay, scene.start + time);
+		const player = (frame, id) => frame.players.find((item) => item.id === id);
+		const planted = player(at(plan.settledAt + 0.01), plan.defenderId);
+		const contact = at(plan.contactAt);
+		const defender = player(contact, plan.defenderId);
+		const attacker = player(contact, plan.attackerId);
+		assert(Math.hypot(defender.x - planted.x, defender.y - planted.y) < 0.01,
+			"defender kept sliding into the attacker before impact");
+		assert(Math.abs(Math.hypot(attacker.x - defender.x, attacker.y - defender.y) - 2.4) < 0.01,
+			"charge contact overlapped the player centres");
+		const pushed = at(plan.contactAt + 0.3);
+		const displaced = player(pushed, plan.defenderId);
+		const stopped = player(pushed, plan.attackerId);
+		assert((displaced.x - defender.x) * plan.direction.x + (displaced.y - defender.y) * plan.direction.y > 2.5,
+			"defender only twitched instead of receiving the attacker's impulse");
+		assert((stopped.x - attacker.x) * plan.direction.x + (stopped.y - attacker.y) * plan.direction.y < 0,
+			"attacker continued running through the defender");
+		assert(!pushed.ball.dribble && pushed.clock === scene.clockTo && contact.clock === scene.clockTo,
+			"charge response continued live dribbling or consumed game time after the whistle");
+		const later = player(at(plan.contactAt + 0.52), plan.defenderId);
+		assert(Math.abs(later.angle) < 0.001, "defender never regained balance");
+		assert(JSON.stringify(data) === original && replay.scenes.length === data.actions.length,
+			"charge invented a source event or modified the feed");
+		const sample = JSON.stringify(at(plan.contactAt + 0.1));
+		at(0);
+		assert(JSON.stringify(at(plan.contactAt + 0.1)) === sample, "charge changed after reverse seeking");
+	}
+	const data = scenario();
+	data.actions.at(-1).descriptor = "";
+	assert(!compileReplay(data).scenes.at(-1).chargePlan, "ordinary offensive foul invented a charge");
+});
+
 Deno.test("offensive rebound pressure explains the kick-out before the rebounder leaves the paint", () => {
 	for (const mirrored of [false, true]) {
 		const data = scenario(mirrored);

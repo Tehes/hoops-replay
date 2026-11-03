@@ -1961,6 +1961,56 @@ function connectShot(state, scene, finishDuration, record) {
 	}
 }
 
+// The recorded charge supplies the ruling; the approach and contact response remain schematic.
+function animateCharge(state, scene, hoop, direction, record) {
+	const actor = state.positions[scene.action.personId];
+	const defender = state.positions[scene.action.foulDrawnPersonId];
+	const origin = { ...actor };
+	const from = { ...defender };
+	const radius = Math.hypot(hoop.x - actor.x, hoop.y - actor.y);
+	const ux = radius > 0 ? (hoop.x - actor.x) / radius : direction;
+	const uy = radius > 0 ? (hoop.y - actor.y) / radius : 0;
+	const candidates = [0.3, 0.45, 0.6].map((fraction) => {
+		const travel = Math.max(0, Math.min(12, radius - 8, radius * fraction));
+		const point = { x: origin.x + ux * travel, y: origin.y + uy * travel };
+		const target = { x: point.x + ux * 2.4, y: point.y + uy * 2.4 };
+		const settle = Math.max(0.18, Math.hypot(target.x - from.x, target.y - from.y) * 1.5 / 12);
+		return { point, target, settle, duration: Math.max(0.65, travel * 1.5 / 14, settle + 0.18) };
+	}).sort((a, b) => a.duration - b.duration);
+	const plan = candidates[0];
+	plan.duration = Math.max(plan.duration, Math.min(2.4, scene.liveSeconds * 0.22));
+	const startAt = scene.frames.at(-1).time;
+	scene.chargePlan = { attackerId: scene.action.personId, defenderId: scene.action.foulDrawnPersonId,
+		startAt, settledAt: startAt + plan.settle, contactAt: startAt + plan.duration,
+		direction: { x: ux, y: uy }, source: "schematic-recorded-charge" };
+	state.ball.dribble = true;
+	const steps = Math.ceil(plan.duration / 0.08);
+	for (let step = 1; step <= steps; step++) {
+		const u = step / steps;
+		const progress = u * u * (2 - u);
+		const v = Math.min(1, u * plan.duration / plan.settle);
+		const settled = v * v * (3 - 2 * v);
+		actor.x = origin.x + (plan.point.x - origin.x) * progress;
+		actor.y = origin.y + (plan.point.y - origin.y) * progress;
+		defender.x = from.x + (plan.target.x - from.x) * settled;
+		defender.y = from.y + (plan.target.y - from.y) * settled;
+		actor.angle = -ux * 0.12;
+		record(plan.duration / steps);
+	}
+	scene.stoppedAt = scene.chargePlan.contactAt;
+	state.ball.dribble = false;
+	for (const [travel, displacement, angle, duration] of [[0.45, 1.8, 0.35, 0.14],
+		[-0.65, 2.6, 0.2, 0.16], [-0.65, 2.6, 0, 0.22]]) {
+		actor.x = plan.point.x + ux * travel;
+		actor.y = plan.point.y + uy * travel;
+		actor.angle = ux * angle * 0.5;
+		defender.x = plan.target.x + ux * displacement;
+		defender.y = plan.target.y + uy * displacement;
+		defender.angle = -ux * angle;
+		record(duration);
+	}
+}
+
 function animateLooseBallTurnover(state, scene, foul, direction, record) {
 	const fouler = state.positions[foul.action.personId];
 	const victim = state.positions[foul.action.foulDrawnPersonId];
@@ -3366,6 +3416,7 @@ function compileScene(replay, scene, index, state, data) {
 		record(0.7);
 	} else if (scene.kind === "foul" || scene.kind === "turnover" || scene.kind === "steal") {
 		const offensive = scene.kind === "foul" && action.subType === "offensive";
+		const charge = offensive && action.descriptor === "charge" && Boolean(state.positions[action.foulDrawnPersonId]);
 		// An unspecified personal foul is schematically on-ball, not evidence of an off-ball contact.
 		const personalOnBall = scene.kind === "foul" && action.subType === "personal" &&
 			!action.descriptor && Boolean(state.positions[action.foulDrawnPersonId]);
@@ -3384,7 +3435,7 @@ function compileScene(replay, scene, index, state, data) {
 			if (help) {
 				contacts.add(help.playerId);
 				prepareDefensiveHelp(state, scene, help, direction, record, recordMovement);
-			} else {
+			} else if (!charge) {
 				pacePreparation(state, scene, time, scene.action.descriptor === "shooting" ? 2 : 0.8, record, direction);
 			}
 		}
@@ -3394,7 +3445,7 @@ function compileScene(replay, scene, index, state, data) {
 					prepareShootingFoul(state, scene, replay, index, hoop, direction, record);
 				}
 			} else {
-				const receiverId = personalOnBall ? action.foulDrawnPersonId
+				const receiverId = charge ? action.personId : personalOnBall ? action.foulDrawnPersonId
 					: scene.looseBallFoulIndex !== undefined ? action.personId : null;
 				if (receiverId && state.ball.owner !== receiverId) {
 					const receiver = state.positions[receiverId];
@@ -3406,7 +3457,9 @@ function compileScene(replay, scene, index, state, data) {
 				}
 				state.ball.owner = (scene.kind === "foul" && !offensive ? action.foulDrawnPersonId : action.personId) ||
 					state.ball.owner || state.lineups[offense][0];
-				record(0.4);
+				if (!charge) {
+					record(0.4);
+				}
 			}
 		}
 		const victim = state.positions[action.foulDrawnPersonId];
@@ -3420,14 +3473,10 @@ function compileScene(replay, scene, index, state, data) {
 			actor.y += dy * 0.3;
 			actor.angle = direction * 0.2;
 			record(0.3);
-		} else if (scene.kind === "foul" && victim && actor && action.descriptor === "charge") {
+		} else if (charge && actor) {
 			contacts.add(action.foulDrawnPersonId);
-			Object.assign(actor, { x: victim.x - direction * 1.4, y: victim.y });
-			record(0.3);
-			actor.x -= direction * 1.8;
-			actor.angle = -direction * 0.35;
-			victim.x += direction;
-			record(0.25);
+			animateCharge(state, scene, hoop, direction, record);
+			followAttackers = false;
 		} else if (scene.kind === "foul" && victim && actor) {
 			contacts.add(action.personId);
 			const from = { x: actor.x, y: actor.y };
@@ -3485,7 +3534,7 @@ function compileScene(replay, scene, index, state, data) {
 				animateLooseBallTurnover(state, scene, foul, direction, record);
 			}
 		}
-		scene.eventAt = scene.looseBallPlan?.looseAt ?? time;
+		scene.eventAt = scene.chargePlan?.contactAt ?? scene.looseBallPlan?.looseAt ?? time;
 		const markerKind = action.subType === "technical"
 			? "technical"
 			: action.subType === "shot clock"

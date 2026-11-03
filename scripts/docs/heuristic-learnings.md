@@ -185,6 +185,26 @@ die gezeigte Folge, nicht pauschal alle Rebound-Foul-Kontexte.
 
 Grundlage: [WABC Level 1](https://assets.fiba.basketball/image/upload/documents-corporate-wabc-coaching-level-manuals-level-1-eng.pdf).
 
+## Aufgezeichnete Charge: Anlauf, Kontakt und Reaktion
+
+Ein nachträgliches Versetzen des Angreifers zum Verteidiger mit kurzem Zucken erklärt eine Charge
+nicht. Der Ballführer braucht einen erkennbaren Anlauf zum Korb; der Verteidiger muss den gewählten
+Kontaktpunkt vorher erreichen und dort kurz bleiben. Nach dem Kontakt wird der Verteidiger in
+Anlaufrichtung verschoben und kippt kurz zurück, während der Angreifer abbremst und sich etwas
+zurücknimmt. Ein Sturz ist dafür weder nötig noch durch das Foulereignis belegt.
+
+Eine allgemeine Aufbaupause nach einem freien Fang wurde für ausdrücklich aufgezeichnete Charges
+verworfen: Sie lässt die anschließende Kontaktannäherung zusammenhanglos wirken. Der Anlauf
+verbindet Fang und Foul; seine Dauer muss auch erreichbare Verteidigerwege und die abgebildete
+Spielzeit berücksichtigen. Zu starke Verdichtung kann andere Spieler rechnerisch zu lange in der
+Zone halten. Der Pfiff ist am Kontakt verankert, nicht am Ende der sichtbaren Reaktion. Abbremsen,
+Zurückweichen und Stabilisieren danach verbrauchen keine weitere Live-Spielzeit.
+
+Grundlage: [NBA, Comments on the Rules – Block-Charge](https://official.nba.com/comments-on-the-rules/).
+Das aufgezeichnete Ruling bleibt verbindlich; genaue Kontaktstelle, Anlauf und Körperreaktion sind
+schematisch. Körpermittelpunkte, Neigung und begrenzte Verschiebung ersetzen keine Prüfung von
+Fußarbeit oder tatsächlicher Kontaktphysik. Die visuelle Nutzerabnahme der neuen Charge steht aus.
+
 ## Abschluss und Folgebewegung getrennt beurteilen
 
 Eine Abschlussprüfung muss die Landung am Wurfende bewerten. Die Endposition der gesamten Szene
