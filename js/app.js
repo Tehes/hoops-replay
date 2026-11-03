@@ -270,7 +270,7 @@ function drawPlayerShadow(position) {
 	const size = getPlayerSize(scale / (globalThis.devicePixelRatio || 1));
 	ctx.save();
 	ctx.globalAlpha = position.opacity;
-	ctx.translate(position.x, position.y);
+	ctx.translate(position.x, position.y + position.bench * PLAYER_HALF_HEIGHT * size);
 	ctx.scale(size, size);
 	ctx.fillStyle = "#19212c30";
 	ctx.beginPath();

@@ -14,7 +14,9 @@ export function getPlayerGeometry(position, pixelScale) {
 	const sin = Math.sin(position.angle);
 	const cos = Math.cos(position.angle);
 	const x = position.x + sin * PLAYER_HALF_HEIGHT * size;
-	const y = position.y - (cos * PLAYER_HALF_HEIGHT + position.jump * PLAYER_JUMP_HEIGHT) * size;
+	// Bench coordinates already describe the jersey center; blend back to the foot anchor on return.
+	const y = position.y - (cos * PLAYER_HALF_HEIGHT + position.jump * PLAYER_JUMP_HEIGHT -
+		(position.bench ?? 0) * PLAYER_HALF_HEIGHT) * size;
 	const halfWidth = (Math.abs(cos) * 1.45 + Math.abs(sin) * PLAYER_HALF_HEIGHT + 0.08) * size;
 	const halfHeight = (Math.abs(sin) * 1.45 + Math.abs(cos) * PLAYER_HALF_HEIGHT + 0.08) * size;
 	return {

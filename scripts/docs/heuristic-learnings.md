@@ -15,6 +15,15 @@ fachliche Zielbild steht in [PROJECT.md](../../PROJECT.md); Code und Tests zeige
 - Keine Versuchsprotokolle, vollständigen Testergebnisse, Messwerttabellen oder Implementierungsstände
   sammeln. Git bewahrt die Änderungsgeschichte; Spiel-IDs allein sind kein unveränderliches Datenarchiv.
 
+## Court- und Bankanker
+
+Eine Umstellung auf Fußanker darf bestehende Bankpositionen nicht wie Courtpositionen nach oben
+versetzen: Die Pausenaufstellung war bereits auf Trikotmittelpunkte abgestimmt. Der Bankanteil
+wird mit den Replay-Frames interpoliert, damit Auszeit, Viertelpause, Einwechslungen während der
+Pause und Rückkehr dieselbe Darstellung erhalten. Die Kompensation muss mit der sichtbaren
+Trikotgröße skalieren; ein fester Versatz der geplanten Court-Koordinaten genügt auf kleinen
+Displays nicht. Schatten und Klickflächen müssen dem jeweiligen Anker folgen.
+
 ## Sichtbarer Dribbelkontakt
 
 Ein kleines globales Sinus-Wackeln vermittelt keinen Bodenkontakt. Eine größere Auslenkung allein

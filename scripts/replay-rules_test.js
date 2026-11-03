@@ -1,5 +1,6 @@
 import { compileReplay, getReplayFrame } from "../js/replay-engine.js";
 import { getSceneBonus, planGameStates, planTeamFouls } from "../js/replay-rules.js";
+import { getPlayerGeometry } from "../js/replay-presentation.js";
 
 function assert(value, message) {
 	if (!value) {
@@ -51,6 +52,31 @@ const basket = {
 	side: "right",
 	shotResult: "Made",
 };
+
+Deno.test("timeouts and period breaks preserve jersey centers and blend back to court foot anchors", () => {
+	for (const pause of [
+		{ actionType: "timeout", subType: "full", teamId: 1 },
+		{ actionType: "period", subType: "end" },
+	]) {
+		const replay = compileReplay(scenario([
+			pause,
+			{ actionType: "period", subType: "start", period: 2, clock: "PT12M00S" },
+		]));
+		const [stop, resume] = replay.scenes;
+		const waiting = getReplayFrame(replay, stop.end - 0.1);
+		for (const p of waiting.players.filter((p) => p.opacity === 1)) {
+			assert(p.bench === 1 && p.y === -5, "bench anchor changed");
+			for (const pixels of [2, 4, 12]) {
+				assert(getPlayerGeometry(p, pixels).y === -5, "bench jersey moved above its previous center");
+			}
+		}
+		const mid = getReplayFrame(replay, resume.start + resume.returnAt / 2);
+		assert(mid.players.filter((p) => p.opacity === 1).every((p) => p.bench > 0 && p.bench < 1),
+			"return does not blend presentation anchors");
+		const returned = getReplayFrame(replay, resume.start + resume.returnAt);
+		assert(returned.players.every((p) => p.bench === 0), "bench offset persists on court");
+	}
+});
 
 Deno.test("team rebounds connect a schematic out ball to the same inbound spot", () => {
 	for (const side of ["left", "right"]) {

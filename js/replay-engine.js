@@ -870,7 +870,11 @@ function snapshot(state, time) {
 	const owner = state.ball.owner && state.positions[state.ball.owner];
 	return {
 		time,
-		players: state.players.map((player) => ({ id: player.id, ...state.positions[player.id] })),
+		players: state.players.map((player) => ({
+			id: player.id,
+			...state.positions[player.id],
+			bench: state.breakPositions ? 1 : 0,
+		})),
 		ball: owner
 			? {
 				...state.ball,
@@ -3889,6 +3893,7 @@ export function getReplayFrame(replay, time) {
 		opacity: mix(player.opacity, to.players[i].opacity),
 		angle: mix(player.angle, to.players[i].angle),
 		jump: mix(player.jump, to.players[i].jump),
+		bench: mix(player.bench, to.players[i].bench),
 	}));
 	const originalPlayers = players;
 	players = movePlayers(scene, frameIndex, fraction, players);
