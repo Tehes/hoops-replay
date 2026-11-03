@@ -116,7 +116,11 @@ export function animateShot(state, scene, shot, hoop, direction, record, contact
 	const rimFinish = style.family === "dunk" || style.family === "layup";
 	const approachLength = style.running ? 12 : style.driving || style.cutting || style.pullup ? 7 : rimFinish ? 4 : 0;
 	let entry = getShotEntry(scene, shot, hoop, direction);
-	if (style.family === "heave") {
+	if (scene.preparedCatch) {
+		// The joint plan has already delivered the recorded final pass at the release location.
+		state.ball.dribble = false;
+		record(0.12);
+	} else if (style.family === "heave") {
 		Object.assign(shooter, entry);
 		if (state.ball.owner !== action.personId) {
 			record(0.2);

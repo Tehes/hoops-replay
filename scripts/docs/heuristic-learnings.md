@@ -236,15 +236,46 @@ daraus folgt keine allgemeine Bestätigung aller Passentscheidungen.
 Ballorientierte Hilfe und die Rückkehr nach einem Pass können einen zeitweilig freien Schützen
 ergeben. Der bekannte Ausgang gewichtet solche Varianten, belegt aber weder den Verteidigerabstand
 noch die tatsächliche Passfolge. Auch getroffene bedrängte und vergebene freie Würfe bleiben möglich.
-Belegte Blocks und bewegte Abschlüsse brauchen ihren eigenen Kontext. Die visuelle Beurteilung und
-ein breiter Vergleich der Wurfchancen stehen aus.
+Belegte Blocks und bewegte Abschlüsse brauchen ihren eigenen Kontext. Ein automatischer Vergleich
+von Abständen ersetzt keine visuelle Nutzerabnahme; der [Iterationsbericht](offense-iteration.md)
+beschreibt die geprüfte Stichprobe und die Grenzen der Messung.
+
+Eine bloße Abwertung enger Passempfänger erzeugt noch keine Wurfchance. Ballbewegung,
+Freilaufen und defensive Reaktionen müssen zusammen geplant und beim Fang sowie beim
+anschließenden Wurf bewertet werden. Das umfasst Drive-and-Kick, Seitenwechsel und Extra Pass,
+Relocation, Off-Ball-Screens sowie Pick-and-Roll/-Pop. Ein pauschaler Ausschluss unbelegter Screens
+wurde als zu enge Modellgrenze verworfen: Wie andere ergänzte Wege dürfen sie schematisch
+entstehen, ohne als tatsächlich gespielter Spielzug zu gelten.
+
+Direkte Wege zum Ende eines Cuts können durch den Blocksteller führen. Erst ein stationärer
+Block mit erreichbarem Umweg für den Verteidiger oder einer räumlich möglichen Übernahme
+begründet eine Screening-Variante. Die Abfolge aus seitlichem Anlauf, Nutzung und Abrollen/-poppen
+muss getrennte Räume lassen. Ein Switch verändert die weiteren Zuordnungen, nicht die
+vorherigen Positionen; eine pauschale Ausnahme von stabilen Matchups wäre zu weitreichend.
+Optionale kleine Spacing-Korrekturen dürfen einer gemeinsamen Angriffsplanung weichen,
+reservierte Rebound- und Folgebewegungen dagegen nicht.
+
+Ein Fangabstand allein reicht nicht: Der Ballflug gibt der Defense Zeit zur Rückkehr, und auch
+Aufnehmen und Wurfvorbereitung verbrauchen den Vorteil. Planung und Abschlussanimation müssen
+vergleichbare Reaktions- und Bewegungsgeschwindigkeiten verwenden. Ein verspäteter Closeout
+ist eine schematische Annahme; feste Reaktionszeiten belegen keine tatsächliche Defensivleistung.
+Körpermittelpunkte dienen der räumlichen Prüfung, während ein gemeinsamer Handversatz nur den
+sichtbaren Ballflug bestimmt. Andernfalls kann eine Feldspiegelung die taktische Bewertung ändern.
+Reservierte Folgebewegungen brauchen dieselbe Positionsprognose in Auswahl und Ausführung.
+Ein weiterlaufender Empfänger bei statischer Prognose lässt seinen Verteidiger scheinbar grundlos
+zurück. Ein pauschales Verbot jeder Zonenquerung verhindert außerdem erreichbare Screen-Anläufe
+und Rolls; maßgeblich ist der zusammenhängende Aufenthalt in abgebildeter Spielzeit.
+Die visuelle Nutzerabnahme des erweiterten Repertoires steht aus.
 
 Beim belegten Assist muss der letzte Pass vom Assistgeber kommen. Sein Ballflug und der Closeout
 laufen gemeinsam; ein zusätzlicher Pass gehört davor und setzt erreichbare Stationen und genügend
 Zeit voraus. Ein Shot-Clock-Verstoß kann mit engerem Druck am Ball dargestellt werden, belegt
 aber weder einen Steal noch die konkrete Ursache für den ausbleibenden Abschluss.
 
-Grundlage: [Jr. NBA, Kick Pass](https://jr.nba.com/basketball-practice-plans/starter/page/3/)
+Grundlagen: [WABC Level 1](https://assets.fiba.basketball/image/upload/documents-corporate-wabc-coaching-level-manuals-level-1-eng.pdf),
+Team 2.1.4–2.1.5 und 2.2 (Ball Reversal, Receivers' Principles, Screens),
+[WABC Level 2](https://assets.fiba.basketball/image/upload/documents-corporate-wabc-coaching-manual-level-2-eng.pdf),
+Player 2.1.2 (Turn Out Cuts), [Jr. NBA, Kick Pass](https://jr.nba.com/basketball-practice-plans/starter/page/3/)
 und [Jr. NBA, Extra Pass](https://jr.nba.com/basketball-practice-plans/rookie/page/7/).
 
 ## Bonus und Teamfouls

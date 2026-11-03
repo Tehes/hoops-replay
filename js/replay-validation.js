@@ -316,6 +316,17 @@ export function checkReplay(data, replay = compileReplay(data)) {
 						expectedMatchups[defender] = attacker;
 					}
 				}
+				const switchPlan = scene.offensivePlan;
+				if (switchPlan?.coverage === "switch") {
+					const use = switchPlan.phases.find((phase) => phase.screen);
+					const first = Object.keys(expectedMatchups).find((id) => expectedMatchups[id] === use.user);
+					const second = Object.keys(expectedMatchups).find((id) => expectedMatchups[id] === use.screen);
+					check(first !== undefined && second !== undefined && switchPlan.switchAt >= use.start - 1e-8 &&
+						switchPlan.switchAt <= use.end, `${id} reachable screen switch ${scene.action.actionNumber}`);
+					if (first !== undefined && second !== undefined) {
+						[expectedMatchups[first], expectedMatchups[second]] = [expectedMatchups[second], expectedMatchups[first]];
+					}
+				}
 				check(
 					Object.keys(expectedMatchups).every((defender) =>
 						scene.matchups[defender] === expectedMatchups[defender]

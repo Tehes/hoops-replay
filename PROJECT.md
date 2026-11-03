@@ -55,9 +55,11 @@ schematische Ergänzungen zu verstehen. Es gibt keinen Live-Spielmodus.
 - Das gesamte abgeschlossene Spiel darf vorab analysiert werden. Vorauswissen darf frühere
   Positionierungen beeinflussen; sichtbare Reaktionen dürfen keinen exakten Abprall- oder
   Abfangpunkt vorwegnehmen.
-- Konkrete Screens, Pick-and-Roll-, Pick-and-Pop- oder andere feste Spielzugabläufe erfordern
-  ausdrückliche Quelldaten. Assist, Wurfort oder ein passender Laufweg reichen dafür nicht aus.
-  Ein fehlender Assist beweist keine Isolation, ein Turnover allein keinen Fastbreak.
+- Screens, Pick-and-Roll, Pick-and-Pop und weitere Angriffsabläufe dürfen als plausible schematische
+  Ergänzungen entstehen. Ohne ausdrückliche Quelldaten sind sie Annahmen und kein Nachweis des
+  tatsächlich gespielten Spielzugs. Assist, Wurfort und Spielerprofile begrenzen die Auswahl,
+  belegen aber keinen bestimmten Ablauf. Ein fehlender Assist beweist keine Isolation,
+  ein Turnover allein keinen Fastbreak.
 - Das Replay verdichtet Zeit. Auch bei 1× ist es keine Echtzeitwiedergabe.
   Aufgezeichnete Spieluhrzeiten bleiben verbindliche Anker.
 - Eine Shotclock-Anzeige beschränkt sich auf einen schematischen Schlusscountdown vor einem
@@ -167,7 +169,8 @@ geometrisch beurteilen. Verbleibende Grenzen werden ausdrücklich dokumentiert.
 ## Choreografie im Zielbild
 
 Der Planer verbindet wiederverwendbare Fähigkeiten: einwerfen, vortragen, passen, fangen,
-freilaufen, Position halten, zum Korb ziehen, abschließen, helfen, zurückkehren und rebounden.
+freilaufen, Position halten, zum Korb ziehen, einen Block stellen und nutzen, abrollen, nach außen
+ausweichen, abschließen, helfen, übernehmen, zurückkehren und rebounden.
 Er plant das Zusammenspiel beider Teams aus bisherigen Positionen, verfügbarem Zeitfenster
 und belegten Ereignissen.
 
@@ -188,7 +191,19 @@ und belegten Ereignissen.
 - Abschlussorte werden rechtzeitig erreicht, ohne den nächsten Schützen dauerhaft dort abzustellen.
   Rollen helfen bei der Verteilung; aufgezeichnete Beteiligung und Außenwürfe haben Vorrang.
 - Pässe treffen erreichbare Empfänger. Mitspieler schaffen Raum für Drives und Passlinien;
-  freie Spieler müssen nicht nach jedem Pass weiterlaufen.
+  freie Spieler müssen nicht nach jedem Pass weiterlaufen. Optionale Zuspiele zu vollständig
+  zugestellten Empfängern werden vermieden; aufgezeichnete Beteiligte behalten Vorrang.
+- Wurfchancen entstehen aus einer zusammenhängenden Angriffsaktion und defensiven Antwort:
+  Korbdruck bindet Hilfe, ein Seitenwechsel oder Extra Pass nutzt die Rotation, Cuts und Relocation
+  öffnen Empfangswinkel, Screens schaffen einen Vorsprung. Pick-and-Roll und Pick-and-Pop
+  verbinden die Entscheidungen von Ballführer, Blocksteller und Verteidigung. Die Auswahl folgt
+  verfügbaren Spielern, Ausgangsräumen, Zeit und belegtem Abschluss statt einer Pflichtrotation
+  durch bestimmte Spielzüge. Transition bleibt eine eigene Möglichkeit vor der geordneten Defense.
+- Die Defense kann am Block verfolgen, übernehmen oder zum Korb absinken. Ein Übernehmen erhält
+  eindeutige Zuordnungen und benötigt erreichbare Wege. Ein ergänzter Block wird vor seiner Nutzung
+  stationär; der Blocksteller und die anderen Spieler sind keine durchquerbaren Hindernisse.
+  Freie Fang- und Wurfmomente werden einschließlich Ballflug, Hilfe und Closeout beurteilt.
+  Die Defense darf einen Vorteil wieder schließen; ein freier Wurf ist kein vorgeschriebenes Ergebnis.
 - Ein ergänzter Einwurf am angegriffenen Korb bietet bei anschließendem Aufbau eine äußere
   Anspielstation an, statt ohne Anlass eine freie Korbchance mit anschließendem Rückpass zu erzeugen.
   Ein tiefer Fang muss zum direkten Abschluss oder zu erkennbarem Verteidigungsdruck und einer
@@ -234,8 +249,8 @@ Innenrollen werden tiefe und hohe Anspielräume passend kombiniert. Eine Grundor
 keinen konkreten Spielzug oder zusätzlichen Screen vor.
 
 Defensive Matchups berücksichtigen Position, Größe, Gewicht und das offensive Profil der
-Gegenspieler. Die Zuordnung bleibt innerhalb eines Angriffs stabil, soweit belegte Beteiligung
-oder die Fortsetzung keine Anpassung erfordern. Diese Merkmale begründen plausible Zuordnungen,
+Gegenspieler. Die Zuordnung bleibt innerhalb eines Angriffs stabil, soweit belegte Beteiligung,
+eine defensive Übernahme oder die Fortsetzung keine Anpassung erfordern. Diese Merkmale begründen plausible Zuordnungen,
 beweisen aber keine tatsächlich gespielten Matchups.
 
 Wurfquoten, Wurfversuche und weitere verfügbare Spielerstatistiken beschreiben individuelle

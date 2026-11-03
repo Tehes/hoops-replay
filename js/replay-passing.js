@@ -17,10 +17,13 @@ export function getPassCost(from, to, defenders) {
 		clearance = Math.min(clearance, distance);
 		receivingSpace = Math.min(receivingSpace, Math.hypot(defender.x - to.x, defender.y - to.y));
 	}
+	if (receivingSpace < 2) {
+		return Infinity;
+	}
 	// A clear weak-side catch can justify skipping the intermediate stations.
 	const openSkip = (from.y - 25) * (to.y - 25) < 0 && Math.abs(dy) >= 20 && receivingSpace >= 6;
 	return 0.5 + length * 0.04 + (openSkip ? 0 : Math.max(0, length - 20) ** 2 * 0.025) +
-		Math.max(0, 5 - clearance) ** 2 + Math.max(0, 5 - receivingSpace) ** 2 * 0.2;
+		Math.max(0, 5 - clearance) ** 2 + Math.max(0, 5 - receivingSpace) ** 2;
 }
 
 export function planInboundReception(from, buildupTarget, defenders, teammates, direction) {

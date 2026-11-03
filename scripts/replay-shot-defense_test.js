@@ -78,13 +78,13 @@ Deno.test("shot-clock display follows game time, expires at the event and surviv
 	}
 });
 
-Deno.test("ball-oriented help changes the shooter's defender before a catch", () => {
-	const helped = scenario("Made", 1);
-	const covered = scenario("Missed", 1);
+Deno.test("short possessions retain ball-oriented help without forcing an extra offensive action", () => {
+	const helped = scenario("Made", 1, "", 0, { clock: "PT11M57S" });
+	const covered = scenario("Missed", 1, "", 0, { clock: "PT11M57S" });
 	const distance = (replay) => {
 		const scene = replay.scenes[0];
 		const defenderId = Number(Object.keys(scene.matchups).find((id) => scene.matchups[id] === 2));
-		const frame = getReplayFrame(replay, scene.start + scene.approachAt);
+		const frame = getReplayFrame(replay, scene.start + scene.shotPassAt);
 		const shooter = frame.players.find((player) => player.id === 2);
 		const defender = frame.players.find((player) => player.id === defenderId);
 		return Math.hypot(shooter.x - defender.x, shooter.y - defender.y);
