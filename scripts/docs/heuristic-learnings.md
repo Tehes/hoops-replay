@@ -15,6 +15,28 @@ fachliche Zielbild steht in [PROJECT.md](../../PROJECT.md); Code und Tests zeige
 - Keine Versuchsprotokolle, vollständigen Testergebnisse, Messwerttabellen oder Implementierungsstände
   sammeln. Git bewahrt die Änderungsgeschichte; Spiel-IDs allein sind kein unveränderliches Datenarchiv.
 
+## Feed-Semantik und tatsächliche Nutzung
+
+Ein erhaltenes oder normalisiertes Feld ist noch kein verwendeter Beleg: Saison-`REB` und
+Boxscore-Minuten werden übernommen, erreichen aber keine fachliche Entscheidung. Umgekehrt
+werden zweite Chancen, Turnoverfolgen und Bonus bereits aus Ereignissen abgeleitet, obwohl
+`2ndchance`, `fromturnover` und `inpenalty` nicht direkt ausgewertet werden. Zusätzliche Qualifier
+eignen sich hier zunächst als Gegenprobe; sie beweisen weder genaue Wege noch den früheren
+Eintritt einer Situation. Boxscore-Endzustände dürfen keine historischen Replay-Zustände ersetzen.
+
+Dokumentierte Ereignisnamen und tatsächlich gelieferte CDN-Werte unterscheiden sich. Varianten
+wie `3-second-violation`, `8-second-violation`, `5-second-violation` und `LaneViolation` erreichen
+nicht automatisch die Abfragen für ähnlich benannte Verstöße. Ein allgemeiner Turnover erhält
+zwar den Besitzwechsel, belegt aber keine spezifisch korrekte Ortswahl oder Fortsetzung. Eng
+belegte Varianten müssen zusammen mit Ereignistyp und Kontext geprüft werden.
+
+WNBA-`area`/`areaDetail` stehen auch an Ereignissen ohne Koordinaten und können sich widersprechen.
+Sie sind mögliche grobe Ortsbelege, deren Zuverlässigkeit vor einer Choreografienutzung offen ist;
+keine exakten Kontaktorte daraus ableiten. Ein `defensivegoaltending`-Qualifier am gewerteten Wurf
+und ein separater Violation-Eintrag können gemeinsam Wurfursache und Verteidiger belegen; eine
+normale Trefferanimation wertet diesen Zusammenhang noch nicht aus. Feldinventar, konkrete
+Belege und Grenzen stehen im [Feed-Nutzungsabgleich](feed-usage-audit.md).
+
 ## Court- und Bankanker
 
 Eine Umstellung auf Fußanker darf bestehende Bankpositionen nicht wie Courtpositionen nach oben
@@ -25,6 +47,11 @@ Trikotgröße skalieren; ein fester Versatz der geplanten Court-Koordinaten gen�
 Displays nicht. Schatten und Klickflächen müssen dem jeweiligen Anker folgen.
 
 ## Sichtbarer Dribbelkontakt
+
+Ein sichtbarer Einwurfpass beendet den vorherigen Dribbelzustand. Nach dem Fang muss der
+anschließende Live-Vortrag das Dribbeln ausdrücklich wieder aktivieren; den Ballhalter allein
+zu setzen lässt ihn sonst mit gehaltenem Ball über das Feld laufen. Prüfungen müssen deshalb
+den bewegten Empfänger nach dem Fang erfassen, nicht nur Einwurfort und freien Passflug.
 
 Ein kleines globales Sinus-Wackeln vermittelt keinen Bodenkontakt. Eine größere Auslenkung allein
 kann beim Pass oder Wurf einen Sprung zur Hand erzeugen. Vollständige Zyklen pro zusammenhängender
@@ -71,6 +98,46 @@ nicht durch nachträgliches Versetzen des Balls entstehen. Eine bestimmte Kontak
 nicht ohne Beleg ableiten. Ein allgemeines Teamkontrollmodell und die visuelle Nutzerabnahme des
 Kandidaten stehen aus; nicht direkt verknüpfbare Folgen sowie Rebound-/Wurf-Fälle bleiben offen.
 Details und Quellen zur Untersuchung stehen im [Iterationsbericht](loose-ball-iteration.md).
+
+## Einwurfort und Fortsetzungsgrund
+
+Ein allgemeiner Seitenlinienfallback kann einen bereits dargestellten Ausball auf die andere
+Feldseite versetzen und regelabhängig feste Orte verfehlen. Der Fortsetzungsgrund muss deshalb
+die zulässige Ortsgruppe bestimmen; der anschließende Wurfort ist dafür kein Ersatz.
+NBA und WNBA dürfen dabei nicht pauschal gleichgesetzt werden: WNBA 2026 setzt den Einwurf nach
+Rückspiel/Acht-Sekunden-Verstoß einen Schritt ins Rückfeld, NBA an die Mittellinie.
+
+Ausballort und Einwurfort sind unterschiedliche Anker. Bei Grundlinienausball muss der Einwerfer
+außerhalb der verlängerten Drei-Sekunden-Zone stehen; ein Ballausflug direkt hinter dem Korb
+begründet dort keinen legalen Einwurf. Die Gleichsetzung beider Punkte und ein auf Gleichheit
+beschränkter Regressionstest sind für diese Fälle fachlich unzureichend. Nach Treffern besteht dagegen die
+Bewegungsfreiheit entlang der Grundlinie. Fehlende Ortsbelege erlauben einen schematischen
+Unterbrechungsanker, aber keine Behauptung des tatsächlichen Ortes. Eine späte Auszeit belegt
+für sich weder Berechtigung noch Wahl einer Vorverlegung.
+
+Nach einer Vorverlegung ist die Angriffsrichtung des nun ballberechtigten Teams maßgeblich,
+nicht die Richtung des ursprünglichen Turnovers. Nach einem Einwurfverstoß bleibt dagegen der
+physische Ort erhalten, auch wenn er für den neuen Gegner nun im Rückfeld liegt. Eine anschließende
+Auszeit wird anhand des neuen Einwurfrechts geprüft, nicht als zweite Auszeit des vorherigen Teams.
+Ein späterer gegnerischer Wurf darf die ursprüngliche Vorverlegungswahl nicht rückwirkend begrenzen.
+Eine Challenge ist ohne Beleg einer belasteten
+Auszeit kein Anlass für eine ergänzte Vorverlegung. Eine legale ursprüngliche Fortsetzung kann
+stattdessen erhalten bleiben. Team-Fünf-Sekunden-Turnover vor einer ausstehenden Einwurffortsetzung
+müssen auch bei abweichender Feed-Uhr als Einwurfkontext erkannt werden; die Uhr wird dabei nicht
+umgeschrieben. Ein als Turnover aufgezeichneter Lane-Verstoß belegt den Besitzverlust auch bei
+unvollständiger Freiwurfnummerierung. Ein gewöhnlicher Lane-Violation-Eintrag allein darf dagegen
+keine verbleibenden Freiwürfe entfernen. Gelieferte Schreibvarianten brauchen eine explizite
+Zuordnung; nur dokumentierte Kurzformen abzufragen reicht nicht.
+
+Andere Einwurforte können bestehende Reboundfolgen verändern, ohne deren Wege zu verletzen:
+Zonenausläufe dürfen nach einem vorherigen Kick-out beginnen und vor dem gemeinsamen Aufbauende
+fertig sein. Ein während einer Receiver-Bewegung helfender Verteidiger darf seine Zuordnung
+verlassen, sofern seine explizite Reboundhilfe den Weg erklärt. Prüfungen müssen diese Aufträge
+gegen ihre eigenen Zeitfenster und Zielwege prüfen, statt starre Start- oder Abstandsannahmen
+auf sämtliche Spieler anzuwenden.
+
+Grundlagen: NBA-Regeln 5/6/8/10/12 und WNBA-Regelbuch 2026. Quellen, konkrete reproduzierte
+Abweichungen und Grenzen stehen im [Einwurfort-Regelabgleich](inbound-location-audit.md).
 
 ## Teamrebound und angenommener Ausball
 

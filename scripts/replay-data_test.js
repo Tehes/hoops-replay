@@ -5,6 +5,74 @@ import { getTeamColors, getTeamLogo, getTeamName } from "../js/replay-teams.js";
 import { loadFeed, loadGame } from "./replay-source.js";
 import { getLaneWaitingPoint, isDefensiveLaneCountActive, isInOffensiveLane } from "../js/replay-rules.js";
 
+Deno.test("MIL-UTA action 19 dribbles after the inbound instead of carrying the ball across court", async () => {
+	const data = await loadGame("0022600172");
+	const replay = compileReplay(data);
+	const scene = replay.scenes.find((scene) => scene.action.actionNumber === 19);
+	const catchFrame = getReplayFrame(replay, scene.start + scene.liveAt);
+	const owner = catchFrame.ball.owner;
+	assert(owner && catchFrame.ball.dribble, "inbound catch did not restore dribbling");
+	const moving = scene.frames.filter((frame) => frame.time > scene.liveAt && frame.ball.owner === owner);
+	assert(moving.some((frame) => Math.hypot(frame.ball.x - catchFrame.ball.x, frame.ball.y - catchFrame.ball.y) > 20),
+		"regression no longer exercises the long carry");
+	assert(moving.every((frame) => frame.ball.dribble), "live advance held the ball after the inbound catch");
+	const sample = JSON.stringify(getReplayFrame(replay, 43));
+	getReplayFrame(replay, replay.duration);
+	assert(JSON.stringify(getReplayFrame(replay, 43)) === sample, "seeking changed the dribble state");
+	assert(checkReplay(data, replay).errors.length === 0, "dribble fix broke replay validation");
+});
+
+Deno.test("recorded inbound-location regressions retain exit sides and apply the correct rule locations", async () => {
+	for (const [id, exitAction, nextAction, fixedAction, fixedNext] of [
+		["0022600007", 131, 132, 404, 405],
+		["1042600304", 139, 144, 194, 199],
+	]) {
+		const data = await loadGame(id);
+		const original = JSON.stringify(data);
+		const replay = compileReplay(data);
+		const exit = replay.scenes.find((scene) => scene.action.actionNumber === exitAction).frames.at(-1).ball;
+		const inbound = replay.scenes.find((scene) => scene.action.actionNumber === nextAction);
+		assert(exit.y < 0 && inbound.inboundPlan.point.y === -1.5 && inbound.inboundPlan.point.x === exit.x,
+			`${id} moved the inbound away from the shown sideline exit`);
+		const fixed = replay.scenes.find((scene) => scene.action.actionNumber === fixedNext);
+		assert(fixed.inboundPlan.point.x === 75, `${id}:${fixedAction} failed to use free-throw line extended`);
+		const teamInbounds = replay.scenes.filter((scene) => scene.assumedInbound &&
+			(scene.inboundPlan.point.x < 0 || scene.inboundPlan.point.x > 94));
+		assert(teamInbounds.length > 0 && teamInbounds.every((scene) =>
+			scene.inboundPlan.point.y < 17 || scene.inboundPlan.point.y > 33), "team-rebound inbound in extended lane");
+		assert(checkReplay(data, replay).errors.length === 0, "new locations broke replay validation");
+		assert(JSON.stringify(data) === original, "location planning mutated recorded data");
+	}
+});
+
+Deno.test("actual CDN violation spellings reach their specific inbound locations", async () => {
+	for (const [id, number, subtype] of [
+		["0012600017", 134, "3-second-violation"],
+		["0012600066", 508, "8-second-violation"],
+		["0012600033", 483, "5-second-violation"],
+		["1042600307", 270, "LaneViolation"],
+	]) {
+		const data = await loadGame(id);
+		const replay = compileReplay(data);
+		const index = replay.scenes.findIndex((scene) => scene.action.actionNumber === number);
+		const source = replay.scenes[index];
+		assert(source.action.subType === subtype, "recorded violation changed");
+		const next = replay.scenes.slice(index + 1).find((scene) => scene.rules.requiresPlay);
+		assert(next.inboundPlan, `${id}:${number} omitted inbound`);
+		if (subtype === "8-second-violation") {
+			assert(next.inboundPlan.point.x === 47, "NBA eight-second turnover missed midcourt");
+		} else if (subtype === "5-second-violation") {
+			assert(source.failedInboundPlan && !source.rules.requiresPlay &&
+				next.inboundPlan.point.x === source.failedInboundPlan.point.x,
+				"team inbound violation lost the pending spot");
+		} else {
+			const direction = attackDirection(data, source.action.teamId, source.action.period);
+			assert(next.inboundPlan.point.x === (direction === 1 ? 75 : 19), "wrong free-throw-line extended location");
+		}
+		assert(checkReplay(data, replay).errors.length === 0, `${id} failed replay validation`);
+	}
+});
+
 Deno.test("rebound pressure connects the catch to the personal foul without a retreat or invented pass", async () => {
 	for (const [id, actionNumber] of [["1042600306", 303], ["1022600311", 229], ["0022600148", 651]]) {
 		const data = await loadGame(id);
@@ -1296,7 +1364,7 @@ Deno.test("second chances keep off-ball positions instead of swapping the next r
 				}
 				const from = first.players.find((player) => player.id === playerId);
 				const direction = attackDirection(data, scene.attackTeam, scene.action.period);
-				const exit = scene.laneExits?.find((move) => move.id === playerId && move.startAt === 0);
+				const exit = scene.laneExits?.find((move) => move.id === playerId);
 				const target = getLaneWaitingPoint(from, direction);
 				for (
 					const frame of scene.frames.filter((frame) => frame.time <= scene.preparationAt)
@@ -2317,7 +2385,9 @@ Deno.test("buildup overlaps player travel, bounds speed and positions the shoote
 					assert(distance <= (move.end - move.start) * 18 + 0.00001, "buildup still rushes a long route");
 					if (distance > 6) {
 						moving++;
-						const middle = getReplayFrame(replay, scene.start + (move.start + move.end) / 2);
+						const exit = scene.laneExits?.find((route) => route.id === player.id && route.startAt === move.start);
+						const sampleAt = exit ? exit.startAt + exit.duration / 2 : (move.start + move.end) / 2;
+						const middle = getReplayFrame(replay, scene.start + sampleAt);
 						const traveler = middle.players.find((item) => item.id === player.id);
 						// Individual starts and reaction delays no longer imply equal midpoint progress.
 						assert(
@@ -2396,8 +2466,14 @@ Deno.test("next receivers move during the preceding shot without anticipating it
 					Object.keys(scene.matchups).find((id) => scene.matchups[id] === move.playerId),
 				);
 				const defender = frames[i].players.find((player) => player.id === defenderId);
+				const help = scene.reboundHelpRun?.id === defenderId ? scene.reboundHelpRun : null;
+				const u = help ? Math.max(0, Math.min(1, (frames[i].time - help.startAt) / help.duration)) : 0;
+				const progress = u * u * (3 - 2 * u);
+				const followingHelp = help && frames[i].time >= help.startAt && Math.hypot(
+					defender.x - help.from.x - (help.x - help.from.x) * progress,
+					defender.y - help.from.y - (help.y - help.from.y) * progress) < 0.00001;
 				assert(
-					Math.hypot(defender.x - current.x, defender.y - current.y) < 10.5,
+					Math.hypot(defender.x - current.x, defender.y - current.y) < 10.5 || followingHelp,
 					"assigned defender left the receiver beyond the allowed help and reaction range",
 				);
 				distance += step;

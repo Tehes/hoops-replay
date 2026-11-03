@@ -114,6 +114,35 @@ export function checkReplay(data, replay = compileReplay(data)) {
 	let shots = 0;
 	for (const scene of replay.scenes) {
 		const tag = `${id}:${scene.action.actionNumber}`;
+		if (scene.inboundAt !== undefined) {
+			const plan = scene.inboundPlan;
+			const disposal = scene.frames.find((frame) => frame.time === scene.inboundAt);
+			const thrower = disposal.players.find((player) => player.id === disposal.ball.owner);
+			const direction = attackDirection(data, scene.attackTeam, scene.action.period);
+			const baseline = thrower.x < 0 || thrower.x > 94;
+			check(baseline || thrower.y < 0 || thrower.y > 50, `${tag} thrower outside court`);
+			check(!baseline || plan.freeBaseline || thrower.y < 17 || thrower.y > 33,
+				`${tag} designated baseline spot outside extended lane`);
+			check(scene.lineups[scene.attackTeam].includes(thrower.id), `${tag} entitled team throws in`);
+			check(scene.inboundAt < scene.liveAt && scene.liveAt <= scene.eventAt, `${tag} inbound before live action`);
+			const catchFrame = getReplayFrame(replay, scene.start + scene.liveAt);
+			const receiver = catchFrame.players.find((player) => player.id === catchFrame.ball.owner);
+			const backcourtAllowed = (thrower.x - 47) * direction < 0 || plan.location === "advanced" ||
+				(scene.action.period >= 4 && scene.clockFrom <= 120);
+			check(backcourtAllowed || (receiver.x - 47) * direction > 0, `${tag} legal inbound pass direction`);
+			if (plan.location === "free-throw-line") {
+				const basketDirection = attackDirection(data, plan.basketTeam, replay.scenes[plan.sourceIndex].action.period);
+				check(thrower.x === (basketDirection === 1 ? 75 : 19), `${tag} free-throw-line extended inbound`);
+			} else if (plan.location === "midcourt") {
+				check(thrower.x === (replay.league.id === "wnba" ? 47 - direction * 1.5 : 47),
+					`${tag} league-specific midcourt inbound`);
+			} else if (plan.location === "advanced") {
+				const advancedDirection = attackDirection(data, plan.basketTeam, replay.scenes[plan.sourceIndex].action.period);
+				check(thrower.x === (advancedDirection === 1 ? 66 : 28), `${tag} original timeout hash mark`);
+			} else if (plan.location === "sideline-limited") {
+				check(!baseline && thrower.x >= 19 && thrower.x <= 75, `${tag} sideline inbound limited by free-throw lines`);
+			}
+		}
 		for (const a of [scene.action, ...scene.related]) represented.add(a.actionNumber);
 		for (const frame of scene.frames) {
 			frames++;

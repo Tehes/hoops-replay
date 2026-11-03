@@ -1,6 +1,7 @@
-import { compileReplay, getReplayFrame } from "../js/replay-engine.js";
+import { attackDirection, compileReplay, getReplayFrame } from "../js/replay-engine.js";
 import { getSceneBonus, planGameStates, planTeamFouls } from "../js/replay-rules.js";
 import { getPlayerGeometry } from "../js/replay-presentation.js";
+import { canPassToBackcourt, getThrowInPoint } from "../js/replay-inbounds.js";
 
 function assert(value, message) {
 	if (!value) {
@@ -41,6 +42,25 @@ function rules(actions) {
 	return scenes;
 }
 
+function throwerAt(scene) {
+	const frame = scene.frames.find((frame) => frame.time === scene.inboundAt);
+	assert(frame, "missing inbound");
+	return frame.players.find((player) => player.id === frame.ball.owner);
+}
+
+function stopScenario(stop, league, side, extra = []) {
+	const teamId = stop.actionType === "timeout" || stop.actionType === "foul" && stop.subType !== "offensive" ||
+		stop.actionType === "violation" && stop.subType === "kicked ball" ? 1 : 2;
+	return scenario([
+		{ ...basket, side, shotResult: "Missed", clock: "PT08M10S" },
+		{ actionType: "rebound", subType: "offensive", teamId: 1, personId: 2, clock: "PT08M09S" },
+		{ clock: "PT08M00S", ...stop },
+		...extra,
+		{ ...basket, teamId, personId: teamId === 1 ? 1 : 6,
+			side: teamId === 1 ? side : side === "left" ? "right" : "left", clock: "PT07M48S" },
+	], league);
+}
+
 const basket = {
 	actionType: "2pt",
 	subType: "Jump Shot",
@@ -78,7 +98,7 @@ Deno.test("timeouts and period breaks preserve jersey centers and blend back to 
 	}
 });
 
-Deno.test("team rebounds connect a schematic out ball to the same inbound spot", () => {
+Deno.test("team rebounds keep the exit boundary and move baseline throwers outside the extended lane", () => {
 	for (const side of ["left", "right"]) {
 		for (const teamId of [1, 2]) {
 			const data = scenario([
@@ -111,7 +131,10 @@ Deno.test("team rebounds connect a schematic out ball to the same inbound spot",
 			assert(next.frames[0].ball.x === end.x && next.frames[0].ball.y === end.y, "scene boundary moved ball");
 			const release = next.frames.find((frame) => frame.time === next.inboundAt);
 			const thrower = release.players.find((player) => player.id === release.ball.owner);
-			assert(thrower.x === plan.point.x && thrower.y === plan.point.y, "inbound moved to another boundary");
+			assert(thrower.x === plan.point.x, "inbound moved to another boundary");
+			assert(thrower.y < 17 || thrower.y > 33, "baseline thrower stands in the extended lane");
+			assert(next.inboundPlan.origin.x === plan.point.x && next.inboundPlan.origin.y === plan.point.y,
+				"legal spot replaced the actual ball exit");
 			assert(next.frames.some((frame) => frame.time > next.inboundAt && frame.time < next.liveAt &&
 				frame.ball.flight && frame.ball.owner === null), "missing inbound pass");
 			const sample = shot.start + (shot.eventAt + shot.outAt) / 2;
@@ -191,6 +214,37 @@ const attempt = {
 	personId: 1,
 	shotResult: "Made",
 };
+
+Deno.test("inbound catches restore dribbling throughout the following live advance", () => {
+	for (const league of ["nba", "wnba"]) {
+		for (const side of ["left", "right"]) {
+			const data = scenario([
+				{ ...basket, side, x: side === "right" ? 80 : 20 },
+				{ ...basket, teamId: 2, personId: 6, side: side === "left" ? "right" : "left",
+					x: side === "left" ? 80 : 20, clock: "PT07M40S" },
+			], league);
+			const replay = compileReplay(data);
+			const scene = replay.scenes[1];
+			assert(scene.frames.some((frame) => frame.time > scene.inboundAt && frame.time < scene.liveAt &&
+				!frame.ball.owner && frame.ball.flight && !frame.ball.dribble), "inbound pass started dribbling in flight");
+			let moving = 0;
+			for (const run of scene.transitionRuns ?? []) {
+				const frames = scene.frames.filter((frame) => frame.time >= run.start && frame.time <= run.end);
+				for (let i = 1; i < frames.length; i++) {
+					const from = frames[i - 1];
+					const to = frames[i];
+					if (from.ball.owner !== run.ballHandler || to.ball.owner !== run.ballHandler ||
+						Math.hypot(to.ball.x - from.ball.x, to.ball.y - from.ball.y) < 1) {
+						continue;
+					}
+					assert(from.ball.dribble && to.ball.dribble, "inbound receiver carried the ball during the live advance");
+					moving++;
+				}
+			}
+			assert(moving > 0, "scenario did not exercise a moving inbound receiver");
+		}
+	}
+});
 
 Deno.test("a basket requires a baseline inbound before the next recorded live interruption", () => {
 	for (const league of ["nba", "wnba"]) {
@@ -404,6 +458,327 @@ Deno.test("bonus counts the first team foul at 2:00 but excludes technical, offe
 	assert(getSceneBonus(scenes[5], 2, 120).join(",") === "true,false", "2:00 foul did not exhaust late quota");
 	assert(getSceneBonus(scenes[6], 2, 120).join(",") === "true,true", "flagrant did not count as team foul");
 	assert(getSceneBonus(scenes[7], 2, 120).join(",") === "false,false", "bonus remains at game end");
+});
+
+Deno.test("inbound locations follow foul and violation classes in both leagues and directions", () => {
+	const cases = [
+		{ actionType: "foul", subType: "personal", teamId: 2, personId: 10, foulDrawnPersonId: 1 },
+		{ actionType: "foul", subType: "offensive", teamId: 1, personId: 1, foulDrawnPersonId: 10 },
+		...["traveling", "double dribble", "shot clock", "backcourt", "8-second", "8-second-violation", "3-second",
+			"3-second-violation", "discontinued dribble", "offensive-kicked-ball", "basket-from-below",
+			"offensive goaltending", "5-second back to basket"].map((subType) =>
+			({ actionType: "turnover", subType, teamId: 1, personId: 1 })),
+		{ actionType: "violation", subType: "kicked ball", teamId: 2, personId: 10 },
+	];
+	for (const league of ["nba", "wnba"]) {
+		for (const side of ["left", "right"]) {
+			for (const stop of cases) {
+				const data = stopScenario({ ...stop, x: side === "right" ? 90 : 10, y: 20 }, league, side);
+				const original = JSON.stringify(data);
+				const replay = compileReplay(data);
+				const next = replay.scenes.at(-1);
+				const thrower = throwerAt(next);
+				const sourceDirection = side === "right" ? 1 : -1;
+				const newDirection = attackDirection(data, next.attackTeam, 1);
+				const midcourt = ["backcourt", "8-second", "8-second-violation"].includes(stop.subType);
+				const x = midcourt ? league === "wnba" ? 47 - newDirection * 1.5 : 47
+					: sourceDirection === 1 ? 75 : 19;
+				assert(thrower.x === x && thrower.y === -1.5, `${league}/${side}/${stop.subType}: wrong spot`);
+				assert(next.inboundPlan.originSource === "recorded", "ignored source coordinates");
+				const catchFrame = getReplayFrame(replay, next.start + next.liveAt);
+				const receiver = catchFrame.players.find((player) => player.id === catchFrame.ball.owner);
+				if (!next.inboundPlan.canPassBackcourt) {
+					assert((receiver.x - 47) * newDirection > 0, "illegal initial backcourt pass");
+				}
+				assert(getReplayFrame(replay, next.start + next.inboundAt).clock === next.clockFrom,
+					"inbound consumed game time");
+				const frame = JSON.stringify(catchFrame);
+				getReplayFrame(replay, replay.duration);
+				assert(JSON.stringify(getReplayFrame(replay, next.start + next.liveAt)) === frame, "seeking moved the catch");
+				assert(JSON.stringify(data) === original, "inbound mutated data");
+			}
+		}
+	}
+});
+
+Deno.test("a schematic bad-pass exit determines the next inbound across a timeout and technical", () => {
+	for (const side of ["left", "right"]) {
+		for (const interrupted of [false, true]) {
+			const extra = interrupted ? [
+				{ ...technical, teamId: 1, possession: 2 },
+				{ ...attempt, descriptor: "technical", subType: "1 of 1", shotResult: "Missed", teamId: 2, personId: 6 },
+				{ actionType: "timeout", teamId: 2 },
+			] : [];
+			const data = stopScenario({ actionType: "turnover", subType: "out-of-bounds", descriptor: "bad pass",
+				teamId: 1, personId: 1 }, "nba", side, extra);
+			const replay = compileReplay(data);
+			const stop = replay.scenes[2];
+			const exit = stop.frames.at(-1).ball;
+			const next = replay.scenes.at(-1);
+			const thrower = throwerAt(next);
+			assert(next.inboundPlan.origin.x === exit.x && next.inboundPlan.origin.y === exit.y,
+				"penalty or timeout replaced the exit origin");
+			if (exit.y < 0 || exit.y > 50) {
+				assert(thrower.y === (exit.y < 0 ? -1.5 : 51.5) && Math.abs(thrower.x - exit.x) < 0.001,
+					"sideline exit changed side or longitudinal position");
+			} else {
+				assert(thrower.x === (exit.x < 0 ? -1.5 : 95.5), "baseline exit changed boundary");
+				assert(thrower.y < 17 || thrower.y > 33, "baseline inbound inside extended lane");
+			}
+		}
+	}
+});
+
+Deno.test("baseline exits exclude the extended lane while scoring restarts retain endline privileges", () => {
+	for (const x of [-1, 95]) {
+		for (const y of [5, 17, 22, 25, 33, 45]) {
+			const point = getThrowInPoint({ location: "boundary" }, { x, y }, 1, "nba");
+			assert(point.x === (x < 0 ? -1.5 : 95.5), "changed exit boundary");
+			assert(point.y < 17 || point.y > 33, "throw-in inside extended lane");
+			assert(y >= 17 && y <= 33 || point.y === y, "moved already legal baseline spot");
+		}
+	}
+	const replay = compileReplay(scenario([basket, { ...basket, teamId: 2, personId: 6,
+		side: "left", clock: "PT07M48S" }]));
+	assert(throwerAt(replay.scenes[1]).x === 95.5 && replay.scenes[1].inboundPlan.freeBaseline,
+		"scoring restart lost baseline privileges");
+});
+
+Deno.test("retained foul penalties preserve the foul location through misses and an inserted technical", () => {
+	for (const descriptor of ["flagrant-type-1", "punching", "clear path", "transition take", "away from play"]) {
+		for (const side of ["left", "right"]) {
+			for (const result of ["Made", "Missed"]) {
+				const data = stopScenario({ actionType: "foul", subType: "personal", descriptor,
+					teamId: 2, personId: 10, foulDrawnPersonId: 1, x: side === "right" ? 65 : 35, y: 20 },
+					"nba", side, [
+						{ ...technical, teamId: 2, possession: 1 },
+						{ ...attempt, descriptor: "technical", subType: "1 of 1" },
+						{ ...attempt, subType: "1 of 1", shotResult: result },
+					]);
+				const replay = compileReplay(data);
+				const ft = replay.scenes[5];
+				assert(ft.rules.freeThrow.retained && !ft.rules.freeThrow.live && ft.freeThrowMoves.length === 0,
+					`${descriptor}: special penalty became live`);
+				const next = replay.scenes.at(-1);
+				const thrower = throwerAt(next);
+				const fixed = ["flagrant-type-1", "punching"].includes(descriptor);
+				const x = fixed ? side === "right" ? 75 : 19 : (side === "right" ? 65 : 35) * 0.94;
+				assert(thrower.x === x && thrower.y === (fixed ? 51.5 : -1.5), `${descriptor}: penalty lost original location`);
+				assert(next.rules.before.entitledTeam === 1, "special penalty changed entitled team");
+			}
+		}
+	}
+});
+
+Deno.test("throw-in violations change entitlement at the original spot without starting live play", () => {
+	for (const subType of ["5-second inbound", "5-second-violation", "out-of-bounds"]) {
+		const replay = compileReplay(scenario([
+			basket,
+			{ actionType: "turnover", subType, teamId: 2, personId: 6, qualifiers: ["untouched"] },
+			{ ...basket, clock: "PT07M48S" },
+		]));
+		assert(!replay.scenes[1].rules.requiresPlay, "throw-in violation started live play");
+		const next = replay.scenes[2];
+		assert(throwerAt(next).x === 95.5 && !next.inboundPlan.freeBaseline, "did not retain designated spot");
+		assert(next.rules.before.entitledTeam === 1, "violation retained possession");
+	}
+});
+
+Deno.test("kicks during throw-ins preserve the spot but live kicks use the new interruption", () => {
+	for (const live of [false, true]) {
+		const replay = compileReplay(scenario([
+			basket,
+			{ actionType: "violation", subType: "kicked ball", teamId: 1, personId: 1, possession: 2,
+				x: 60, y: 20, clock: live ? "PT07M59S" : "PT08M00S" },
+			{ ...basket, teamId: 2, personId: 6, side: "left", clock: "PT07M48S" },
+		]));
+		const next = replay.scenes[2];
+		const thrower = throwerAt(next);
+		assert(live ? thrower.x === 56.4 && thrower.y === -1.5
+			: thrower.x === 95.5 && next.inboundPlan.freeBaseline, "kick used the wrong interruption");
+	}
+});
+
+Deno.test("offensive last-free-throw violations use that basket's free-throw-line sideline", () => {
+	for (const side of ["left", "right"]) {
+		for (const result of ["Made", "Missed"]) {
+			const replay = compileReplay(scenario([
+				{ ...basket, side, shotResult: "Missed" },
+				{ ...attempt, subType: "1 of 1", shotResult: result },
+				{ actionType: "violation", subType: "lane", teamId: 1, personId: 1 },
+				{ ...basket, teamId: 2, personId: 6, side: side === "right" ? "left" : "right", clock: "PT07M48S" },
+			]));
+			assert(throwerAt(replay.scenes[3]).x === (side === "right" ? 75 : 19), "wrong basket after lane violation");
+			assert(replay.scenes[3].rules.before.entitledTeam === 2, "lane violation did not award opponent");
+		}
+	}
+});
+
+Deno.test("late timeout advance is optional and requires the team's eligible backcourt possession", () => {
+	for (const league of ["nba", "wnba"]) {
+		for (const side of ["left", "right"]) {
+			for (const variant of ["eligible", "too-early", "neutral", "opponent", "challenge", "backcourt-shot"]) {
+				const data = scenario([
+					{ ...basket, side, period: 4, clock: variant === "too-early" ? "PT02M01S" : "PT01M00S" },
+					{ actionType: "timeout", teamId: variant === "neutral" ? 0 : variant === "opponent" ? 1 : 2,
+						subType: variant === "challenge" ? "challenge" : "full",
+						period: 4, clock: variant === "too-early" ? "PT02M01S" : "PT01M00S" },
+					{ ...basket, period: 4, clock: "PT00M55S", teamId: 2, personId: 6,
+						side: side === "right" ? "left" : "right",
+						x: variant === "backcourt-shot" ? side === "right" ? 80 : 20 : side === "right" ? 20 : 80 },
+				], league);
+				const replay = compileReplay(data);
+				const timeout = replay.scenes[1];
+				const chosen = variant === "eligible";
+				assert(timeout.timeoutAdvance.chosen === chosen, `${league}/${variant}: wrong advance decision`);
+				const next = replay.scenes[2];
+				const thrower = throwerAt(next);
+				assert(chosen ? thrower.x === (side === "right" ? 28 : 66)
+					: thrower.x === (side === "right" ? 95.5 : -1.5), "wrong timeout inbound spot");
+				assert(timeout.timeoutAdvance.source === "schematic-choice", "advance presented as recorded choice");
+			}
+		}
+	}
+});
+
+Deno.test("timeout after a live advance requires a second charged timeout to advance again", () => {
+	const replay = compileReplay(scenario([
+		{ ...basket, period: 4, clock: "PT01M10S", shotResult: "Missed" },
+		{ actionType: "rebound", subType: "defensive", teamId: 2, personId: 10, period: 4, clock: "PT01M09S" },
+		{ actionType: "timeout", teamId: 2, period: 4, clock: "PT01M08S", x: 85, y: 20 },
+		{ actionType: "timeout", teamId: 2, period: 4, clock: "PT01M08S" },
+		{ ...basket, teamId: 2, personId: 6, side: "left", x: 20, period: 4, clock: "PT01M00S" },
+	]));
+	assert(!replay.scenes[2].timeoutAdvance.eligible && replay.scenes[3].timeoutAdvance.chosen,
+		"did not distinguish the first timeout after advancing from the second");
+	assert(throwerAt(replay.scenes[4]).x === 28, "second timeout did not use the frontcourt hash mark");
+});
+
+Deno.test("same-clock backcourt recoveries permit timeout advance while frontcourt recoveries do not", () => {
+	for (const side of ["left", "right"]) {
+		for (const frontcourt of [false, true]) {
+			const data = scenario([
+				{ ...basket, side, period: 5, clock: "PT01M00S", shotResult: "Missed" },
+				{ actionType: "rebound", subType: "defensive", teamId: 2, personId: 10, period: 5, clock: "PT01M00S" },
+				{ actionType: "timeout", teamId: 2, period: 5, clock: "PT01M00S",
+					x: frontcourt ? side === "right" ? 20 : 80 : side === "right" ? 80 : 20, y: 20 },
+				{ ...basket, teamId: 2, personId: 6, side: side === "right" ? "left" : "right",
+					x: side === "right" ? 20 : 80, period: 5, clock: "PT00M55S" },
+			]);
+			const replay = compileReplay(data);
+			assert(replay.scenes[2].timeoutAdvance.chosen === !frontcourt, "wrong recovery-based timeout eligibility");
+		}
+	}
+});
+
+Deno.test("ordinary live timeouts use the nearest unrestricted sideline and survive another dead timeout", () => {
+	const replay = compileReplay(stopScenario({ actionType: "timeout", teamId: 1, x: 90, y: 20 }, "nba", "right", [
+		{ actionType: "timeout", teamId: 1 },
+	]));
+	const next = replay.scenes.at(-1);
+	assert(throwerAt(next).x === 84.6 && throwerAt(next).y === -1.5, "timeout was clamped like a personal foul");
+});
+
+Deno.test("away-from-play penalties before a throw-in retain that spot and its endline privileges", () => {
+	const replay = compileReplay(scenario([
+		basket,
+		{ actionType: "foul", subType: "personal", descriptor: "away from play", teamId: 1, personId: 1, possession: 2 },
+		{ ...attempt, teamId: 2, personId: 6, subType: "1 of 1", shotResult: "Missed" },
+		{ ...basket, teamId: 2, personId: 6, side: "left", clock: "PT07M48S" },
+	]));
+	const next = replay.scenes[3];
+	assert(next.inboundPlan.freeBaseline && throwerAt(next).x === 95.5, "away-from-play penalty lost original privileges");
+});
+
+Deno.test("intermediate and defensive free-throw violations do not award an offensive lane-violation inbound", () => {
+	for (const intermediate of [false, true]) {
+		const scenes = rules([
+			{ ...attempt, subType: intermediate ? "1 of 2" : "1 of 1", shotResult: "Made" },
+			{ actionType: "violation", subType: "lane", teamId: intermediate ? 1 : 2 },
+			...(intermediate ? [{ ...attempt, subType: "2 of 2", shotResult: "Made" }] : []),
+		]);
+		assert(scenes[1].rules.after.throwIn === scenes[0].rules.after.throwIn, "wrongly awarded a new throw-in");
+	}
+});
+
+Deno.test("a recorded LaneViolation turnover overrides an incomplete free-throw label without a phantom live attack", () => {
+	const replay = compileReplay(scenario([
+		{ ...attempt, subType: "1 of 2", shotResult: "Made" },
+		{ actionType: "turnover", subType: "LaneViolation", teamId: 1, personId: 2 },
+		{ ...basket, teamId: 2, personId: 6, side: "left", clock: "PT07M48S" },
+	]));
+	assert(!replay.scenes[1].rules.requiresPlay, "lane turnover invented a live ball before the violation");
+	assert(throwerAt(replay.scenes[2]).x === 75, "recorded lane turnover ignored the free-throw-line spot");
+});
+
+Deno.test("double-lane violations use the recorded jump-ball continuation and preserve intermediate attempts otherwise", () => {
+	const last = rules([
+		{ ...attempt, subType: "1 of 1", shotResult: "Missed" },
+		{ actionType: "violation", subType: "double lane", teamId: 1 },
+		{ actionType: "jumpball", teamId: 2 },
+	]);
+	assert(last[1].rules.after.phase === "jump-ball" && last[1].rules.after.restart === "jump-ball",
+		"double lane awarded an inbound");
+	const intermediate = rules([
+		{ ...attempt, subType: "1 of 2" },
+		{ actionType: "violation", subType: "double lane", teamId: 1 },
+		{ ...attempt, subType: "2 of 2" },
+	]);
+	assert(intermediate[1].rules.after.pendingFreeThrows.length === 1 && intermediate[1].rules.after.restart === null,
+		"intermediate double lane removed the remaining free throw");
+});
+
+Deno.test("team five-second turnovers retain the pending inbound despite a differing feed clock", () => {
+	const replay = compileReplay(scenario([
+		basket,
+		{ actionType: "timeout", teamId: 2, clock: "PT07M59S" },
+		{ actionType: "turnover", subType: "5-second-violation", teamId: 2, qualifiers: ["team"], clock: "PT07M57S" },
+		{ ...basket, clock: "PT07M48S" },
+	]));
+	assert(replay.scenes[2].failedInboundPlan && !replay.scenes[2].rules.requiresPlay, "lost the pending throw-in context");
+	assert(throwerAt(replay.scenes[3]).x === replay.scenes[2].failedInboundPlan.point.x, "changed original inbound boundary");
+});
+
+Deno.test("timeout advancement after a turnover uses the newly entitled team's frontcourt", () => {
+	const replay = compileReplay(scenario([
+		{ ...basket, period: 4, clock: "PT01M10S", shotResult: "Missed" },
+		{ actionType: "turnover", subType: "shot clock", teamId: 1, personId: 1, period: 4, clock: "PT01M00S", x: 90, y: 20 },
+		{ actionType: "timeout", teamId: 2, period: 4, clock: "PT01M00S" },
+		{ ...basket, teamId: 2, personId: 6, side: "left", x: 20, period: 4, clock: "PT00M55S" },
+	]));
+	assert(replay.scenes[2].timeoutAdvance.chosen && throwerAt(replay.scenes[3]).x === 28,
+		"advanced toward the turnover team's basket instead of the entitled team's basket");
+});
+
+Deno.test("a violation at an advanced throw-in retains its physical spot and resets the new team's timeout eligibility", () => {
+	for (const anotherTimeout of [false, true]) {
+		const replay = compileReplay(scenario([
+			{ ...basket, period: 4, clock: "PT01M00S" },
+			{ actionType: "timeout", teamId: 2, period: 4, clock: "PT01M00S" },
+			{ actionType: "turnover", subType: "inbound", teamId: 2, period: 4, clock: "PT01M00S" },
+			...(anotherTimeout ? [{ actionType: "timeout", teamId: 1, period: 4, clock: "PT01M00S" }] : []),
+			{ ...basket, period: 4, clock: "PT00M55S" },
+		]));
+		const next = replay.scenes.at(-1);
+		assert(throwerAt(next).x === (anotherTimeout ? 66 : 28),
+			`lost original spot or new advance option (${anotherTimeout}): ${JSON.stringify(next.inboundPlan)}`);
+		if (anotherTimeout) {
+			assert(replay.scenes[3].timeoutAdvance.chosen, "new entitlement was treated as an old team's second timeout");
+		}
+	}
+});
+
+Deno.test("inbound pass direction respects league-specific midcourt and late-game exceptions", () => {
+	for (const direction of [-1, 1]) {
+		assert(!canPassToBackcourt({ location: "midcourt" }, { x: 47 }, direction, "nba", 3, 60),
+			"ordinary NBA midcourt inbound allowed backcourt");
+		assert(canPassToBackcourt({ location: "midcourt" }, { x: 47 - direction * 1.5 }, direction, "wnba", 3, 60),
+			"WNBA backcourt inbound lost pass freedom");
+		assert(canPassToBackcourt({ location: "sideline" }, { x: 47 + direction * 20 }, direction, "nba", 4, 120),
+			"last-two-minutes exception missing");
+		assert(!canPassToBackcourt({ location: "sideline" }, { x: 47 + direction * 20 }, direction, "nba", 4, 121),
+			"last-two-minutes exception started early");
+	}
 });
 
 Deno.test("compiled replay changes bonus at the foul anchor and keeps it off through the final scene", () => {

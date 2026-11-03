@@ -145,6 +145,20 @@ danach ist je nach Ergebnis ein Live-Rebound oder Einwurf möglich.
 Freiwurfserien, technische Zusatzstrafen, erhaltenes Angriffsrecht und Unterbrechungen müssen
 zusammenhängend behandelt werden. Unzureichende oder widersprüchliche Belege bleiben erkennbar.
 
+Einwurfort und Ausballort sind getrennte Anker. Nach einem Grundlinienausball liegt der feste
+Einwurfort außerhalb der verlängerten Drei-Sekunden-Zone; nach einem Treffer und zu Beginn der
+regulären Folgeperioden besteht dagegen Bewegungsfreiheit entlang der hinteren Grundlinie.
+Andere Fortsetzungen unterscheiden nächstgelegene Seitenlinie, Begrenzung durch die verlängerte
+Freiwurflinie und feste Orte an Freiwurf- oder Mittellinie. NBA und WNBA unterscheiden sich dabei
+insbesondere nach Rückspiel und Acht-Sekunden-Verstoß. Zusätzliche Strafen und Unterbrechungen
+erhalten den ursprünglichen Einwurfort und seine Privilegien, soweit die einschlägige Regel dies vorsieht.
+
+Ein belegter Ereignisort hat Vorrang. Ohne Ortsbeleg wird der dargestellte Unterbrechungsort als
+schematischer Anker verwendet; der spätere Wurfort bestimmt nicht rückwirkend den Einwurfort.
+Eine späte Auszeit erlaubt eine Vorverlegung nur unter den ligaspezifischen Voraussetzungen.
+Eine ergänzte Wahl dieser Option bleibt eine Annahme und darf einem belegten Rückfeldabschluss
+nicht widersprechen. Der erste Einwurfpass beachtet die für Ort, Liga und Spielzeit erlaubte Richtung.
+
 Wir entscheiden tatsächliche Fouls oder Video-Reviews nicht selbst neu. Feed-Entscheidungen
 und ihre Folgen sind maßgeblich; auch Bonusfreiwürfe oder Platzverweise werden nicht aus
 erfundenen Kontakten abgeleitet.

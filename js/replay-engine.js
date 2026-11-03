@@ -5,6 +5,7 @@ import { movePlayers } from "./replay-motion.js";
 import { planOffensiveAction } from "./replay-offense.js";
 import { getPassCost, planInboundReception, planPassConnection } from "./replay-passing.js";
 import { getLeague } from "./replay-leagues.js";
+import { canPassToBackcourt, getThrowInPoint } from "./replay-inbounds.js";
 import { getInteriorScore, getMatchupCost, getPlayerRole } from "./replay-profiles.js";
 import { getLaneWaitingPoint, getSceneBonus, getSceneGameState, isDefensiveLaneCountActive, isInOffensiveLane, planGameStates, planTeamFouls, scheduleGameStates } from "./replay-rules.js";
 
@@ -1504,6 +1505,50 @@ function planOutlet(state, scene, origin, carrier, receiver, direction, data) {
 	}) ?? null;
 }
 
+function resolveThrowIn(plan, replay, data) {
+	const source = replay.scenes[plan.sourceIndex];
+	if (plan.original && !source.timeoutAdvance?.chosen) {
+		const original = resolveThrowIn(plan.original, replay, data);
+		const resolved = { ...plan, ...original, sourceIndex: plan.sourceIndex, reason: plan.reason,
+			freeBaseline: plan.freeBaseline && original.freeBaseline };
+		if (resolved.location === "baseline" && !resolved.freeBaseline) {
+			resolved.point = getThrowInPoint({ location: "boundary" }, original.point, 1, replay.league.id);
+		}
+		return resolved;
+	}
+	const basketTeam = source.timeoutAdvance?.chosen ? source.rules.after.entitledTeam : plan.basketTeam;
+	const direction = attackDirection(data, basketTeam, source.action.period);
+	const origin = source.throwInOrigin;
+	const effective = source.timeoutAdvance?.chosen ? { ...plan, basketTeam, location: "advanced", freeBaseline: false } : plan;
+	return { ...effective, origin, originSource: source.throwInOriginSource,
+		point: getThrowInPoint(effective, origin, direction, replay.league.id) };
+}
+
+function planTimeoutAdvance(scene, index, replay, data) {
+	const before = scene.rules.before;
+	const team = scene.rules.after.entitledTeam;
+	const direction = attackDirection(data, team, scene.action.period);
+	const origin = scene.throwInOrigin;
+	const previous = replay.scenes.slice(0, index).findLast((item) =>
+		!["substitution", "timeout"].includes(item.kind));
+	const sameClockRecovery = previous?.action.period === scene.action.period &&
+		previous.clockTo === scene.clockTo && previous.rules.after.controlTeam === team &&
+		(previous.kind === "rebound" || previous.kind === "steal" || Boolean(previous.action.stealPersonId));
+	const original = before.throwIn ? resolveThrowIn(before.throwIn, replay, data) : null;
+	const secondTimeout = original?.reason.startsWith("timeout/") &&
+		replay.scenes[original.sourceIndex].action.teamId === team;
+	const backcourt = ((original?.point.x ?? origin.x) - 47) * direction < 0;
+	const eligible = scene.action.period >= 4 && scene.clockTo <= 120 && scene.action.teamId === team &&
+		scene.action.subType !== "challenge" &&
+		before.pendingFreeThrows.length === 0 && backcourt &&
+		(before.phase === "throw-in" && (!original.reason.startsWith("timeout/") || secondTimeout) ||
+			!scene.rules.requiresPlay && sameClockRecovery);
+	const next = replay.scenes.slice(index + 1).find((item) => item.rules.requiresPlay);
+	const backcourtShot = next?.rules.offense === team && next.action.period === scene.action.period &&
+		next.action.isFieldGoal && (next.action.x * 0.94 - 47) * direction < 0;
+	return { eligible, chosen: eligible && !backcourtShot, source: "schematic-choice" };
+}
+
 function prepareAttack(state, scene, offense, direction, matchups, record, data, replay, index, recordPlay) {
 	const lineup = state.lineups[offense];
 	const pg = lineup[0];
@@ -1608,12 +1653,10 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 	placeFormation(state, offense, direction, matchups, data, buildup);
 	const targets = Object.fromEntries(Object.entries(state.positions).map(([id, position]) => [id, { ...position }]));
 	if (restart) {
-		const inboundPoint = scene.assumedInbound?.point ?? (restart === "baseline"
-			? { x: direction === 1 ? -1.5 : 95.5, y: 30 }
-			: restart === "flagrant" || restart === "free-throw-line"
-			? { x: direction === 1 ? 75 : 19,
-				y: restart === "free-throw-line" && state.restartOrigin.y < 25 ? -1.5 : 51.5 }
-			: { x: state.formation.backcourt ? direction === 1 ? 34 : 60 : 47, y: 51.5 });
+		scene.inboundPlan = resolveThrowIn(scene.rules.before.throwIn, replay, data);
+		const inboundPoint = scene.inboundPlan.point;
+		scene.inboundPlan.canPassBackcourt = canPassToBackcourt(scene.inboundPlan, inboundPoint, direction,
+			replay.league.id, scene.action.period, scene.clockFrom);
 		const inbounder = lineup.filter((id) => id !== pg).reduce((closest, id) =>
 			Math.hypot(origins[id].x - inboundPoint.x, origins[id].y - inboundPoint.y) <
 					Math.hypot(origins[closest].x - inboundPoint.x, origins[closest].y - inboundPoint.y)
@@ -1631,16 +1674,13 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 			}
 		}
 		Object.assign(state.positions[inbounder], inboundPoint);
-		Object.assign(
-			state.positions[pg],
-			scene.assumedInbound
-				? { x: Math.max(8, Math.min(86, inboundPoint.x)), y: Math.max(8, Math.min(42, inboundPoint.y)) }
-				: restart === "baseline" ? { x: direction === 1 ? 15 : 79, y: 28 } : { x: inboundPoint.x, y: 40 },
-		);
 		const directFinish = scene.kind === "2pt" && scene.action.personId === pg &&
 			!scene.action.assistPersonId && scene.liveSeconds <= 3 &&
 			Math.hypot(scene.shotPoint.x - scene.hoop.x, scene.shotPoint.y - 25) <= 8;
-		if (scene.assumedInbound && !scene.formation.backcourt && !directFinish &&
+		Object.assign(state.positions[pg], directFinish && !scene.inboundPlan.freeBaseline ? scene.shotPoint
+			: scene.inboundPlan.freeBaseline ? { x: direction === 1 ? 15 : 79, y: 28 }
+			: { x: Math.max(8, Math.min(86, inboundPoint.x)), y: Math.max(8, Math.min(42, inboundPoint.y)) });
+		if (!scene.formation.backcourt && !directFinish &&
 			(direction === 1 ? inboundPoint.x : 94 - inboundPoint.x) > 75) {
 			const defenders = Object.keys(matchups).map((id) => state.positions[id]);
 			const teammates = lineup.filter((id) => id !== pg && id !== inbounder).map((id) => state.positions[id]);
@@ -1650,15 +1690,18 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 				scene.inboundReception = { receiverId: pg, ...reception, reason: "perimeter-safety" };
 			}
 		}
+		if (!scene.inboundPlan.canPassBackcourt && (state.positions[pg].x - 47) * direction <= 0) {
+			state.positions[pg].x = 47 + direction * 4;
+		}
 		state.ball.owner = inbounder;
 		record(0.85);
 		scene.inboundAt = scene.frames.at(-1).time;
-		if (scene.assumedInbound) {
-			const receiver = state.positions[pg];
-			flyBall(state, record, { x: receiver.x + 1, y: receiver.y + 0.8, z: 0.5 }, 0.5, 0.45);
-		}
+		const receiver = state.positions[pg];
+		flyBall(state, record, { x: receiver.x + 1, y: receiver.y + 0.8, z: 0.5 }, 0.5,
+			Math.max(0.45, Math.hypot(receiver.x - inboundPoint.x, receiver.y - inboundPoint.y) / 45));
 		state.ball.owner = pg;
-		record(scene.assumedInbound ? 0.01 : 0.45);
+		state.ball.dribble = true;
+		record(0.01);
 		// Inbound setup takes replay time without consuming the game clock.
 		scene.liveAt = scene.frames.at(-1).time;
 		if (!prepareTransition(state, scene, direction, record, data)) {
@@ -3381,9 +3424,9 @@ function compileScene(replay, scene, index, state, data) {
 		addMarker(replay, scene, time, made ? "made" : "miss", shooter, made ? "+1" : "");
 		if (!final && !technical) {
 			state.ball.owner = action.personId;
-		} else if (!made && animateTeamReboundOut(state, scene, replay, record)) {
+		} else if (!made && scene.rules.freeThrow.live && animateTeamReboundOut(state, scene, replay, record)) {
 			scene.outAt = time;
-		} else if (!made && !technical && !scene.flagrantFreeThrow) {
+		} else if (!made && scene.rules.freeThrow.live) {
 			const reboundPoint = { x: state.ball.x - direction * 3, y: 28, z: 3.1 };
 			if (namedRebound) {
 				const player = state.positions[namedRebound];
@@ -3417,6 +3460,18 @@ function compileScene(replay, scene, index, state, data) {
 			pacePreparation(state, scene, time, 0.8, record, direction);
 		}
 		scene.eventAt = time;
+		record(0.7);
+	} else if (scene.rules.throwInViolation) {
+		scene.failedInboundPlan = resolveThrowIn(scene.rules.before.throwIn, replay, data);
+		const lineup = state.lineups[scene.rules.before.entitledTeam];
+		const thrower = lineup.includes(action.personId) ? action.personId : lineup.at(-1);
+		Object.assign(state.positions[thrower], scene.failedInboundPlan.point);
+		state.ball.owner = thrower;
+		state.ball.dribble = false;
+		record(0.85);
+		scene.eventAt = time;
+		addMarker(replay, scene, time, "violation", scene.failedInboundPlan.point);
+		releaseBall(state);
 		record(0.7);
 	} else if (scene.kind === "foul" || scene.kind === "turnover" || scene.kind === "steal") {
 		const offensive = scene.kind === "foul" && action.subType === "offensive";
@@ -3550,7 +3605,7 @@ function compileScene(replay, scene, index, state, data) {
 			: "turnover";
 		addMarker(replay, scene, scene.eventAt, markerKind, victim || actor || state.ball);
 		if (scene.rules.defensiveThreeSeconds) {
-			state.restartOrigin = { x: actor.x, y: actor.y };
+			scene.throwInOrigin = { x: actor.x, y: actor.y };
 			followAttackers = false;
 		}
 		if (action.stealPersonId || scene.kind === "steal") {
@@ -3720,6 +3775,9 @@ function compileScene(replay, scene, index, state, data) {
 		}
 		if (scene.kind === "timeout" || (scene.kind === "period" && action.subType === "end")) {
 			followAttackers = false;
+			if (scene.kind === "timeout") {
+				scene.throwInOrigin = { ...scene.frames.at(-1).ball };
+			}
 			scene.stoppedAt = time;
 			leaveCourt(state, data, record);
 		} else {
@@ -3728,6 +3786,19 @@ function compileScene(replay, scene, index, state, data) {
 	}
 	if (scene.eventAt === undefined) {
 		scene.eventAt = Math.max(0.01, time - 0.4);
+	}
+	const recordedPoint = Number.isFinite(action.x) && Number.isFinite(action.y) &&
+		action.x >= 0 && action.x <= 100 && action.y >= 0 && action.y <= 100;
+	scene.throwInOriginSource = recordedPoint ? "recorded" : "schematic-event";
+	if (recordedPoint) {
+		scene.throwInOrigin = { x: action.x * 0.94, y: action.y * 0.5 };
+	} else if (!scene.throwInOrigin) {
+		const frame = scene.kind === "turnover" && action.subType === "out-of-bounds"
+			? scene.frames.at(-1) : scene.frames.find((frame) => frame.time >= scene.eventAt) ?? scene.frames.at(-1);
+		scene.throwInOrigin = { x: frame.ball.x, y: frame.ball.y };
+	}
+	if (scene.kind === "timeout" && scene.rules.after.phase === "throw-in") {
+		scene.timeoutAdvance = planTimeoutAdvance(scene, index, replay, data);
 	}
 	scheduleGameStates(scene);
 	state.possession = scene.rules.after.entitledTeam ?? state.possession;
@@ -3784,7 +3855,6 @@ export function compileReplay(data) {
 		score: [0, 0],
 		possession: data.teams.find((team) => team.home).id,
 		restart: null,
-		restartOrigin: null,
 		needsAdvance: false,
 		formation: null,
 		matchups: null,
