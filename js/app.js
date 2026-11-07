@@ -109,17 +109,27 @@ function drawCourt() {
 	c.fill();
 	c.fillStyle = "#dcb784";
 	c.fillRect(0, 0, 94, 50);
+	const boardColors = ["#d6b07e", "#dcb785", "#e2bf8d", "#dab482", "#dfbc8a"];
 	for (let row = 0; row < 60; row++) {
 		const rowHeight = Math.min(0.83, 50 - row * 0.84);
-		c.fillStyle = row % 3 === 0 ? "#d6ad7a" : row % 3 === 1 ? "#dfbc8c" : "#e3c396";
-		c.fillRect(0, row * 0.84, 94, rowHeight);
-		c.strokeStyle = "#9e744323";
+		c.strokeStyle = "#9e74433b";
 		c.lineWidth = 0.035;
-		for (let x = (row % 4) * 5; x < 94; x += 22) {
-			c.beginPath();
-			c.moveTo(x, row * 0.84);
-			c.lineTo(x, row * 0.84 + rowHeight);
-			c.stroke();
+		let x = -((row * 13) % 19);
+		let board = 0;
+		while (x < 94) {
+			const boardWidth = 12 + (row * 11 + board * 7) % 9;
+			const start = Math.max(0, x);
+			const end = Math.min(94, x + boardWidth);
+			c.fillStyle = boardColors[(row * 17 + board * 7 + row * board * 3) % boardColors.length];
+			c.fillRect(start, row * 0.84, Math.max(0, end - start), rowHeight);
+			if (x > 0) {
+				c.beginPath();
+				c.moveTo(x, row * 0.84);
+				c.lineTo(x, row * 0.84 + rowHeight);
+				c.stroke();
+			}
+			x += boardWidth;
+			board++;
 		}
 	}
 	c.fillStyle = colors.shirt;
