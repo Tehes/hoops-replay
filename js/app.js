@@ -6,6 +6,7 @@ import { loadGameUniforms, loadRecentGameIds, loadReplayData } from "./replay-da
 import { checkReplay } from "./replay-validation.js";
 import { attackDirection, compileReplay, getReplayFrame } from "./replay-engine.js";
 import { getJerseyColors, getTeamColors, getTeamLogo, getTeamName } from "./replay-teams.js";
+import { getPaintColor } from "./replay-colors.js";
 import { getLeague } from "./replay-leagues.js";
 import {
 	getBallGeometry,
@@ -132,7 +133,7 @@ function drawCourt() {
 			board++;
 		}
 	}
-	c.fillStyle = colors.shirt;
+	c.fillStyle = getPaintColor(colors.shirt, [...jerseyByTeamId.values()]);
 	c.fillRect(0, 17, 19, 16);
 	c.fillRect(75, 17, 19, 16);
 	c.strokeStyle = "#28303c";

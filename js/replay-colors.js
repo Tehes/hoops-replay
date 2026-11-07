@@ -54,6 +54,61 @@ function getNeutralColor(background) {
 	return getColorContrast("#ffffff", background) >= getColorContrast("#000000", background) ? "#ffffff" : "#000000";
 }
 
+function oklabToHex([lightness, a, b]) {
+	const l = (lightness + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+	const m = (lightness - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+	const s = (lightness - 0.0894841775 * a - 1.2914855480 * b) ** 3;
+	const channels = [
+		4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+		-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+		-0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s,
+	];
+	return `#${
+		channels.map((channel) => {
+			const value = Math.max(0, Math.min(1, channel));
+			const encoded = value <= 0.0031308 ? value * 12.92 : 1.055 * value ** (1 / 2.4) - 0.055;
+			return Math.round(encoded * 255).toString(16).padStart(2, "0");
+		}).join("")
+	}`;
+}
+
+export function getPaintColor(base, jerseys) {
+	if (!jerseys.length) {
+		return base;
+	}
+	const minimumContrast = (color) => Math.min(...jerseys.map((jersey) => getColorContrast(color, jersey.shirt)));
+	let best = base;
+	let bestContrast = minimumContrast(base);
+	if (bestContrast >= 1.3) {
+		return base;
+	}
+	const [lightness, a, b] = hexToOklab(base);
+	const baseChannels = base.slice(1).match(/../g).map((channel) => parseInt(channel, 16));
+	// Keep the team hue and cap the adjustment, even if stronger contrast would require a larger change.
+	for (let step = 1; step <= 12; step++) {
+		for (const direction of [1, -1]) {
+			const candidate = oklabToHex([
+				Math.max(0, Math.min(1, lightness + direction * step * 0.02)),
+				a * 0.9,
+				b * 0.9,
+			]);
+			const channels = candidate.slice(1).match(/../g).map((channel) => parseInt(channel, 16));
+			if (channels.some((channel, index) => Math.abs(channel - baseChannels[index]) > 32)) {
+				continue;
+			}
+			const contrast = minimumContrast(candidate);
+			if (contrast > bestContrast) {
+				best = candidate;
+				bestContrast = contrast;
+			}
+		}
+		if (bestContrast >= 1.3) {
+			break;
+		}
+	}
+	return best;
+}
+
 export function createJerseyColors(shirt, colors) {
 	let detail = getNeutralColor(shirt);
 	const teamColors = [colors.shirt, colors.alternate].filter(Boolean);
