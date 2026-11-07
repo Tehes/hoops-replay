@@ -132,13 +132,13 @@ HOOPS REPLAY
 .jumbotron {
 	position: relative;
 	z-index: 1;
-	max-width: 760px;
+	max-width: 610px;
 	margin: 0 auto 6px;
 	overflow: hidden;
 	border: 1px solid #d8ecff40;
 	border-radius: var(--radius);
 	background: radial-gradient(ellipse at top, #253e50, #0d1720 80%);
-	box-shadow: 0 0 12px #d4eaff59, 0 0 36px #9bcaff47, 0 0 80px #9bcaff2e, inset 0 0 28px #b9dbff14;
+	box-shadow: 0 -2px 10px #d4eaff33, 0 -6px 24px #9bcaff24, 0 -12px 48px #9bcaff14, inset 0 0 28px #b9dbff14;
 	animation: jumbotron-glow 6s ease-in-out infinite;
 }
 
@@ -148,7 +148,7 @@ HOOPS REPLAY
 
 @keyframes jumbotron-glow {
 	50% {
-		box-shadow: 0 0 16px #d4eaff73, 0 0 44px #9bcaff5c, 0 0 88px #9bcaff3d, inset 0 0 28px #b9dbff14;
+		box-shadow: 0 -2px 12px #d4eaff40, 0 -6px 28px #9bcaff30, 0 -12px 56px #9bcaff1f, inset 0 0 28px #b9dbff14;
 	}
 }
 
@@ -317,7 +317,8 @@ HOOPS REPLAY
 
 .court-stage {
 	position: relative;
-	margin-top: -3%;
+	/* Bench players occupy the canvas's top edge during substitutions. */
+	margin-top: 0;
 }
 #court {
 	width: 100%;
