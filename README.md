@@ -163,4 +163,4 @@ See [LICENSE.txt](LICENSE.txt) for the terms.
 
 NBA and WNBA game data, team names, logos, and player photos belong to their respective owners.
 Player photos load from the respective league's CDN; team logos are stored locally.
-Hoops Replay is an independent, unofficial project. 
+Hoops Replay is an independent, unofficial project.
