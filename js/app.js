@@ -537,11 +537,17 @@ function drawBall(frame, ball) {
 	ctx.arc(0, 0, radius, 0, Math.PI * 2);
 	ctx.fill();
 	ctx.stroke();
+	ctx.lineWidth = 0.09;
 	ctx.beginPath();
 	ctx.moveTo(-radius, 0);
 	ctx.lineTo(radius, 0);
 	ctx.moveTo(0, -radius);
 	ctx.lineTo(0, radius);
+	const seamEdge = radius * Math.SQRT1_2;
+	ctx.moveTo(-seamEdge, -seamEdge);
+	ctx.bezierCurveTo(-radius * 0.1, -radius * 0.4, -radius * 0.1, radius * 0.4, -seamEdge, seamEdge);
+	ctx.moveTo(seamEdge, -seamEdge);
+	ctx.bezierCurveTo(radius * 0.1, -radius * 0.4, radius * 0.1, radius * 0.4, seamEdge, seamEdge);
 	ctx.stroke();
 	ctx.restore();
 }
