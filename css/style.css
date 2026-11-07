@@ -135,10 +135,21 @@ HOOPS REPLAY
 	max-width: 760px;
 	margin: 0 auto 6px;
 	overflow: hidden;
-	border: 1px solid var(--line-color);
+	border: 1px solid #d8ecff40;
 	border-radius: var(--radius);
-	background: #0a1017;
-	box-shadow: 0 8px 24px #00000040, inset 0 2px var(--accent-color);
+	background: radial-gradient(ellipse at top, #253e50, #0d1720 80%);
+	box-shadow: 0 0 12px #d4eaff59, 0 0 36px #9bcaff47, 0 0 80px #9bcaff2e, inset 0 0 28px #b9dbff14;
+	animation: jumbotron-glow 6s ease-in-out infinite;
+}
+
+.jumbotron strong {
+	text-shadow: 0 0 4px #ffffff30;
+}
+
+@keyframes jumbotron-glow {
+	50% {
+		box-shadow: 0 0 16px #d4eaff73, 0 0 44px #9bcaff5c, 0 0 88px #9bcaff3d, inset 0 0 28px #b9dbff14;
+	}
 }
 
 /* Scoreboard */
@@ -228,13 +239,13 @@ HOOPS REPLAY
 	gap: min(2vw, 16px);
 	min-height: 88px;
 	padding: 0 min(2vw, 20px);
-	border-top: 1px solid var(--line-color);
-	border-left: 3px solid var(--event-color);
-	background: radial-gradient(ellipse at left bottom, #263544, #0a1017 75%);
+	border-top: 1px solid #d8ecff1a;
+	background: radial-gradient(ellipse at bottom, #2b4559, #111f2b 80%);
 }
 .action-display img {
 	flex: 0 0 auto;
 	width: 104px;
+	max-height: 76px;
 	align-self: end;
 }
 .action-copy {
