@@ -146,6 +146,66 @@ Deno.test("intermediate and special free throws do not trigger live box outs", (
 	}
 });
 
+Deno.test("intermediate free throws finish at the basket before a separate dead-ball return", () => {
+	for (const period of [1, 3]) {
+		for (const result of ["Made", "Missed"]) {
+			const data = scenario(period, result, "1 of 2", "", 0);
+			const replay = compileReplay(data);
+			const shot = replay.scenes[0];
+			const direction = attackDirection(data, 1, period);
+			const hoopX = direction === 1 ? 88.75 : 5.25;
+			const outcome = shot.frames.find((frame) => Math.abs(frame.time - shot.eventAt) < 1e-8);
+			assert(outcome.ball.owner === null && outcome.ball.x === hoopX, "shot never reached the rim");
+			const after = shot.frames.filter((frame) => frame.time > shot.eventAt);
+			assert(after[0].ball.owner === null, "ball snapped straight back to the shooter");
+			assert(after.some((frame) => frame.ball.owner === null && frame.ball.z === 0),
+				"outcome never separated the shot from the return");
+			const caught = after.find((frame) => frame.ball.owner === 1);
+			assert(caught.time - shot.eventAt >= 1, "dead-ball return has no travel time");
+			assert(!caught.ball.flight && !caught.ball.dribble, "returned ball still behaves like a shot");
+			for (let i = 1; i < after.length; i++) {
+				assert(Math.hypot(after[i].ball.x - after[i - 1].ball.x, after[i].ball.y - after[i - 1].ball.y) < 4,
+					"return contains a discontinuous ball jump");
+			}
+		}
+	}
+});
+
+Deno.test("dead-ball team rebounds preserve the free-throw holder without a live rebound marker", () => {
+	for (const period of [1, 3]) {
+		const data = scenario(period, "Missed", "1 of 2", "", 0);
+		data.actions[1].qualifiers = ["team", "deadball"];
+		data.actions.push({ ...data.actions[0], actionNumber: 3, orderNumber: 3, subType: "2 of 2", shotResult: "Made" });
+		const original = JSON.stringify(data);
+		const replay = compileReplay(data);
+		const [shot, rebound, final] = replay.scenes;
+		assert(rebound.action === data.actions[1], "statistical event was removed");
+		assert(rebound.frames.every((frame) => frame.ball.owner === 1 && !frame.ball.flight),
+			"dead-ball entry changed the visible holder");
+		assert(!replay.markers.some((marker) => marker.kind === "rebound"), "statistical entry drew a live rebound");
+		assert(!rebound.reboundApproach && !final.inboundPlan, "dead-ball entry invented live play");
+		assert(shot.frames.at(-1).ball.x === final.frames[0].ball.x, "series lost ball continuity");
+		const sample = JSON.stringify(getReplayFrame(replay, rebound.start + 0.3));
+		getReplayFrame(replay, replay.duration);
+		assert(JSON.stringify(getReplayFrame(replay, rebound.start + 0.3)) === sample, "seeking changes dead rebound");
+		assert(JSON.stringify(data) === original, "presentation changed recorded events");
+	}
+});
+
+Deno.test("made final and special free throws finish below the rim without a return to the shooter", () => {
+	for (const period of [1, 3]) {
+		for (const descriptor of ["", "technical", "flagrant"]) {
+			const replay = compileReplay(scenario(period, "Made", "1 of 1", descriptor));
+			const shot = replay.scenes[0];
+			const last = shot.frames.at(-1).ball;
+			assert(last.owner === null && last.z === 0 && last.y > 25,
+				"made free throw stayed at rim height or returned to shooter");
+			assert(shot.frames.filter((frame) => frame.time > shot.eventAt).every((frame) => frame.ball.owner === null),
+				"final free throw invented a return catch");
+		}
+	}
+});
+
 Deno.test("lane places stay stable across a series and both leagues use the same release constraints", () => {
 	for (const league of ["nba", "wnba"]) {
 		const data = scenario(1, "Missed");

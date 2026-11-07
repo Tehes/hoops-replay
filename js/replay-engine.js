@@ -3347,6 +3347,10 @@ function compileScene(replay, scene, index, state, data) {
 		landPlayers(state);
 		record(0.22);
 		record(!made && namedRebound ? 0.08 : 0.65);
+	} else if (scene.kind === "rebound" && !action.personId && scene.rules.before.ballStatus === "dead") {
+		// Statistical rebounds during a stoppage do not create a catch or change the visible holder.
+		scene.eventAt = time;
+		record(0.8);
 	} else if (scene.kind === "rebound") {
 		const defensive = action.subType === "defensive";
 		if (action.personId) {
@@ -3394,6 +3398,7 @@ function compileScene(replay, scene, index, state, data) {
 		prepareFreeThrow(state, scene, direction, technical || scene.flagrantFreeThrow || (final && !scene.rules.freeThrow.live));
 		state.ball.owner = action.personId;
 		state.ball.dribble = false;
+		state.ball.flight = false;
 		record(0.75);
 		scene.freeThrowAt = time;
 		record(0.15);
@@ -3422,8 +3427,17 @@ function compileScene(replay, scene, index, state, data) {
 		const made = action.shotResult === "Made";
 		setScore(state, action);
 		addMarker(replay, scene, time, made ? "made" : "miss", shooter, made ? "+1" : "");
+		if (made) {
+			flyBall(state, record, { x: hoop.x, y: hoop.y + 1.5, z: 0 }, 0, 0.18);
+		} else if (!scene.rules.freeThrow.live) {
+			flyBall(state, record, { x: hoop.x - direction * 2, y: 27, z: 0 }, 0.6, 0.3);
+		}
 		if (!final && !technical) {
+			// Condense the dead-ball return, but keep it distinct from the shot and its outcome.
+			record(0.2);
+			flyBall(state, record, { x: shooter.x + 1, y: shooter.y + 0.8, z: 0.5 }, 0.6, 0.65);
 			state.ball.owner = action.personId;
+			state.ball.flight = false;
 		} else if (!made && scene.rules.freeThrow.live && animateTeamReboundOut(state, scene, replay, record)) {
 			scene.outAt = time;
 		} else if (!made && scene.rules.freeThrow.live) {

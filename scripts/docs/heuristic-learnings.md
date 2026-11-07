@@ -141,6 +141,15 @@ Abweichungen und Grenzen stehen im [Einwurfort-Regelabgleich](inbound-location-a
 
 ## Teamrebound und angenommener Ausball
 
+Statistische Teamrebounds während einer bereits toten Ballphase lösen keine Fangbewegung,
+Besitzänderung oder Reboundmarkierung aus. Insbesondere zwischen Freiwürfen bleibt der
+zurückgegebene Ball beim Schützen; der Feed-Eintrag bleibt als Ereignis erhalten.
+Die Regelphase ist dafür maßgeblich, nicht allein das Vorhandensein eines Teamrebound-Eintrags.
+Ein Zwischenfreiwurf darf den Ball nach dem Ringkontakt nicht sofort wieder dem Schützen zuweisen:
+Treffer beziehungsweise toter Abpraller und eine zeitlich getrennte schematische Rückgabe
+müssen erkennbar sein. Die Rückgabe belegt weder einen tatsächlichen Pass noch einen Beteiligten.
+Letzte reguläre Fehlwürfe behalten ihre Live-Rebound-Fortsetzung.
+
 Ein Teamrebound ohne benannten Fänger ist kein belegter individueller Fang. Folgt auf einen
 zusammenhängenden Live-Fehlwurf eine gewöhnliche Spielfortsetzung mit Einwurfrecht, kann ein
 schematischer Ausball die fehlende Unterbrechung erklären. Den Ball im Feld liegen zu lassen und

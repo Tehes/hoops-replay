@@ -5,6 +5,27 @@ import { getTeamColors, getTeamLogo, getTeamName } from "../js/replay-teams.js";
 import { loadFeed, loadGame } from "./replay-source.js";
 import { getLaneWaitingPoint, isDefensiveLaneCountActive, isInOffensiveLane } from "../js/replay-rules.js";
 
+Deno.test("DEN-OKC intermediate free-throw misses return smoothly and retain dead-ball team rebound events", async () => {
+	const data = await loadGame("0022600007");
+	const original = JSON.stringify(data);
+	const replay = compileReplay(data);
+	for (const [shotNumber, reboundNumber] of [[260, 261], [322, 323], [609, 610]]) {
+		const shot = replay.scenes.find((scene) => scene.action.actionNumber === shotNumber);
+		const rebound = replay.scenes.find((scene) => scene.action.actionNumber === reboundNumber);
+		assert(shot.action.shotResult === "Missed" && !shot.finalFreeThrow, "regression lost intermediate miss");
+		assert(rebound.action.qualifiers.includes("deadball"), "regression lost statistical team rebound");
+		const after = shot.frames.filter((frame) => frame.time > shot.eventAt);
+		assert(after[0].ball.owner === null && after.find((frame) => frame.ball.owner).time - shot.eventAt >= 1,
+			"ball snapped back before completing the outcome and return");
+		assert(rebound.frames.every((frame) => frame.ball.owner === shot.action.personId && !frame.ball.flight),
+			"statistical rebound released the returned ball");
+		assert(!replay.markers.some((marker) => marker.kind === "rebound" &&
+			marker.time >= rebound.start && marker.time <= rebound.end), "statistical rebound drew a live marker");
+	}
+	assert(JSON.stringify(data) === original, "free-throw choreography mutated recorded events");
+	assert(checkReplay(data, replay).errors.length === 0, "free-throw fix broke replay validation");
+});
+
 Deno.test("MIL-UTA action 19 dribbles after the inbound instead of carrying the ball across court", async () => {
 	const data = await loadGame("0022600172");
 	const replay = compileReplay(data);
