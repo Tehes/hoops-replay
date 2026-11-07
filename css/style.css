@@ -208,6 +208,8 @@ input:focus-visible {
 }
 
 .jumbotron {
+	position: relative;
+	z-index: 1;
 	max-width: 760px;
 	margin: 0 auto 6px;
 	overflow: hidden;
@@ -392,6 +394,7 @@ input:focus-visible {
 
 .court-stage {
 	position: relative;
+	margin-top: -3%;
 }
 #court {
 	display: block;
@@ -454,6 +457,7 @@ input:focus-visible {
 	display: grid;
 	grid-template-columns: 1fr auto 1fr;
 	align-items: center;
+	margin-top: 12px;
 }
 #elapsed {
 	color: var(--muted-color);

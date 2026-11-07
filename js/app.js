@@ -110,23 +110,21 @@ function drawCourt() {
 	c.fillStyle = "#dcb784";
 	c.fillRect(0, 0, 94, 50);
 	for (let row = 0; row < 60; row++) {
+		const rowHeight = Math.min(0.83, 50 - row * 0.84);
 		c.fillStyle = row % 3 === 0 ? "#d6ad7a" : row % 3 === 1 ? "#dfbc8c" : "#e3c396";
-		c.fillRect(0, row * 0.84, 94, 0.83);
+		c.fillRect(0, row * 0.84, 94, rowHeight);
 		c.strokeStyle = "#9e744323";
 		c.lineWidth = 0.035;
 		for (let x = (row % 4) * 5; x < 94; x += 22) {
 			c.beginPath();
 			c.moveTo(x, row * 0.84);
-			c.lineTo(x, row * 0.84 + 0.83);
+			c.lineTo(x, row * 0.84 + rowHeight);
 			c.stroke();
 		}
 	}
 	c.fillStyle = colors.shirt;
 	c.fillRect(0, 17, 19, 16);
 	c.fillRect(75, 17, 19, 16);
-	c.fillStyle = colors.trim;
-	c.fillRect(0, 17, 19, 0.5);
-	c.fillRect(75, 32.5, 19, 0.5);
 	c.strokeStyle = "#28303c";
 	c.lineWidth = 0.14;
 	c.strokeRect(0, 0, 94, 50);
@@ -148,7 +146,7 @@ function drawCourt() {
 		}
 		c.strokeStyle = "#ffffffc7";
 		c.lineWidth = 0.14;
-		c.strokeRect(0, 17, 19, 16);
+		c.strokeRect(c.lineWidth / 2, 17, 19 - c.lineWidth / 2, 16);
 		c.beginPath();
 		c.arc(19, 25, 6, -Math.PI / 2, Math.PI / 2);
 		c.stroke();
