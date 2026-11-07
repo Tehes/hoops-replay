@@ -1633,13 +1633,22 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 		}
 		return;
 	}
-	const destinations = newAttack ? state.formation.slots : lineup.map((id) => {
+	const destinations = newAttack ? state.formation.slots.slice() : lineup.map((id) => {
 		const position = state.positions[id];
 		// Retained positions are waiting spots too, even when buildup consumes the entire preparation budget.
 		const target = scene.shotPoint && scene.liveSeconds > 3 && !scene.formation.backcourt
 			? getLaneWaitingPoint(position, direction) : position;
 		return [direction === 1 ? target.x : 94 - target.x, target.y];
 	});
+	if (scene.kind === "turnover" && scene.action.subType === "backcourt") {
+		// Build up near midcourt instead of reaching the basket before returning for the violation.
+		for (const id of new Set([pg, scene.action.personId])) {
+			const slot = lineup.indexOf(id);
+			if (slot >= 0) {
+				destinations[slot] = id === pg ? [55, 25] : [51, 16];
+			}
+		}
+	}
 	scene.spacingDestinations = destinations;
 	scene.spacingSource = newAttack ? "planned" : "current";
 	state.possession = offense;
@@ -1766,6 +1775,59 @@ function prepareAttack(state, scene, offense, direction, matchups, record, data,
 	}
 	state.restart = null;
 	state.needsAdvance = false;
+}
+
+function animateBackcourtTurnover(state, scene, direction, contacts, record) {
+	const actorId = scene.action.personId;
+	const actor = state.positions[actorId];
+	const defenderId = Number(Object.keys(scene.matchups).find((id) => scene.matchups[id] === actorId));
+	const defender = state.positions[defenderId];
+	const carrierId = state.ball.owner;
+	const carrier = state.positions[carrierId];
+	const from = { ...actor };
+	Object.assign(actor, { x: 47 + direction * 4, y: carrierId === actorId ? 25 : 16 });
+	let distance = Math.hypot(actor.x - from.x, actor.y - from.y);
+	if (carrierId !== actorId) {
+		const origin = { ...carrier };
+		Object.assign(carrier, { x: 47 + direction * 8, y: 25 });
+		distance = Math.max(distance, Math.hypot(carrier.x - origin.x, carrier.y - origin.y));
+	}
+	const defenderFrom = { ...defender };
+	contacts.add(defenderId);
+	Object.assign(defender, { x: actor.x + direction * 5.8, y: actor.y + 0.8 });
+	distance = Math.max(distance, Math.hypot(defender.x - defenderFrom.x, defender.y - defenderFrom.y));
+	state.ball.dribble = true;
+	record(Math.max(0.3, distance / 10));
+	if (carrierId !== actorId) {
+		releaseBall(state);
+		record(0.01);
+		flyBall(state, record, { x: actor.x + 1, y: actor.y + 0.8, z: 0.5 }, 0.5, 0.45);
+		state.ball.owner = actorId;
+		state.ball.dribble = true;
+		record(0.15);
+	}
+	// Jr. NBA Starter Practice 2, p. 220: retreat creates space against pressure in front.
+	// This is a schematic cause of the recorded violation, not evidence of the actual play.
+	const plan = { defenderId, closeoutAt: scene.frames.at(-1).time };
+	scene.backcourtPlan = plan;
+	defender.x = actor.x + direction * 3.3;
+	record(0.45);
+	actor.angle = direction * 0.15;
+	record(0.18);
+	plan.retreatAt = scene.frames.at(-1).time;
+	actor.x -= direction * 2;
+	defender.x -= direction * 0.7;
+	record(0.45);
+	// The first retreat opens space; the defender closes it before the next escape step.
+	plan.repressureAt = scene.frames.at(-1).time;
+	defender.x = actor.x + direction * 3.3;
+	record(0.3);
+	plan.escapeAt = scene.frames.at(-1).time;
+	actor.x = 47 - direction * 1.5;
+	defender.x -= direction * 2.5;
+	record(0.6);
+	state.ball.dribble = false;
+	actor.angle = 0;
 }
 
 function preparationPosition(state, scene, id, time) {
@@ -3488,6 +3550,8 @@ function compileScene(replay, scene, index, state, data) {
 		releaseBall(state);
 		record(0.7);
 	} else if (scene.kind === "foul" || scene.kind === "turnover" || scene.kind === "steal") {
+		const backcourt = scene.kind === "turnover" && action.subType === "backcourt" &&
+			Boolean(state.positions[action.personId]);
 		const offensive = scene.kind === "foul" && action.subType === "offensive";
 		const charge = offensive && action.descriptor === "charge" && Boolean(state.positions[action.foulDrawnPersonId]);
 		// An unspecified personal foul is schematically on-ball, not evidence of an off-ball contact.
@@ -3508,11 +3572,14 @@ function compileScene(replay, scene, index, state, data) {
 			if (help) {
 				contacts.add(help.playerId);
 				prepareDefensiveHelp(state, scene, help, direction, record, recordMovement);
-			} else if (!charge) {
+			} else if (!charge && !backcourt) {
 				pacePreparation(state, scene, time, scene.action.descriptor === "shooting" ? 2 : 0.8, record, direction);
 			}
 		}
-		if (onBall && !scene.reboundPressure) {
+		if (backcourt) {
+			animateBackcourtTurnover(state, scene, direction, contacts, record);
+		}
+		if (onBall && !scene.reboundPressure && !backcourt) {
 			if (scene.kind === "foul" && action.descriptor === "shooting") {
 				if (scene.rules.requiresPlay) {
 					prepareShootingFoul(state, scene, replay, index, hoop, direction, record);

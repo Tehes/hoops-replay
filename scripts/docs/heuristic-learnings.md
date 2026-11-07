@@ -85,6 +85,31 @@ die visuelle Nutzerabnahme des neuen Kandidaten steht aus.
 Grundlage: WABC Level 1, Team 1.1.7–1.1.8, sowie NBA-/WNBA-Regel 10, Abschnitt VII.
 Coaching-Prinzipien belegen keine tatsächlichen Pässe oder Laufwege.
 
+## Rückspiel-Turnover
+
+`turnover/backcourt` belegt ein Rückspiel, nicht einen Acht-Sekunden-Verstoß und auch nicht dessen
+genauen Ablauf. Ein gewöhnlicher Aufbau bis zum Korb mit anschließender direkter Ballzuweisung an
+den benannten Spieler stellt den Verstoß nicht dar und kann den Ball teleportieren lassen.
+Bei neuem Aufbau bleiben Ballführer und Beteiligter deshalb nahe der Mittellinie; bei fortgesetztem
+Angriff kommen sie aus ihren vorhandenen Positionen dorthin. Ein nötiges Zuspiel bleibt sichtbar.
+Eine bloße Rückwärtsbewegung zum Verstoß wurde als ursachenlos verworfen: Der zugeordnete
+Verteidiger muss zuerst von vorn den Raum schließen, während der Ballführer noch stehen bleibt.
+Ein seitlich abgeschirmter Retreat Dribble schafft Abstand; erneutes Nachsetzen erklärt einen
+zweiten Rückzug über die Mittellinie. Der Verteidiger braucht dafür erreichbare Wege und einen
+eigenen Auftrag statt nur den generischen Folgeabstand. Räumliche Nähe allein belegt diese
+Reihenfolge nicht. Tests müssen Druck vor Rückzug, den zwischenzeitlichen Raumgewinn und
+erneutes Schließen einschließlich interpolierter Abstände prüfen. Andere Turnover und legale
+Vorträge dürfen diese Choreografie nicht erben. Diese Dribbelvariante einschließlich Gegnerdruck
+ist ohne weitere Orts-/Aktionsbelege eine schematische Ergänzung, keine Rekonstruktion. Die
+ligaspezifische Einwurffortsetzung bleibt unabhängig davon bestehen. Bewegungsziele dürfen die
+geteilten Formationsslots nicht verändern, sonst verändern spätere Szenen rückwirkend den Plan.
+
+Grundlagen: [NBA-Regel 10, Abschnitt IX](https://official.nba.com/rule-no-10-violations-and-penalties/)
+und [Jr. NBA Starter, Practice 2, S. 220–221, „Fundamentals of the Retreat Dribble“](https://ak-static.cms.nba.com/wp-content/uploads/sites/52/2024/12/JrNBA24_Curriculum_Starter_PP_02.pdf).
+Der Drill begründet Ballschutz und Raumgewinn unter Druck, nicht das absichtliche Übertreten der
+Mittellinie; dieses bleibt der aufgezeichnete Fehler. Die bisherige Prüfung begründet keine
+allgemeine Freigabe sämtlicher Rückspielvarianten; die visuelle Nutzerbewertung steht aus.
+
 ## Turnover und anschließendes Loose-Ball-Foul
 
 Die frühe Reservierung des belegten Kontaktpaars verkürzt zwar Wege, erklärt aber weder den

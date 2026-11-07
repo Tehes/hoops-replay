@@ -460,6 +460,94 @@ Deno.test("bonus counts the first team foul at 2:00 but excludes technical, offe
 	assert(getSceneBonus(scenes[7], 2, 120).join(",") === "false,false", "bonus remains at game end");
 });
 
+Deno.test("backcourt turnovers visibly return the named ballhandler across midcourt", () => {
+	for (const league of ["nba", "wnba"]) {
+		for (const side of ["left", "right"]) {
+			for (const personId of [1, 5]) {
+				for (const restart of [true, false]) {
+					const direction = side === "right" ? 1 : -1;
+					const data = scenario([
+						{ ...basket, teamId: restart ? 2 : 1, personId: restart ? 6 : 1,
+							side: restart ? side === "right" ? "left" : "right" : side,
+							clock: "PT08M10S", shotResult: restart ? "Made" : "Missed" },
+						...restart ? [] : [{ actionType: "rebound", subType: "offensive", teamId: 1,
+							personId: 1, clock: "PT08M09S" }],
+						{ actionType: "turnover", subType: "backcourt", teamId: 1, personId, clock: "PT08M02S" },
+						{ ...basket, teamId: 2, personId: 6, side: side === "right" ? "left" : "right",
+							clock: "PT07M50S" },
+					], league);
+					const original = JSON.stringify(data);
+					const replay = compileReplay(data);
+					const scene = replay.scenes.find((scene) => scene.action.subType === "backcourt");
+					const controlled = scene.frames.filter((frame) => frame.ball.owner === personId);
+					assert(controlled.some((frame) => (frame.ball.x - 47) * direction > 0 &&
+						(frame.players.find((p) => p.id === personId).x - 47) * direction > 0),
+						"named player never controlled the ball in the frontcourt");
+					const plan = scene.backcourtPlan;
+					assert(scene.matchups[plan.defenderId] === personId, "pressure changed the defensive assignment");
+					const samples = [plan.closeoutAt, plan.retreatAt, plan.repressureAt, plan.escapeAt].map((time) => {
+						const frame = getReplayFrame(replay, scene.start + time);
+						const actor = frame.players.find((p) => p.id === personId);
+						const defender = frame.players.find((p) => p.id === plan.defenderId);
+						assert(frame.ball.owner === personId && frame.ball.dribble, "pressure interrupted ball control");
+						return { actor, defender, gap: Math.hypot(defender.x - actor.x, defender.y - actor.y) };
+					});
+					const [beforePressure, underPressure, firstRetreat, renewedPressure] = samples;
+					assert(Math.abs(beforePressure.actor.x - underPressure.actor.x) < 0.01 &&
+						beforePressure.gap - underPressure.gap > 2,
+						"ballhandler retreated before the defender closed down the space");
+					assert((underPressure.defender.x - underPressure.actor.x) * direction > 0 &&
+						underPressure.gap < 3.6, "defender did not contain the forward route");
+					assert((underPressure.actor.x - firstRetreat.actor.x) * direction > 1.5 &&
+						firstRetreat.gap > underPressure.gap + 1,
+						"retreat did not create space from the pressure");
+					assert(Math.abs(firstRetreat.actor.x - renewedPressure.actor.x) < 0.01 &&
+						renewedPressure.gap < firstRetreat.gap - 1,
+						"second escape step lacked renewed defensive pressure");
+					for (let time = plan.closeoutAt; time <= scene.eventAt; time += 0.05) {
+						const frame = getReplayFrame(replay, scene.start + time);
+						const actor = frame.players.find((p) => p.id === personId);
+						const defender = frame.players.find((p) => p.id === plan.defenderId);
+						assert(Math.hypot(defender.x - actor.x, defender.y - actor.y) >= 3,
+							"pressure created a collision instead of containment");
+					}
+					const event = getReplayFrame(replay, scene.start + scene.eventAt);
+					assert((event.ball.x - 47) * direction < 0 &&
+						(event.players.find((p) => p.id === personId).x - 47) * direction < 0,
+						"turnover happened away from the backcourt");
+					for (let i = 1; i < scene.frames.length; i++) {
+						const before = scene.frames[i - 1];
+						const after = scene.frames[i];
+						if (after.time > (scene.liveAt ?? 0) && after.ball.owner === personId && before.ball.owner !== personId) {
+							assert(Math.hypot(after.ball.x - before.ball.x, after.ball.y - before.ball.y) < 0.1,
+								"ball teleported to the violator instead of being passed");
+						}
+					}
+					const next = replay.scenes.at(-1);
+					assert(next.inboundPlan.location === "midcourt", "backcourt turnover lost its midcourt restart");
+					const saved = JSON.stringify(event);
+					getReplayFrame(replay, replay.duration);
+					assert(JSON.stringify(getReplayFrame(replay, scene.start + scene.eventAt)) === saved,
+						"seeking changed the violation");
+					assert(JSON.stringify(data) === original, "choreography changed source events");
+				}
+			}
+		}
+	}
+});
+
+Deno.test("other turnovers and legal advances do not inherit backcourt pressure choreography", () => {
+	for (const subType of ["traveling", "lost ball", "8-second-violation", "double dribble"]) {
+		const replay = compileReplay(stopScenario({ actionType: "turnover", subType, teamId: 1, personId: 5 }, "nba", "right"));
+		assert(replay.scenes.every((scene) => !scene.backcourtPlan), `${subType} inherited retreat pressure`);
+	}
+	const replay = compileReplay(scenario([
+		{ ...basket, teamId: 2, personId: 6, side: "left", clock: "PT08M10S" },
+		{ ...basket, clock: "PT08M00S" },
+	]));
+	assert(replay.scenes.every((scene) => !scene.backcourtPlan), "legal advance inherited retreat pressure");
+});
+
 Deno.test("inbound locations follow foul and violation classes in both leagues and directions", () => {
 	const cases = [
 		{ actionType: "foul", subType: "personal", teamId: 2, personId: 10, foulDrawnPersonId: 1 },
